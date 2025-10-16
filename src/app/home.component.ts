@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
@@ -9,23 +9,71 @@ import { AsyncPipe, NgIf } from '@angular/common';
   standalone: true,
   imports: [CommonModule, AsyncPipe, NgIf],
   template: `
-    <h2>Home</h2>
-    <div *ngIf="auth.currentUser$ | async as u; else guest">
-      <p>ようこそ、{{ u.email }} さん</p>
-      <button (click)="logout()">ログアウト</button>
+    <div class="home-container">
+      <div class="loading" *ngIf="isLoading">
+        <div class="spinner"></div>
+        <p>読み込み中...</p>
+      </div>
+      <div class="redirect-message" *ngIf="!isLoading">
+        <p>メインページにリダイレクトしています...</p>
+      </div>
     </div>
-    <ng-template #guest>
-      <p><a routerLink="/login">ログイン</a> または <a routerLink="/signup">新規登録</a></p>
-    </ng-template>
   `,
+  styles: [`
+    .home-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .loading {
+      text-align: center;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top: 4px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading p, .redirect-message p {
+      margin: 0;
+      font-size: 16px;
+      opacity: 0.9;
+    }
+  `]
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit {
   auth = inject(AuthService);
   private router = inject(Router);
+  isLoading = true;
 
-  async logout() {
-    await this.auth.logout();
-    await this.router.navigateByUrl('/login');
+  ngOnInit() {
+    // ログイン状態をチェックしてリダイレクト
+    this.auth.currentUser$.subscribe(user => {
+      if (user) {
+        // ログイン済みの場合はメインページにリダイレクト
+        this.router.navigate(['/main']);
+      } else {
+        // 未ログインの場合はログインページにリダイレクト
+        this.router.navigate(['/login']);
+      }
+      this.isLoading = false;
+    });
   }
 }
 

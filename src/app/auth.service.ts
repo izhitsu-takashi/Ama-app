@@ -8,6 +8,10 @@ export class AuthService {
 
   currentUser$: Observable<User | null> = user(this.auth);
 
+  get currentUser(): User | null {
+    return this.auth.currentUser;
+  }
+
   signUpWithEmail(email: string, password: string) {
     return createUserWithEmailAndPassword(this.auth, email, password);
   }
