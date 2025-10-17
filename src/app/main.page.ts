@@ -123,9 +123,9 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
                      [routerLink]="['/group', group.id]">
                     <div class="group-info">
                       <h3 class="group-name">{{ group.name }}</h3>
-                      <div class="group-stats">
-                        <span class="member-count">👥 {{ group.memberIds.length }}人</span>
-                      </div>
+            <div class="group-stats">
+              <span class="member-count">👥 {{ getGroupMemberCount(group.id) }}人</span>
+            </div>
                     </div>
                     <div class="group-actions">
                       <button class="action-btn small" (click)="openGroup(group); $event.stopPropagation()">
@@ -184,14 +184,6 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
                 </ng-template>
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- 一言メッセージ -->
-        <div class="motivational-message" *ngIf="motivationalMessage">
-          <div class="message-content">
-            <span class="message-icon">💬</span>
-            <span class="message-text">{{ motivationalMessage }}</span>
           </div>
         </div>
       </main>
@@ -358,18 +350,23 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .notification-btn {
-      background: none;
-      border: none;
-      font-size: 1.5rem;
+      background: #f3f4f6; /* 薄いグレー */
+      border: 1px solid #e5e7eb;
+      font-size: 1.25rem;
       cursor: pointer;
       position: relative;
-      padding: 0.5rem;
-      border-radius: 50%;
-      transition: background-color 0.2s;
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px; /* 丸 */
+      transition: background-color 0.2s, border-color 0.2s;
     }
 
     .notification-btn:hover {
-      background-color: rgba(0, 0, 0, 0.1);
+      background-color: #e5e7eb;
+      border-color: #d1d5db;
     }
 
     .notification-container {
@@ -841,27 +838,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       background: #a0aec0;
     }
 
-    .motivational-message {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 1rem 1.5rem;
-      border-radius: 1rem;
-      margin-top: 2rem;
-    }
-
-    .message-content {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .message-icon {
-      font-size: 1.25rem;
-    }
-
-    .message-text {
-      font-weight: 500;
-    }
+    
 
     /* レスポンシブ */
     @media (max-width: 1024px) {
@@ -914,7 +891,6 @@ export class MainPage implements OnInit, OnDestroy {
   recentTasks$: Observable<TaskItem[]> = of([]);
   unreadNotifications = 0;
   private destroy$ = new Subject<void>();
-  motivationalMessage = '';
   currentMonth = '';
   calendarDays: any[] = [];
   allEvents: CalendarEvent[] = [];
@@ -931,6 +907,7 @@ export class MainPage implements OnInit, OnDestroy {
   
   private subscriptions: Subscription[] = [];
   private calendarSubscriptions: Subscription[] = [];
+  private memberCountSubs: { [groupId: string]: Subscription } = {};
   private timeInterval: any;
   showEventModal = false;
   loading = false;
@@ -946,7 +923,6 @@ export class MainPage implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.loadUserData();
-    this.generateMotivationalMessage();
     this.initializeCalendar();
     this.initializeTodayInfo();
     
@@ -1009,11 +985,42 @@ export class MainPage implements OnInit, OnDestroy {
       // キャッシュして同期参照に使用
       obs.pipe(take(1)).subscribe(groups => {
         this.userGroupsCache = groups;
+        // メンバー数購読を更新
+        this.setupMemberCountSubscriptions(groups.map(g => g.id));
       });
     } else {
       this.userGroups$ = of([]);
       this.userGroupsCache = [];
+      this.teardownMemberCountSubscriptions();
     }
+  }
+
+  private setupMemberCountSubscriptions(groupIds: string[]) {
+    // 既存購読を解除
+    this.teardownMemberCountSubscriptions();
+    if (!this.currentUser) return;
+    // 各グループのメンバー数を購読
+    groupIds.forEach(groupId => {
+      const sub = collectionData(
+        query(collection(this.firestore, 'groupMemberships'), where('groupId', '==', groupId)),
+        { idField: 'id' }
+      ).subscribe((members: any[]) => {
+        this._groupIdToMemberCount[groupId] = (members || []).length;
+      });
+      this.memberCountSubs[groupId] = sub;
+    });
+  }
+
+  private teardownMemberCountSubscriptions() {
+    Object.values(this.memberCountSubs).forEach(sub => sub.unsubscribe());
+    this.memberCountSubs = {};
+    this._groupIdToMemberCount = {} as any;
+  }
+
+  private _groupIdToMemberCount: Record<string, number> = {};
+
+  getGroupMemberCount(groupId: string): number {
+    return this._groupIdToMemberCount[groupId] ?? 0;
   }
 
   private loadRecentTasks() {
@@ -1039,16 +1046,7 @@ export class MainPage implements OnInit, OnDestroy {
     }
   }
 
-  private generateMotivationalMessage() {
-    const messages = [
-      'お疲れ様です！今日も頑張りましょう 💪',
-      '未読のメッセージがありません ✨',
-      '課題のリミットが近いです ⏰',
-      '素晴らしい進捗ですね！ 🎉',
-      '今日も一日お疲れ様でした 🌟'
-    ];
-    this.motivationalMessage = messages[Math.floor(Math.random() * messages.length)];
-  }
+  
 
   private initializeTodayInfo() {
     const now = new Date();
