@@ -4,7 +4,9 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { NotificationService } from './notification.service';
 import { AuthService } from './auth.service';
-import { Notification } from './models';
+import { JoinRequestService } from './join-request.service';
+import { GroupService } from './group.service';
+import { Notification, JoinRequest } from './models';
 import { Observable, Subject, of } from 'rxjs';
 import { takeUntil, switchMap } from 'rxjs/operators';
 
@@ -94,6 +96,44 @@ import { takeUntil, switchMap } from 'rxjs/operators';
             <div class="empty-icon">🔔</div>
             <h3 class="empty-title">通知がありません</h3>
             <p class="empty-description">新しい通知が届くとここに表示されます</p>
+          </div>
+        </ng-template>
+      </div>
+
+      <!-- 参加リクエスト管理 -->
+      <div class="join-requests-section">
+        <div class="section-header">
+          <h2 class="section-title">参加リクエスト管理</h2>
+        </div>
+        
+        <div class="join-requests-list" *ngIf="(joinRequests$ | async) as requests; else noJoinRequests">
+          <div class="join-request-item" *ngFor="let request of requests">
+            <div class="request-info">
+              <div class="request-header">
+                <h4 class="request-user">{{ request.userName }}</h4>
+                <span class="request-date">{{ formatDate(request.createdAt) }}</span>
+              </div>
+              <p class="request-group">グループ: {{ getGroupName(request.groupId) }}</p>
+              <p class="request-email">{{ request.userEmail }}</p>
+            </div>
+            <div class="request-actions">
+              <button class="btn btn-success" (click)="approveJoinRequest(request.id!)">
+                <span class="btn-icon">✓</span>
+                承認
+              </button>
+              <button class="btn btn-danger" (click)="rejectJoinRequest(request.id!)">
+                <span class="btn-icon">✗</span>
+                拒否
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #noJoinRequests>
+          <div class="empty-state">
+            <div class="empty-icon">👥</div>
+            <h3 class="empty-title">参加リクエストがありません</h3>
+            <p class="empty-description">グループへの参加リクエストが届くとここに表示されます</p>
           </div>
         </ng-template>
       </div>
@@ -321,7 +361,58 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       font-size: 16px;
     }
 
-    .notifications-section, .reminders-section {
+    .join-request-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      background: #f8f9fa;
+    }
+
+    .request-info {
+      flex: 1;
+    }
+
+    .request-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .request-user {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2d3748;
+      margin: 0;
+    }
+
+    .request-date {
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .request-group {
+      font-size: 14px;
+      color: #4a5568;
+      margin: 4px 0;
+    }
+
+    .request-email {
+      font-size: 12px;
+      color: #6b7280;
+      margin: 0;
+    }
+
+    .request-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .notifications-section, .reminders-section, .join-requests-section {
       background: white;
       border-radius: 16px;
       padding: 24px;
@@ -635,11 +726,14 @@ export class NotificationsPage implements OnInit, OnDestroy {
   private router = inject(Router);
   private notificationService = inject(NotificationService);
   private auth = inject(AuthService);
+  private joinRequestService = inject(JoinRequestService);
+  private groupService = inject(GroupService);
 
   private destroy$ = new Subject<void>();
 
   notifications$: Observable<Notification[]> = of([]);
   reminders$: Observable<any[]> = of([]);
+  joinRequests$: Observable<JoinRequest[]> = of([]);
   unreadCount = 0;
   totalCount = 0;
   hasUnreadNotifications = false;
@@ -663,6 +757,7 @@ export class NotificationsPage implements OnInit, OnDestroy {
         if (user) {
           this.notifications$ = this.notificationService.getUserNotifications(user.uid);
           this.reminders$ = this.notificationService.getUserReminders(user.uid);
+          this.joinRequests$ = this.joinRequestService.getUserOwnedGroupJoinRequests(user.uid);
           
           // 未読通知数を取得
           this.notificationService.getUnreadCount(user.uid).subscribe(count => {
@@ -737,8 +832,20 @@ export class NotificationsPage implements OnInit, OnDestroy {
   async markAsRead(notificationId: string) {
     try {
       await this.notificationService.markAsRead(notificationId);
+      // 既読にした後、未読数を更新
+      this.loadUnreadCount();
     } catch (error) {
       console.error('既読マークエラー:', error);
+    }
+  }
+
+  private loadUnreadCount() {
+    const currentUser = this.auth.currentUser;
+    if (currentUser) {
+      this.notificationService.getUnreadCount(currentUser.uid).subscribe(count => {
+        this.unreadCount = count;
+        this.hasUnreadNotifications = count > 0;
+      });
     }
   }
 
@@ -747,6 +854,8 @@ export class NotificationsPage implements OnInit, OnDestroy {
       const currentUser = this.auth.currentUser;
       if (currentUser) {
         await this.notificationService.markAllAsRead(currentUser.uid);
+        // すべて既読にした後、未読数を更新
+        this.loadUnreadCount();
       }
     } catch (error) {
       console.error('すべて既読エラー:', error);
@@ -805,5 +914,38 @@ export class NotificationsPage implements OnInit, OnDestroy {
         console.error('リマインド削除エラー:', error);
       }
     }
+  }
+
+  // 参加リクエストを承認
+  async approveJoinRequest(requestId: string) {
+    if (confirm('この参加リクエストを承認しますか？')) {
+      try {
+        await this.joinRequestService.approveJoinRequest(requestId);
+        alert('参加リクエストを承認しました！');
+      } catch (error) {
+        console.error('参加リクエスト承認エラー:', error);
+        alert('参加リクエストの承認に失敗しました。');
+      }
+    }
+  }
+
+  // 参加リクエストを拒否
+  async rejectJoinRequest(requestId: string) {
+    if (confirm('この参加リクエストを拒否しますか？')) {
+      try {
+        await this.joinRequestService.rejectJoinRequest(requestId);
+        alert('参加リクエストを拒否しました。');
+      } catch (error) {
+        console.error('参加リクエスト拒否エラー:', error);
+        alert('参加リクエストの拒否に失敗しました。');
+      }
+    }
+  }
+
+  // グループ名を取得
+  getGroupName(groupId: string): string {
+    // 簡単な実装：グループIDをそのまま返す
+    // 実際の実装では、グループサービスからグループ名を取得する
+    return `グループ ${groupId.substring(0, 8)}...`;
   }
 }

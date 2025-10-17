@@ -1,12 +1,13 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, query, where, collectionData, orderBy, limit, getDocs, writeBatch } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, query, where, collectionData, orderBy, limit, getDocs, writeBatch, docData } from '@angular/fire/firestore';
 import { Observable, from, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { map, catchError, switchMap, shareReplay, take } from 'rxjs/operators';
 import { Notification, Reminder } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
   private firestore = inject(Firestore);
+  private notificationCache = new Map<string, Promise<string>>(); // 重複通知を防ぐキャッシュ
 
   // 通知作成
   async createNotification(notificationData: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<void> {
@@ -19,6 +20,10 @@ export class NotificationService {
 
   // ユーザーの通知一覧取得
   getUserNotifications(userId: string, limitCount: number = 50): Observable<Notification[]> {
+    if (!userId) {
+      return of([]);
+    }
+    
     return collectionData(
       query(
         collection(this.firestore, 'notifications'),
@@ -45,6 +50,10 @@ export class NotificationService {
 
   // 未読通知数取得
   getUnreadCount(userId: string): Observable<number> {
+    if (!userId) {
+      return of(0);
+    }
+    
     return collectionData(
       query(
         collection(this.firestore, 'notifications'),
@@ -372,5 +381,93 @@ export class NotificationService {
     setInterval(() => {
       this.checkAndSendTaskReminders();
     }, 60 * 60 * 1000); // 1時間
+  }
+
+
+  // 参加リクエスト通知作成（Promise版）
+  async createGroupJoinRequestNotification(groupId: string, requesterId: string, requesterName: string): Promise<string> {
+    // 重複チェック用のキーを作成
+    const cacheKey = `${groupId}-${requesterId}`;
+    
+    // 既に同じ通知が処理中または完了している場合は、そのPromiseを返す
+    if (this.notificationCache.has(cacheKey)) {
+      return this.notificationCache.get(cacheKey)!;
+    }
+    
+    // 新しい通知作成処理を開始
+    const notificationPromise = this.createNotificationInternal(groupId, requesterId, requesterName);
+    this.notificationCache.set(cacheKey, notificationPromise);
+    
+    try {
+      const result = await notificationPromise;
+      // 完了後にキャッシュから削除
+      this.notificationCache.delete(cacheKey);
+      return result;
+    } catch (error) {
+      // エラー時もキャッシュから削除
+      this.notificationCache.delete(cacheKey);
+      throw error;
+    }
+  }
+  
+  private async createNotificationInternal(groupId: string, requesterId: string, requesterName: string): Promise<string> {
+    try {
+      // グループ情報を取得
+      const groupInfo = await this.getGroupInfo(groupId).pipe(take(1)).toPromise();
+      
+      if (!groupInfo?.ownerId) {
+        return '';
+      }
+
+      const notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'> = {
+        userId: groupInfo.ownerId,
+        type: 'group_join_request',
+        title: 'グループ参加リクエスト',
+        content: `${requesterName}さんが「${groupInfo.groupName}」への参加をリクエストしました`,
+        message: `${requesterName}さんが「${groupInfo.groupName}」への参加をリクエストしました`,
+        data: { 
+          groupId, 
+          requesterId, 
+          requesterName,
+          groupName: groupInfo.groupName
+        }
+      };
+
+      await this.createNotification(notification);
+      return 'success'; // 成功を示す文字列を返す
+      
+    } catch (error) {
+      // 権限エラーの場合は静かに失敗
+      if (error && typeof error === 'object' && 'code' in error) {
+        const firebaseError = error as any;
+        if (firebaseError.code === 'permission-denied' || 
+            firebaseError.code === 'unauthenticated') {
+          return '';
+        }
+      }
+      return '';
+    }
+  }
+
+  // グループ情報を取得（オーナーIDとグループ名を一度に）
+  private getGroupInfo(groupId: string): Observable<{ ownerId: string | null, groupName: string }> {
+    return docData(doc(this.firestore, 'groups', groupId)).pipe(
+      map((group: any) => ({
+        ownerId: group?.ownerId || null,
+        groupName: group?.name || 'グループ'
+      })),
+      catchError(error => {
+        // 権限エラーの場合はデフォルト値を返す
+        if (error && typeof error === 'object' && 'code' in error) {
+          const firebaseError = error as any;
+          if (firebaseError.code === 'permission-denied' || 
+              firebaseError.code === 'unauthenticated') {
+            return of({ ownerId: null, groupName: 'グループ' });
+          }
+        }
+        return of({ ownerId: null, groupName: 'グループ' });
+      }),
+      shareReplay(1) // 結果をキャッシュして重複実行を防ぐ
+    );
   }
 }

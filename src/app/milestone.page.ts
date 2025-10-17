@@ -1,11 +1,11 @@
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { MilestoneService } from './milestone.service';
 import { GroupService } from './group.service';
 import { AuthService } from './auth.service';
-import { Milestone, Group } from './models';
+import { Milestone, Group, MilestoneSubTask, MilestoneFlowStep } from './models';
 import { Observable, Subject, of } from 'rxjs';
 import { takeUntil, switchMap, take } from 'rxjs/operators';
 
@@ -75,6 +75,27 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
                 <span class="date-label">終了日:</span>
                 <span class="date-value">{{ formatDate(milestone.endDate) }}</span>
               </div>
+              <div class="date-item">
+                <span class="date-label">期間:</span>
+                <span class="date-value">{{ getDuration(milestone.startDate, milestone.endDate) }}</span>
+              </div>
+            </div>
+
+            <!-- タスク進捗 -->
+            <div class="milestone-progress" *ngIf="milestone.tasks && milestone.tasks.length > 0">
+              <div class="progress-header">
+                <span class="progress-label">タスク進捗</span>
+                <span class="progress-text">{{ getTaskProgress(milestone.tasks) }}</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="getTaskProgressPercentage(milestone.tasks)"></div>
+              </div>
+              <div class="task-summary">
+                <span class="task-count">📋 {{ milestone.tasks.length }}タスク</span>
+                <span class="estimated-hours" *ngIf="getTotalEstimatedHours(milestone.tasks) > 0">
+                  ⏱️ {{ getTotalEstimatedHours(milestone.tasks) }}時間見積もり
+                </span>
+              </div>
             </div>
 
             <div class="milestone-meta">
@@ -82,9 +103,33 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
               <span class="meta-item">📅 {{ formatDate(milestone.createdAt) }} 作成</span>
             </div>
 
+            <!-- フローチャート表示 -->
+            <div class="milestone-flow" *ngIf="milestone.flowSteps && milestone.flowSteps.length > 0">
+              <h4 class="flow-title">プロセスフロー</h4>
+              <div class="flow-chart">
+                <div 
+                  class="flow-step" 
+                  *ngFor="let step of milestone.flowSteps; let i = index; trackBy: trackByStepId"
+                  [class]="'step-' + step.status"
+                >
+                  <div class="step-content">
+                    <div class="step-name">{{ step.name }}</div>
+                    <div class="step-description" *ngIf="step.description">{{ step.description }}</div>
+                    <div class="step-status">
+                      <span class="status-indicator" [class]="'status-' + step.status">
+                        {{ getStepStatusLabel(step.status) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flow-arrow" *ngIf="i < milestone.flowSteps!.length - 1">
+                    <span class="arrow">▶</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="milestone-actions">
               <button class="btn small primary" (click)="editMilestone(milestone)">編集</button>
-              <button class="btn small secondary" (click)="viewMilestone(milestone)">詳細</button>
               <button class="btn small danger" (click)="deleteMilestone(milestone.id)">削除</button>
             </div>
           </div>
@@ -168,6 +213,138 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
                 <div *ngIf="milestoneForm.get('endDate')?.invalid && milestoneForm.get('endDate')?.touched" class="error-message">
                   終了日を選択してください
                 </div>
+              </div>
+            </div>
+
+            <!-- フローチャート設定セクション -->
+            <div class="form-group">
+              <div class="section-header">
+                <label class="form-label">プロセスフロー</label>
+                <div class="flow-actions">
+                  <button type="button" class="btn small secondary" (click)="loadTemplate()">
+                    📋 テンプレート
+                  </button>
+                  <button type="button" class="btn small primary" (click)="addFlowStep()">
+                    + ステップ追加
+                  </button>
+                </div>
+              </div>
+              
+              <div class="flow-steps-container" *ngIf="flowSteps.length > 0">
+                <div class="flow-step-item" *ngFor="let step of flowSteps; let i = index">
+                  <div class="step-header">
+                    <input 
+                      type="text" 
+                      [(ngModel)]="step.name"
+                      class="form-input step-name-input"
+                      placeholder="ステップ名 (例: 企画)"
+                    />
+                    <button type="button" class="btn small danger" (click)="removeFlowStep(i)">
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div class="step-details">
+                    <textarea 
+                      [(ngModel)]="step.description"
+                      class="form-textarea step-description"
+                      placeholder="ステップの詳細説明 (任意)"
+                      rows="2"
+                    ></textarea>
+                    
+                    <div class="step-meta">
+                      <select [(ngModel)]="step.status" class="form-select step-status">
+                        <option value="not_started">未着手</option>
+                        <option value="in_progress">実行中</option>
+                        <option value="completed">完了</option>
+                      </select>
+                      
+                      <div class="step-dates">
+                        <input 
+                          type="date" 
+                          [(ngModel)]="step.startDate"
+                          class="form-input step-date"
+                          placeholder="開始日"
+                        />
+                        <input 
+                          type="date" 
+                          [(ngModel)]="step.endDate"
+                          class="form-input step-date"
+                          placeholder="終了日"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="no-flow-steps" *ngIf="flowSteps.length === 0">
+                <p class="no-steps-text">プロセスフローを設定してマイルストーンの流れを可視化しましょう</p>
+                <div class="template-buttons">
+                  <button type="button" class="btn small secondary" (click)="loadDefaultTemplate()">
+                    📋 デフォルトテンプレート
+                  </button>
+                  <button type="button" class="btn small secondary" (click)="loadDevelopmentTemplate()">
+                    💻 開発テンプレート
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- タスク分割セクション -->
+            <div class="form-group">
+              <div class="section-header">
+                <label class="form-label">タスク分割</label>
+                <button type="button" class="btn small primary" (click)="addSubTask()">
+                  + タスク追加
+                </button>
+              </div>
+              
+              <div class="subtasks-container" *ngIf="subTasks.length > 0">
+                <div class="subtask-item" *ngFor="let task of subTasks; let i = index">
+                  <div class="subtask-header">
+                    <input 
+                      type="text" 
+                      [(ngModel)]="task.title"
+                      class="form-input subtask-title"
+                      placeholder="タスク名を入力"
+                    />
+                    <button type="button" class="btn small danger" (click)="removeSubTask(i)">
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div class="subtask-details">
+                    <textarea 
+                      [(ngModel)]="task.description"
+                      class="form-textarea subtask-description"
+                      placeholder="タスクの詳細 (任意)"
+                      rows="2"
+                    ></textarea>
+                    
+                    <div class="subtask-meta">
+                      <select [(ngModel)]="task.priority" class="form-select subtask-priority">
+                        <option value="low">低</option>
+                        <option value="medium">中</option>
+                        <option value="high">高</option>
+                      </select>
+                      
+                      <input 
+                        type="number" 
+                        [(ngModel)]="task.estimatedHours"
+                        class="form-input subtask-hours"
+                        placeholder="見積もり時間"
+                        min="0"
+                        step="0.5"
+                      />
+                      <span class="hours-label">時間</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="no-tasks" *ngIf="subTasks.length === 0">
+                <p class="no-tasks-text">タスクを追加してマイルストーンを詳細に計画しましょう</p>
               </div>
             </div>
 
@@ -436,8 +613,8 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
     .modal {
       background: white;
       border-radius: 1rem;
-      width: 90%;
-      max-width: 600px;
+      width: 95%;
+      max-width: 900px;
       max-height: 90vh;
       overflow-y: auto;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
@@ -487,6 +664,12 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
       gap: 1rem;
     }
 
+    .form-row-wide {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem;
+    }
+
     .form-label {
       display: block;
       margin-bottom: 0.5rem;
@@ -498,11 +681,13 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
     .form-textarea,
     .form-select {
       width: 100%;
+      max-width: 100%;
       padding: 0.75rem;
       border: 1px solid #d1d5db;
       border-radius: 0.5rem;
       font-size: 1rem;
       transition: border-color 0.2s, box-shadow 0.2s;
+      box-sizing: border-box;
     }
 
     .form-input:focus,
@@ -613,6 +798,396 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
         margin: 1rem;
       }
     }
+
+    /* サブタスク関連のスタイル */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .subtasks-container {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      background: #f9f9f9;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .subtask-item {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .subtask-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .subtask-header {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtask-title {
+      flex: 1;
+      font-weight: 600;
+    }
+
+    .subtask-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .subtask-description {
+      font-size: 0.9rem;
+      resize: vertical;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .subtask-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .subtask-priority {
+      width: 80px;
+    }
+
+    .subtask-hours {
+      width: 100px;
+    }
+
+    .hours-label {
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .no-tasks {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+    }
+
+    .no-tasks-text {
+      margin: 0;
+      font-style: italic;
+    }
+
+    /* 進捗表示のスタイル */
+    .milestone-progress {
+      margin: 1rem 0;
+      padding: 1rem;
+      background: #f8f9fa;
+      border-radius: 0.5rem;
+      border: 1px solid #e9ecef;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-label {
+      font-weight: 600;
+      color: #495057;
+    }
+
+    .progress-text {
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e9ecef;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #28a745, #20c997);
+      transition: width 0.3s ease;
+    }
+
+    .task-summary {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.85rem;
+      color: #6c757d;
+    }
+
+    .task-count, .estimated-hours {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    /* フローチャート関連のスタイル */
+    .milestone-flow {
+      margin: 1rem 0;
+      padding: 1rem;
+      background: #f8f9fa;
+      border-radius: 0.5rem;
+      border: 1px solid #e9ecef;
+    }
+
+    .flow-title {
+      margin: 0 0 1rem 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #495057;
+    }
+
+    .flow-chart {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .flow-step {
+      display: flex;
+      align-items: center;
+      background: white;
+      border: 2px solid #e9ecef;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      min-width: 120px;
+      position: relative;
+    }
+
+    .flow-step.step-not_started {
+      border-color: #6c757d;
+      background: #f8f9fa;
+    }
+
+    .flow-step.step-in_progress {
+      border-color: #007bff;
+      background: #e3f2fd;
+    }
+
+    .flow-step.step-completed {
+      border-color: #28a745;
+      background: #e8f5e8;
+    }
+
+    .step-content {
+      text-align: center;
+    }
+
+    .step-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+      color: #495057;
+    }
+
+    .step-description {
+      font-size: 0.75rem;
+      color: #6c757d;
+      margin-bottom: 0.5rem;
+    }
+
+    .step-status {
+      margin-top: 0.25rem;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .status-indicator.status-not_started {
+      background: #6c757d;
+      color: white;
+    }
+
+    .status-indicator.status-in_progress {
+      background: #007bff;
+      color: white;
+    }
+
+    .status-indicator.status-completed {
+      background: #28a745;
+      color: white;
+    }
+
+    .flow-arrow {
+      margin: 0 0.5rem;
+      color: #6c757d;
+      font-size: 1.2rem;
+    }
+
+    .arrow {
+      display: block;
+    }
+
+    /* フローチャート編集用のスタイル */
+    .flow-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .flow-steps-container {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      background: #f9f9f9;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .flow-step-item {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .flow-step-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .step-header {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .step-name-input {
+      flex: 1;
+      font-weight: 600;
+    }
+
+    .step-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .step-description {
+      font-size: 0.9rem;
+      resize: vertical;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .step-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .step-status {
+      width: 100px;
+    }
+
+    .step-dates {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .step-date {
+      width: 120px;
+    }
+
+    .no-flow-steps {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+    }
+
+    .no-steps-text {
+      margin: 0 0 1rem 0;
+      font-style: italic;
+    }
+
+    .template-buttons {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* レスポンシブ対応 */
+    @media (max-width: 768px) {
+      .modal {
+        width: 98%;
+        max-width: none;
+        margin: 0.5rem;
+      }
+
+      .form-row-wide {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-steps-container,
+      .subtasks-container {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-chart {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .flow-arrow {
+        transform: rotate(90deg);
+        margin: 0.5rem 0;
+        text-align: center;
+      }
+
+      .flow-step {
+        min-width: auto;
+      }
+
+      .step-meta {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .step-dates {
+        justify-content: space-between;
+      }
+
+      .template-buttons {
+        flex-direction: column;
+      }
+    }
   `]
 })
 export class MilestonePage implements OnInit, OnDestroy {
@@ -620,6 +1195,7 @@ export class MilestonePage implements OnInit, OnDestroy {
   private groupService = inject(GroupService);
   private auth = inject(AuthService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private fb = inject(FormBuilder);
   private destroy$ = new Subject<void>();
 
@@ -633,6 +1209,8 @@ export class MilestonePage implements OnInit, OnDestroy {
   showCreateModalFlag = false;
   editingMilestone: Milestone | null = null;
   loading = false;
+  subTasks: MilestoneSubTask[] = [];
+  flowSteps: MilestoneFlowStep[] = [];
 
   milestoneForm = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(2)]],
@@ -646,6 +1224,16 @@ export class MilestonePage implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadUserGroups();
     this.loadMilestones();
+    
+    // クエリパラメータからグループIDを取得してフィルタリング
+    this.route.queryParams.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(params => {
+      if (params['groupId']) {
+        this.selectedGroupId = params['groupId'];
+        this.applyFilter();
+      }
+    });
   }
 
   ngOnDestroy() {
@@ -721,6 +1309,8 @@ export class MilestonePage implements OnInit, OnDestroy {
     this.showCreateModalFlag = false;
     this.editingMilestone = null;
     this.milestoneForm.reset();
+    this.subTasks = [];
+    this.flowSteps = [];
   }
 
   editMilestone(milestone: Milestone) {
@@ -733,6 +1323,9 @@ export class MilestonePage implements OnInit, OnDestroy {
       endDate: this.formatDateForInput(milestone.endDate),
       status: milestone.status
     });
+    // サブタスクとフローチャートステップを読み込み
+    this.subTasks = milestone.tasks ? [...milestone.tasks] : [];
+    this.flowSteps = milestone.flowSteps ? [...milestone.flowSteps] : [];
     this.showCreateModalFlag = true;
   }
 
@@ -758,7 +1351,9 @@ export class MilestonePage implements OnInit, OnDestroy {
           startDate: new Date(formData.startDate!),
           endDate: new Date(formData.endDate!),
           status: formData.status as any,
-          createdBy: this.editingMilestone.createdBy
+          createdBy: this.editingMilestone.createdBy,
+          tasks: this.subTasks,
+          flowSteps: this.flowSteps
         });
       } else {
         // 作成
@@ -769,7 +1364,9 @@ export class MilestonePage implements OnInit, OnDestroy {
           startDate: new Date(formData.startDate!),
           endDate: new Date(formData.endDate!),
           status: formData.status as any,
-          createdBy: currentUser.uid
+          createdBy: currentUser.uid,
+          tasks: this.subTasks,
+          flowSteps: this.flowSteps
         });
       }
       
@@ -793,10 +1390,6 @@ export class MilestonePage implements OnInit, OnDestroy {
     }
   }
 
-  viewMilestone(milestone: Milestone) {
-    // TODO: マイルストーン詳細ページに遷移
-    console.log('マイルストーン詳細:', milestone);
-  }
 
   getStatusLabel(status: string): string {
     const labels: { [key: string]: string } = {
@@ -828,5 +1421,177 @@ export class MilestonePage implements OnInit, OnDestroy {
     if (!date) return '';
     const d = date.toDate ? date.toDate() : new Date(date);
     return d.toISOString().split('T')[0];
+  }
+
+  // サブタスク管理メソッド
+  addSubTask() {
+    const newTask: MilestoneSubTask = {
+      id: Date.now().toString(),
+      title: '',
+      description: '',
+      isCompleted: false,
+      priority: 'medium',
+      estimatedHours: 0
+    };
+    this.subTasks.push(newTask);
+  }
+
+  removeSubTask(index: number) {
+    this.subTasks.splice(index, 1);
+  }
+
+  // 期間計算
+  getDuration(startDate: any, endDate: any): string {
+    if (!startDate || !endDate) return '';
+    const start = startDate.toDate ? startDate.toDate() : new Date(startDate);
+    const end = endDate.toDate ? endDate.toDate() : new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return `${diffDays}日間`;
+  }
+
+  // タスク進捗計算
+  getTaskProgress(tasks: MilestoneSubTask[]): string {
+    if (!tasks || tasks.length === 0) return '0/0';
+    const completed = tasks.filter(task => task.isCompleted).length;
+    return `${completed}/${tasks.length}`;
+  }
+
+  getTaskProgressPercentage(tasks: MilestoneSubTask[]): number {
+    if (!tasks || tasks.length === 0) return 0;
+    const completed = tasks.filter(task => task.isCompleted).length;
+    return (completed / tasks.length) * 100;
+  }
+
+  getTotalEstimatedHours(tasks: MilestoneSubTask[]): number {
+    if (!tasks || tasks.length === 0) return 0;
+    return tasks.reduce((total, task) => total + (task.estimatedHours || 0), 0);
+  }
+
+  // フローチャート関連メソッド
+  addFlowStep() {
+    const newStep: MilestoneFlowStep = {
+      id: Date.now().toString(),
+      name: '',
+      description: '',
+      status: 'not_started',
+      order: this.flowSteps.length
+    };
+    this.flowSteps.push(newStep);
+  }
+
+  removeFlowStep(index: number) {
+    this.flowSteps.splice(index, 1);
+    // 順序を再設定
+    this.flowSteps.forEach((step, i) => {
+      step.order = i;
+    });
+  }
+
+  trackByStepId(index: number, step: MilestoneFlowStep): string {
+    return step.id;
+  }
+
+  getStepStatusLabel(status: string): string {
+    const labels = {
+      not_started: '未着手',
+      in_progress: '実行中',
+      completed: '完了'
+    };
+    return labels[status as keyof typeof labels] || status;
+  }
+
+  // テンプレート読み込み
+  loadDefaultTemplate() {
+    this.flowSteps = [
+      {
+        id: '1',
+        name: '企画',
+        description: 'プロジェクトの企画・要件定義',
+        status: 'not_started',
+        order: 0
+      },
+      {
+        id: '2',
+        name: '設計',
+        description: 'システム設計・詳細設計',
+        status: 'not_started',
+        order: 1
+      },
+      {
+        id: '3',
+        name: '実装',
+        description: 'コーディング・実装作業',
+        status: 'not_started',
+        order: 2
+      },
+      {
+        id: '4',
+        name: 'テスト',
+        description: 'テスト・品質保証',
+        status: 'not_started',
+        order: 3
+      },
+      {
+        id: '5',
+        name: 'リリース',
+        description: '本番リリース・運用開始',
+        status: 'not_started',
+        order: 4
+      }
+    ];
+  }
+
+  loadDevelopmentTemplate() {
+    this.flowSteps = [
+      {
+        id: '1',
+        name: '要件定義',
+        description: '機能要件・非機能要件の定義',
+        status: 'not_started',
+        order: 0
+      },
+      {
+        id: '2',
+        name: '設計',
+        description: 'アーキテクチャ設計・DB設計',
+        status: 'not_started',
+        order: 1
+      },
+      {
+        id: '3',
+        name: '開発',
+        description: 'フロントエンド・バックエンド開発',
+        status: 'not_started',
+        order: 2
+      },
+      {
+        id: '4',
+        name: '単体テスト',
+        description: 'ユニットテスト・コードレビュー',
+        status: 'not_started',
+        order: 3
+      },
+      {
+        id: '5',
+        name: '結合テスト',
+        description: 'システム統合テスト',
+        status: 'not_started',
+        order: 4
+      },
+      {
+        id: '6',
+        name: 'デプロイ',
+        description: '本番環境へのデプロイ',
+        status: 'not_started',
+        order: 5
+      }
+    ];
+  }
+
+  loadTemplate() {
+    // テンプレート選択モーダルを表示する場合のメソッド
+    // 現在は直接デフォルトテンプレートを読み込み
+    this.loadDefaultTemplate();
   }
 }

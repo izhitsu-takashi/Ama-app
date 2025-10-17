@@ -6,7 +6,9 @@ import { GroupService } from './group.service';
 import { TaskService } from './task.service';
 import { AuthService } from './auth.service';
 import { UserService } from './user.service';
-import { Group, TaskItem, GroupMembership } from './models';
+import { JoinRequestService } from './join-request.service';
+import { MilestoneService } from './milestone.service';
+import { Group, TaskItem, GroupMembership, JoinRequest, Milestone } from './models';
 import { Observable, Subject, combineLatest, of } from 'rxjs';
 import { takeUntil, map, switchMap, take } from 'rxjs/operators';
 
@@ -27,6 +29,37 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
           <p class="group-description" *ngIf="group?.description">{{ group?.description }}</p>
         </div>
         <div class="header-actions">
+          <button 
+            class="btn btn-secondary" 
+            (click)="toggleMembers()"
+          >
+            <span class="btn-icon">👥</span>
+            メンバー
+            <span class="member-count">
+              {{ (members$ | async)?.length || 0 }}
+            </span>
+          </button>
+          <button 
+            class="btn btn-secondary" 
+            (click)="viewGroupMilestones()"
+          >
+            <span class="btn-icon">🎯</span>
+            マイルストーン
+            <span *ngIf="(groupMilestones$ | async)?.length" class="milestone-count">
+              {{ (groupMilestones$ | async)?.length }}
+            </span>
+          </button>
+          <button 
+            *ngIf="isGroupOwner" 
+            class="btn btn-secondary" 
+            (click)="toggleJoinRequests()"
+          >
+            <span class="btn-icon">📝</span>
+            参加リクエスト
+            <span *ngIf="(joinRequests$ | async)?.length" class="request-count">
+              {{ (joinRequests$ | async)?.length }}
+            </span>
+          </button>
           <button class="btn btn-primary" (click)="showCreateTaskModal()">
             <span class="btn-icon">+</span>
             課題を作成
@@ -83,6 +116,80 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
           </select>
         </div>
         <button class="btn btn-secondary" (click)="clearFilters()">クリア</button>
+      </div>
+
+      <!-- メンバー一覧 -->
+      <div class="members-section" *ngIf="showMembers">
+        <div class="section-header">
+          <h2 class="section-title">メンバー一覧</h2>
+          <button class="close-btn" (click)="showMembers = false">×</button>
+        </div>
+        
+        <div class="members-list" *ngIf="(members$ | async) as members; else noMembers">
+          <div class="member-item" *ngFor="let member of members">
+            <div class="member-info">
+              <div class="member-avatar">
+                <span class="avatar-text">{{ getMemberInitial(getMemberDisplayName(member.userId, member.userName, member.userEmail)) }}</span>
+              </div>
+              <div class="member-details">
+                <h4 class="member-name">{{ getMemberDisplayName(member.userId, member.userName, member.userEmail) }}</h4>
+                <p class="member-email">{{ member.userEmail }}</p>
+                <span class="member-role" [class]="member.role">
+                  {{ getRoleLabel(member.role) }}
+                </span>
+              </div>
+            </div>
+            <div class="member-meta">
+              <span class="join-date">参加日: {{ formatDate(member.joinedAt) }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <ng-template #noMembers>
+          <div class="empty-state">
+            <div class="empty-icon">👥</div>
+            <h3 class="empty-title">メンバーがいません</h3>
+            <p class="empty-description">グループにメンバーが参加するとここに表示されます</p>
+          </div>
+        </ng-template>
+      </div>
+
+      <!-- 参加リクエスト管理 -->
+      <div class="join-requests-section" *ngIf="showJoinRequests && isGroupOwner">
+        <div class="section-header">
+          <h2 class="section-title">参加リクエスト</h2>
+          <button class="close-btn" (click)="showJoinRequests = false">×</button>
+        </div>
+        
+        <div class="join-requests-list" *ngIf="(joinRequests$ | async) as requests; else noJoinRequests">
+          <div class="join-request-item" *ngFor="let request of requests">
+            <div class="request-info">
+              <div class="request-header">
+                <h4 class="request-user">{{ request.userName }}</h4>
+                <span class="request-date">{{ formatDate(request.createdAt) }}</span>
+              </div>
+              <p class="request-email">{{ request.userEmail }}</p>
+            </div>
+            <div class="request-actions">
+              <button class="btn btn-success" (click)="approveJoinRequest(request.id!)">
+                <span class="btn-icon">✓</span>
+                承認
+              </button>
+              <button class="btn btn-danger" (click)="rejectJoinRequest(request.id!)">
+                <span class="btn-icon">✗</span>
+                拒否
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <ng-template #noJoinRequests>
+          <div class="empty-state">
+            <div class="empty-icon">👥</div>
+            <h3 class="empty-title">参加リクエストがありません</h3>
+            <p class="empty-description">グループへの参加リクエストが届くとここに表示されます</p>
+          </div>
+        </ng-template>
       </div>
 
       <!-- 課題一覧 -->
@@ -1047,6 +1154,296 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
         flex-direction: column;
       }
     }
+
+    /* 参加リクエスト管理スタイル */
+    .join-requests-section {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #f1f5f9;
+    }
+
+    .section-title {
+      margin: 0;
+      color: #2d3748;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #6b7280;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .close-btn:hover {
+      background: #f1f5f9;
+      color: #374151;
+    }
+
+    .join-requests-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .join-request-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      transition: all 0.2s;
+    }
+
+    .join-request-item:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+
+    .request-info {
+      flex: 1;
+    }
+
+    .request-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .request-user {
+      margin: 0;
+      color: #2d3748;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .request-date {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .request-email {
+      margin: 0;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .request-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+      transform: translateY(-1px);
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+      transform: translateY(-1px);
+    }
+
+    .request-count {
+      background: #ef4444;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 8px;
+    }
+
+    .milestone-count {
+      background: #10b981;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 8px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .empty-title {
+      margin: 0 0 8px;
+      color: #374151;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .empty-description {
+      margin: 0;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    /* メンバー表示スタイル */
+    .members-section {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .members-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .member-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      transition: all 0.2s;
+    }
+
+    .member-item:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+
+    .member-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .member-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    .avatar-text {
+      text-transform: uppercase;
+    }
+
+    .member-details {
+      flex: 1;
+    }
+
+    .member-name {
+      margin: 0 0 4px;
+      color: #2d3748;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .member-email {
+      margin: 0 0 8px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .member-role {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .member-role.owner {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .member-role.member {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .member-meta {
+      text-align: right;
+    }
+
+    .join-date {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .member-count {
+      background: #3b82f6;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 8px;
+    }
   `]
 })
 export class GroupDetailPage implements OnInit, OnDestroy {
@@ -1057,6 +1454,8 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   private taskService = inject(TaskService);
   private auth = inject(AuthService);
   private userService = inject(UserService);
+  private joinRequestService = inject(JoinRequestService);
+  private milestoneService = inject(MilestoneService);
 
   private destroy$ = new Subject<void>();
 
@@ -1066,6 +1465,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   memberNameById: { [userId: string]: string } = {}; // ユーザー名キャッシュ
   tasks$: Observable<TaskItem[]> = of([]);
   filteredTasks: TaskItem[] = [];
+  groupMilestones$: Observable<Milestone[]> = of([]);
 
   showCreateModal = false;
   showEditModal = false;
@@ -1075,6 +1475,14 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   statusFilter = '';
   priorityFilter = '';
   assigneeFilter = '';
+
+  // 参加リクエスト関連
+  joinRequests$: Observable<JoinRequest[]> = of([]);
+  showJoinRequests = false;
+  isGroupOwner = false;
+
+  // メンバー表示関連
+  showMembers = false;
 
   taskForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(2)]],
@@ -1107,6 +1515,17 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       if (group) {
         this.members$ = this.groupService.getGroupMembers(group.id);
         this.tasks$ = this.taskService.getTasksByGroup(group.id);
+        this.groupMilestones$ = this.milestoneService.getGroupMilestones(group.id);
+        
+        // グループオーナーチェック
+        this.auth.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
+          this.isGroupOwner = !!(user && (user as any).uid === group.ownerId);
+          
+          // グループオーナーの場合、参加リクエストを読み込み
+          if (this.isGroupOwner) {
+            this.joinRequests$ = this.joinRequestService.getGroupJoinRequests(group.id);
+          }
+        });
         
         // メンバー情報をキャッシュし、ユーザープロファイルから表示名を解決
         this.members$.pipe(takeUntil(this.destroy$)).subscribe(async members => {
@@ -1182,7 +1601,22 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   }
 
   getMemberDisplayName(userId: string, userName?: string, userEmail?: string): string {
-    return this.memberNameById[userId] || userName || userEmail || 'ユーザー';
+    // キャッシュされた実際のユーザー名を優先
+    if (this.memberNameById[userId]) {
+      return this.memberNameById[userId];
+    }
+    
+    // グループメンバーシップのuserNameが「グループオーナー」の場合は無視
+    if (userName && userName !== 'グループオーナー') {
+      return userName;
+    }
+    
+    // メールアドレスから名前を抽出
+    if (userEmail) {
+      return userEmail.split('@')[0];
+    }
+    
+    return 'ユーザー';
   }
 
   getPriorityLabel(priority: string): string {
@@ -1371,6 +1805,62 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       } catch (error) {
         console.error('課題削除エラー:', error);
       }
+    }
+  }
+
+  // メンバー表示メソッド
+  toggleMembers() {
+    this.showMembers = !this.showMembers;
+  }
+
+  getMemberInitial(name: string): string {
+    if (!name) return 'U';
+    return name.charAt(0).toUpperCase();
+  }
+
+  getRoleLabel(role: string): string {
+    const labels = {
+      owner: 'オーナー',
+      member: 'メンバー'
+    };
+    return labels[role as keyof typeof labels] || role;
+  }
+
+  // 参加リクエスト管理メソッド
+  toggleJoinRequests() {
+    this.showJoinRequests = !this.showJoinRequests;
+  }
+
+  async approveJoinRequest(requestId: string) {
+    if (confirm('この参加リクエストを承認しますか？')) {
+      try {
+        await this.joinRequestService.approveJoinRequest(requestId);
+        alert('参加リクエストを承認しました！');
+      } catch (error) {
+        console.error('参加リクエスト承認エラー:', error);
+        alert('参加リクエストの承認に失敗しました。');
+      }
+    }
+  }
+
+  async rejectJoinRequest(requestId: string) {
+    if (confirm('この参加リクエストを拒否しますか？')) {
+      try {
+        await this.joinRequestService.rejectJoinRequest(requestId);
+        alert('参加リクエストを拒否しました。');
+      } catch (error) {
+        console.error('参加リクエスト拒否エラー:', error);
+        alert('参加リクエストの拒否に失敗しました。');
+      }
+    }
+  }
+
+  // マイルストーン表示メソッド
+  viewGroupMilestones() {
+    if (this.group) {
+      this.router.navigate(['/milestones'], { 
+        queryParams: { groupId: this.group.id } 
+      });
     }
   }
 }

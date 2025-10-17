@@ -126,6 +126,55 @@ export interface Milestone {
   createdBy: Id;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  tasks?: MilestoneSubTask[]; // マイルストーン内のサブタスク
+  flowSteps?: MilestoneFlowStep[]; // フローチャート用のステップ
+}
+
+export interface MilestoneFlowStep {
+  id: string;
+  name: string;
+  description?: string;
+  status: 'not_started' | 'in_progress' | 'completed';
+  order: number; // 表示順序
+  startDate?: Timestamp;
+  endDate?: Timestamp;
+}
+
+export interface MilestoneSubTask {
+  id: string;
+  title: string;
+  description?: string;
+  isCompleted: boolean;
+  priority: 'low' | 'medium' | 'high';
+  estimatedHours?: number; // 見積もり時間
+}
+
+// 進捗報告関連
+export interface ProgressReport {
+  id: Id;
+  title: string;
+  content: string;
+  senderId: Id;
+  senderName: string;
+  recipientId?: Id; // 特定の人への送信
+  recipientName?: string;
+  groupId?: Id; // グループへの送信
+  groupName?: string;
+  attachedGroupId?: Id; // 添付するグループ（個人送信時でも関連グループを指定可能）
+  attachedGroupName?: string;
+  status: 'draft' | 'sent' | 'read';
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  readAt?: Timestamp;
+}
+
+export interface ProgressReportComment {
+  id: Id;
+  reportId: Id;
+  commenterId: Id;
+  commenterName: string;
+  content: string;
+  createdAt: Timestamp;
 }
 
 export interface MilestoneTask {
@@ -136,24 +185,6 @@ export interface MilestoneTask {
   createdAt: Timestamp;
 }
 
-// 進捗報告関連
-export interface ProgressReport {
-  id: Id;
-  groupId: Id;
-  title: string;
-  content: string;
-  period: {
-    startDate: Timestamp;
-    endDate: Timestamp;
-  };
-  authorId: Id;
-  recipients: Id[];
-  attachments: ReportAttachment[];
-  status: 'draft' | 'sent';
-  sentAt?: Timestamp;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
 
 export interface ReportAttachment {
   type: 'group' | 'milestone' | 'task_list';
@@ -165,7 +196,7 @@ export interface ReportAttachment {
 export interface Notification {
   id: Id;
   userId: Id;
-  type: 'task_assigned' | 'task_due' | 'task_comment' | 'task_reaction' | 'group_invite' | 'progress_report' | 'reminder' | 'task_due_soon';
+  type: 'task_assigned' | 'task_due' | 'task_comment' | 'task_reaction' | 'group_invite' | 'progress_report' | 'progress_report_comment' | 'reminder' | 'task_due_soon' | 'group_join_request';
   title: string;
   content: string;
   message: string;
@@ -253,4 +284,19 @@ export interface ExportData {
   reports: ProgressReport[];
   exportedAt: Timestamp;
   exportedBy: Id;
+}
+
+// 参加リクエスト用の型
+export interface JoinRequest {
+  id?: string;
+  groupId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  status: 'pending' | 'approved' | 'rejected';
+  message?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  reviewedAt?: Date;
+  reviewedBy?: string;
 }

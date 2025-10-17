@@ -1,16 +1,16 @@
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { AuthService } from './auth.service';
 import { UserService } from './user.service';
 import { GroupService } from './group.service';
 import { TaskService } from './task.service';
 import { NotificationService } from './notification.service';
 import { User, Group, TaskItem, Notification, CalendarEvent } from './models';
-import { Observable, Subscription, combineLatest, of } from 'rxjs';
+import { Observable, Subscription, combineLatest, of, Subject } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Firestore, collection, addDoc, serverTimestamp, query, where, collectionData, updateDoc, doc, deleteDoc } from '@angular/fire/firestore';
-import { map, switchMap, take } from 'rxjs/operators';
+import { map, switchMap, take, takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-main',
@@ -46,7 +46,7 @@ import { map, switchMap, take } from 'rxjs/operators';
       <main class="main-content">
         <!-- 上部アクションボタン -->
         <div class="action-buttons">
-          <button class="action-btn primary" (click)="createProgressReport()">
+          <button class="action-btn primary" routerLink="/progress-reports">
             📊 進捗報告
           </button>
           <button class="action-btn secondary" (click)="createMilestone()">
@@ -308,7 +308,6 @@ import { map, switchMap, take } from 'rxjs/operators';
 
     .app-title {
       margin: 0;
-      color: #2d3748;
       font-size: 1.5rem;
       font-weight: 700;
       display: flex;
@@ -317,16 +316,39 @@ import { map, switchMap, take } from 'rxjs/operators';
     }
 
     .title-main {
-      font-size: 1.8rem;
-      font-weight: 800;
-      color: #2d3748;
+      font-size: 2.2rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%);
+      background-size: 300% 300%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: gradientShift 3s ease-in-out infinite;
+      text-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
+      letter-spacing: -0.02em;
     }
 
     .title-sub {
       font-size: 0.9rem;
-      font-weight: 400;
-      color: #6b7280;
-      text-transform: lowercase;
+      font-weight: 500;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      opacity: 0.8;
+      margin-top: 0.2rem;
+    }
+
+    @keyframes gradientShift {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
+      }
     }
 
     .header-right {
@@ -891,6 +913,7 @@ export class MainPage implements OnInit, OnDestroy {
   private userGroupsCache: Group[] = [];
   recentTasks$: Observable<TaskItem[]> = of([]);
   unreadNotifications = 0;
+  private destroy$ = new Subject<void>();
   motivationalMessage = '';
   currentMonth = '';
   calendarDays: any[] = [];
@@ -926,9 +949,20 @@ export class MainPage implements OnInit, OnDestroy {
     this.generateMotivationalMessage();
     this.initializeCalendar();
     this.initializeTodayInfo();
+    
+    // 通知ページから戻ってきた時に通知数を更新
+    this.router.events.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(event => {
+      if (event instanceof NavigationEnd && event.url === '/main') {
+        this.loadNotifications();
+      }
+    });
   }
 
   ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
     this.subscriptions.forEach(sub => sub.unsubscribe());
     this.calendarSubscriptions.forEach(sub => sub.unsubscribe());
     if (this.timeInterval) {
@@ -953,9 +987,10 @@ export class MainPage implements OnInit, OnDestroy {
           // ユーザーデータが設定された後にグループと課題を読み込み
           this.loadGroups();
           this.loadRecentTasks();
-          this.loadNotifications();
           // カレンダーイベントも購読開始
           this.loadCalendarEvents();
+          // 通知は最後に読み込み（currentUserが確実に設定された後）
+          this.loadNotifications();
         });
       } else {
         this.currentUser = null;
@@ -991,8 +1026,14 @@ export class MainPage implements OnInit, OnDestroy {
 
   private loadNotifications() {
     if (this.currentUser) {
-      const sub = this.notificationService.getUnreadCount(this.currentUser.id).subscribe(count => {
-        this.unreadNotifications = count;
+      const sub = this.notificationService.getUnreadCount(this.currentUser.id).subscribe({
+        next: (count) => {
+          this.unreadNotifications = count;
+        },
+        error: (error) => {
+          console.error('Error loading notifications:', error);
+          this.unreadNotifications = 0;
+        }
       });
       this.subscriptions.push(sub);
     }
@@ -1193,10 +1234,28 @@ export class MainPage implements OnInit, OnDestroy {
   }
 
   // イベントハンドラー
-  logout() {
-    this.auth.logout().then(() => {
+  async logout() {
+    try {
+      // すべてのサブスクリプションをクリーンアップ
+      this.subscriptions.forEach(sub => sub.unsubscribe());
+      this.subscriptions = [];
+      
+      // カレンダー関連のサブスクリプションもクリーンアップ
+      if (this.calendarSubscriptions) {
+        this.calendarSubscriptions.forEach(sub => sub.unsubscribe());
+        this.calendarSubscriptions = [];
+      }
+      
+      // ログアウト処理
+      await this.auth.logout();
+      
+      // ログインページに遷移
       this.router.navigate(['/login']);
-    });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // エラーが発生してもログインページに遷移
+      this.router.navigate(['/login']);
+    }
   }
 
   showNotifications() {
@@ -1204,9 +1263,6 @@ export class MainPage implements OnInit, OnDestroy {
     console.log('通知一覧を表示');
   }
 
-  createProgressReport() {
-    this.router.navigate(['/progress-report']);
-  }
 
   createMilestone() {
     this.router.navigate(['/milestones']);

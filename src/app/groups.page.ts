@@ -3,10 +3,12 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { GroupService } from './group.service';
+import { TaskService } from './task.service';
 import { AuthService } from './auth.service';
-import { Group } from './models';
+import { JoinRequestService } from './join-request.service';
+import { Group, JoinRequest } from './models';
 import { Observable, Subject, of } from 'rxjs';
-import { takeUntil, switchMap } from 'rxjs/operators';
+import { takeUntil, switchMap, take } from 'rxjs/operators';
 
 @Component({
   selector: 'app-groups',
@@ -31,42 +33,66 @@ import { takeUntil, switchMap } from 'rxjs/operators';
 
       <!-- 検索・フィルター -->
       <div class="search-section">
-        <div class="search-box">
-          <input 
-            type="text" 
-            class="search-input" 
-            placeholder="グループを検索..."
-            [(ngModel)]="searchTerm"
-            (input)="onSearch()"
-          />
-          <span class="search-icon">🔍</span>
+        <div class="search-controls">
+          <div class="search-mode-toggle">
+            <button 
+              class="toggle-btn" 
+              [class.active]="!showAllGroups"
+              (click)="toggleSearchMode(false)"
+            >
+              参加グループ
+            </button>
+            <button 
+              class="toggle-btn" 
+              [class.active]="showAllGroups"
+              (click)="toggleSearchMode(true)"
+            >
+              すべてのグループ
+            </button>
+          </div>
+          <div class="search-box">
+            <input 
+              type="text" 
+              class="search-input" 
+              [placeholder]="showAllGroups ? 'すべてのグループを検索...' : '参加グループを検索...'"
+              [(ngModel)]="searchTerm"
+              (input)="onSearch()"
+              (keyup)="onSearch()"
+            />
+            <span class="search-icon">🔍</span>
+          </div>
         </div>
       </div>
 
       <!-- グループ一覧 -->
       <div class="groups-section">
         <div class="section-header">
-          <h2 class="section-title">参加しているグループ</h2>
+          <h2 class="section-title">{{ showAllGroups ? 'すべてのグループ' : '参加しているグループ' }}</h2>
           <div class="group-count">
-            {{ (userGroups$ | async)?.length || 0 }}グループ
+            {{ filteredGroups.length }}グループ
           </div>
         </div>
 
         <div class="groups-grid" *ngIf="(userGroups$ | async) as groups; else emptyGroups">
-          <div class="group-card" *ngFor="let group of filteredGroups" [routerLink]="['/group', group.id]">
+          <div class="group-card" *ngFor="let group of filteredGroups" [class.restricted]="!isUserInGroup(group.id)">
             <div class="group-header">
               <h3 class="group-name">{{ group.name }}</h3>
-              <div class="group-status">
+              <!-- 参加しているグループのみ公開/非公開を表示 -->
+              <div class="group-status" *ngIf="isUserInGroup(group.id)">
                 <span class="status-badge" [class]="group.isPublic ? 'public' : 'private'">
                   {{ group.isPublic ? '公開' : '非公開' }}
                 </span>
               </div>
             </div>
             
-            <p class="group-description" *ngIf="group.description">{{ group.description }}</p>
-            <p class="group-description empty" *ngIf="!group.description">説明なし</p>
+            <!-- 参加しているグループのみ詳細を表示 -->
+            <p class="group-description" *ngIf="isUserInGroup(group.id) && group.description">{{ group.description }}</p>
+            <p class="group-description empty" *ngIf="isUserInGroup(group.id) && !group.description">説明なし</p>
+            <p class="group-description restricted-content" *ngIf="!isUserInGroup(group.id)">
+              <span class="restricted-text">グループに参加すると詳細を確認できます</span>
+            </p>
             
-            <div class="group-stats">
+            <div class="group-stats" *ngIf="isUserInGroup(group.id)">
               <div class="stat-item">
                 <span class="stat-icon">👥</span>
                 <span class="stat-value">{{ group.memberIds.length }}人</span>
@@ -81,9 +107,38 @@ import { takeUntil, switchMap } from 'rxjs/operators';
               <span class="created-date">
                 作成日: {{ formatDate(group.createdAt) }}
               </span>
-              <button class="group-action-btn" (click)="openGroup(group); $event.stopPropagation()">
-                開く →
-              </button>
+              <div class="group-actions">
+                <!-- 参加しているグループのみ「開く」ボタンを表示 -->
+                <button 
+                  *ngIf="isUserInGroup(group.id)" 
+                  class="group-action-btn" 
+                  (click)="openGroup(group); $event.stopPropagation()"
+                >
+                  開く →
+                </button>
+                
+                <!-- 参加していないグループの場合のアクションボタン -->
+                <ng-container *ngIf="!isUserInGroup(group.id)">
+                  <button 
+                    *ngIf="group.isPublic" 
+                    class="group-action-btn join-btn" 
+                    (click)="joinGroup(group.id); $event.stopPropagation()"
+                    [disabled]="isJoiningGroup"
+                  >
+                    ➕ 参加
+                  </button>
+                  
+                  <button 
+                    *ngIf="!group.isPublic" 
+                    class="group-action-btn request-btn" 
+                    (click)="requestToJoinGroup(group.id); $event.stopPropagation()"
+                    [disabled]="isRequestingJoinForGroup(group.id)"
+                  >
+                    📝 参加リクエスト
+                  </button>
+                  
+                </ng-container>
+              </div>
             </div>
           </div>
         </div>
@@ -190,6 +245,40 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       padding: 20px;
       margin-bottom: 30px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .search-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .search-mode-toggle {
+      display: flex;
+      gap: 8px;
+    }
+
+    .toggle-btn {
+      padding: 8px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      background: white;
+      color: #6b7280;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .toggle-btn:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+
+    .toggle-btn.active {
+      background: #667eea;
+      border-color: #667eea;
+      color: white;
     }
 
     .search-box {
@@ -349,6 +438,12 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       border-top: 1px solid #f1f5f9;
     }
 
+    .group-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
     .created-date {
       font-size: 12px;
       color: #9ca3af;
@@ -369,6 +464,52 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       background: #667eea;
       color: white;
       border-color: #667eea;
+    }
+
+    .group-action-btn:disabled {
+      background: #f3f4f6;
+      color: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    .join-btn {
+      background: #10b981;
+      color: white;
+      border-color: #10b981;
+    }
+
+    .join-btn:hover {
+      background: #059669;
+      border-color: #059669;
+    }
+
+    .request-btn {
+      background: #f59e0b;
+      color: white;
+      border-color: #f59e0b;
+    }
+
+    .request-btn:hover {
+      background: #d97706;
+      border-color: #d97706;
+    }
+
+    .restricted-content {
+      background: #f8f9fa;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .restricted-text {
+      color: #6b7280;
+      font-style: italic;
+      font-size: 14px;
+    }
+
+    .group-card.restricted {
+      opacity: 0.8;
     }
 
     .empty-state {
@@ -414,25 +555,40 @@ import { takeUntil, switchMap } from 'rxjs/operators';
 export class GroupsPage implements OnInit, OnDestroy {
   private router = inject(Router);
   private groupService = inject(GroupService);
+  private taskService = inject(TaskService);
   private auth = inject(AuthService);
+  private joinRequestService = inject(JoinRequestService);
 
   private destroy$ = new Subject<void>();
 
   userGroups$: Observable<Group[]> = of([]);
+  allGroups: Group[] = [];
+  allPublicGroups: Group[] = [];
   filteredGroups: Group[] = [];
   searchTerm = '';
+  groupTaskCounts: { [groupId: string]: number } = {};
+  showAllGroups = false;
+  isJoiningGroup = false;
+  requestingJoinGroups: Set<string> = new Set();
 
   ngOnInit() {
     this.auth.currentUser$.pipe(
       takeUntil(this.destroy$),
       switchMap(user => {
         if (user) {
-          this.userGroups$ = this.groupService.getUserGroups(user.uid);
+          this.userGroups$ = this.groupService.getUserGroups((user as any).uid);
           
-          this.userGroups$.subscribe(groups => {
-            this.filteredGroups = groups;
+          // グループデータを一度だけ購読して、検索フィルタリングを適用
+          this.userGroups$.pipe(
+            takeUntil(this.destroy$)
+          ).subscribe(groups => {
+            this.allGroups = groups;
+            this.loadGroupTaskCounts(groups);
             this.applySearch();
           });
+
+          // 全グループ（公開グループ）も取得
+          this.loadAllPublicGroups();
 
           return this.userGroups$;
         }
@@ -444,6 +600,133 @@ export class GroupsPage implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+    // リクエスト状態をクリア
+    this.requestingJoinGroups.clear();
+  }
+
+  // ユーザーがグループに参加しているかチェック
+  isUserInGroup(groupId: string): boolean {
+    const isInGroup = this.allGroups.some(group => group.id === groupId);
+    return isInGroup;
+  }
+
+
+  // 公開グループに参加
+  async joinGroup(groupId: string): Promise<void> {
+    if (this.isJoiningGroup) return;
+    
+    this.isJoiningGroup = true;
+    try {
+      const user = await this.auth.currentUser$.pipe(take(1)).toPromise();
+      if (!user) {
+        throw new Error('ユーザーがログインしていません');
+      }
+
+      await this.groupService.joinGroup(groupId, (user as any).uid);
+      alert('グループに参加しました！');
+      
+      // グループ一覧を更新
+      this.loadUserGroups();
+    } catch (error) {
+      console.error('グループ参加エラー:', error);
+      alert('グループの参加に失敗しました。');
+    } finally {
+      this.isJoiningGroup = false;
+    }
+  }
+
+  // 特定のグループで参加リクエスト中かチェック
+  isRequestingJoinForGroup(groupId: string): boolean {
+    return this.requestingJoinGroups.has(groupId);
+  }
+
+  // 非公開グループに参加リクエスト
+  async requestToJoinGroup(groupId: string): Promise<void> {
+    if (this.isRequestingJoinForGroup(groupId)) {
+      return;
+    }
+    
+    this.requestingJoinGroups.add(groupId);
+    try {
+      // ユーザーがログインしているかチェック
+      const user = await this.auth.currentUser$.pipe(take(1)).toPromise();
+      if (!user) {
+        return; // ログアウト済みの場合は何もしない
+      }
+      
+      await this.joinRequestService.sendJoinRequest(groupId);
+      
+      // 成功メッセージは即座に表示
+      alert('参加リクエストを送信しました！');
+    } catch (error) {
+      // 権限エラーやログアウト関連のエラーは無視
+      if (error instanceof Error) {
+        if (error.message.includes('auth') || 
+            error.message.includes('permissions') || 
+            error.message.includes('Missing or insufficient permissions')) {
+          return;
+        }
+        alert('参加リクエストの送信に失敗しました。エラー: ' + error.message);
+      } else if (error && typeof error === 'object' && 'code' in error) {
+        const firebaseError = error as any;
+        if (firebaseError.code === 'permission-denied' || 
+            firebaseError.code === 'unauthenticated') {
+          return;
+        }
+        alert('参加リクエストの送信に失敗しました。');
+      } else {
+        alert('参加リクエストの送信に失敗しました。');
+      }
+    } finally {
+      this.requestingJoinGroups.delete(groupId);
+    }
+  }
+
+  // ユーザーグループを再読み込み
+  private loadUserGroups(): void {
+    this.auth.currentUser$.pipe(
+      takeUntil(this.destroy$),
+      switchMap(user => {
+        if (user) {
+          this.userGroups$ = this.groupService.getUserGroups((user as any).uid);
+          return this.userGroups$;
+        }
+        return of([]);
+      })
+    ).subscribe(groups => {
+      this.allGroups = groups;
+      this.applySearch();
+    });
+  }
+
+  toggleSearchMode(showAll: boolean) {
+    this.showAllGroups = showAll;
+    this.searchTerm = ''; // 検索語をリセット
+    
+    // 全グループモードに切り替える場合、データが読み込まれていない場合は読み込む
+    if (showAll && this.allPublicGroups.length === 0) {
+      this.loadAllPublicGroups();
+    } else {
+      this.applySearch();
+    }
+  }
+
+  loadAllPublicGroups() {
+    // 開発用：すべてのグループを取得（公開・非公開問わず）
+    this.groupService.getAllGroups().pipe(
+      takeUntil(this.destroy$)
+    ).subscribe({
+      next: (groups) => {
+        this.allPublicGroups = groups;
+        // 全グループモードの場合は検索を再実行
+        if (this.showAllGroups) {
+          this.applySearch();
+        }
+      },
+      error: (error) => {
+        console.error('Error loading all groups:', error);
+      }
+    });
   }
 
   onSearch() {
@@ -451,24 +734,43 @@ export class GroupsPage implements OnInit, OnDestroy {
   }
 
   applySearch() {
-    if (!this.searchTerm.trim()) {
-      this.userGroups$.subscribe(groups => {
-        this.filteredGroups = groups;
-      });
+    // 検索対象のグループリストを決定
+    const sourceGroups = this.showAllGroups ? this.allPublicGroups : this.allGroups;
+    
+    if (!this.searchTerm || !this.searchTerm.trim()) {
+      // 検索語が空の場合は、すべてのグループを表示
+      this.filteredGroups = [...sourceGroups];
       return;
     }
 
-    this.userGroups$.subscribe(groups => {
-      this.filteredGroups = groups.filter(group =>
-        group.name.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
-        (group.description && group.description.toLowerCase().includes(this.searchTerm.toLowerCase()))
-      );
+    const searchTerm = this.searchTerm.trim();
+    
+    // 検索語がある場合は、sourceGroupsをフィルタリング
+    this.filteredGroups = sourceGroups.filter(group => {
+      const groupName = group.name || '';
+      const groupDesc = group.description || '';
+      
+      // 大文字小文字を区別しない検索（日本語対応）
+      const nameMatch = groupName.toLowerCase().includes(searchTerm.toLowerCase());
+      const descMatch = groupDesc.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      return nameMatch || descMatch;
+    });
+  }
+
+  loadGroupTaskCounts(groups: Group[]) {
+    groups.forEach(group => {
+      this.taskService.getGroupTasks(group.id).pipe(
+        take(1),
+        takeUntil(this.destroy$)
+      ).subscribe(tasks => {
+        this.groupTaskCounts[group.id] = tasks.length;
+      });
     });
   }
 
   getGroupTaskCount(groupId: string): number {
-    // TODO: 実際のタスク数を取得
-    return 0;
+    return this.groupTaskCounts[groupId] || 0;
   }
 
   formatDate(timestamp: any): string {

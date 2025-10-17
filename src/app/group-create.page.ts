@@ -53,24 +53,25 @@ import { AuthService } from './auth.service';
 
 
           <div class="form-group">
-            <label class="form-label">参加承認</label>
+            <label class="form-label">グループの公開設定</label>
             <div class="radio-group">
               <label class="radio-option">
-                <input type="radio" formControlName="requiresApproval" [value]="true" class="radio-input">
+                <input type="radio" formControlName="isPublic" [value]="true" class="radio-input">
                 <span class="radio-label">
-                  <span class="radio-title">承認が必要</span>
-                  <span class="radio-description">管理者が参加リクエストを承認します</span>
+                  <span class="radio-title">公開グループ</span>
+                  <span class="radio-description">誰でも参加できます</span>
                 </span>
               </label>
               <label class="radio-option">
-                <input type="radio" formControlName="requiresApproval" [value]="false" class="radio-input">
+                <input type="radio" formControlName="isPublic" [value]="false" class="radio-input">
                 <span class="radio-label">
-                  <span class="radio-title">自動承認</span>
-                  <span class="radio-description">参加リクエストは自動で承認されます</span>
+                  <span class="radio-title">非公開グループ</span>
+                  <span class="radio-description">参加リクエストが必要です</span>
                 </span>
               </label>
             </div>
           </div>
+
 
           <div class="form-actions">
             <button 
@@ -383,7 +384,7 @@ export class GroupCreatePage {
   form = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(50)]],
     description: ['', [Validators.maxLength(500)]],
-    requiresApproval: [true, [Validators.required]]
+    isPublic: [true, [Validators.required]]
   });
 
   async onSubmit() {
@@ -391,7 +392,7 @@ export class GroupCreatePage {
     this.loading = true;
     this.error = '';
     
-    const { name, description, requiresApproval } = this.form.getRawValue();
+    const { name, description, isPublic } = this.form.getRawValue();
     
     try {
       const currentUser = this.auth.currentUser;
@@ -405,8 +406,8 @@ export class GroupCreatePage {
         description: description || '',
         ownerId: currentUser.uid,
         memberIds: [currentUser.uid],
-        isPublic: false, // デフォルトで非公開
-        requiresApproval: requiresApproval!
+        isPublic: isPublic!,
+        requiresApproval: true // デフォルトで承認が必要
       });
       
       await this.router.navigate(['/group', group.id]);

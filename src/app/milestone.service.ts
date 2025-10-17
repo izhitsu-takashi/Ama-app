@@ -51,7 +51,7 @@ export class MilestoneService {
         });
       }),
       catchError(error => {
-        console.error('Error loading milestones:', error);
+        console.error('Error loading group milestones:', error);
         return of([]);
       })
     );

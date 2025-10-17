@@ -20,8 +20,15 @@ export class AuthService {
     return signInWithEmailAndPassword(this.auth, email, password);
   }
 
-  logout() {
-    return signOut(this.auth);
+  async logout() {
+    try {
+      // ログアウト前にFirebaseの接続をクリーンアップ
+      await signOut(this.auth);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // エラーが発生してもログアウト処理を続行
+      throw error;
+    }
   }
 }
 

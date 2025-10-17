@@ -231,11 +231,39 @@ export class GroupService {
     return collectionData(
       query(
         collection(this.firestore, 'groups'),
-        where('isPublic', '==', true),
-        orderBy('createdAt', 'desc'),
-        limit(20)
+        where('isPublic', '==', true)
       ),
       { idField: 'id' }
+    ).pipe(
+      map((groups: any[]) => {
+        // クライアント側でソートとリミット
+        return (groups as Group[])
+          .sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+            return dateB.getTime() - dateA.getTime();
+          })
+          .slice(0, 20);
+      })
+    ) as Observable<Group[]>;
+  }
+
+  // すべてのグループ一覧取得（開発用）
+  getAllGroups(): Observable<Group[]> {
+    return collectionData(
+      collection(this.firestore, 'groups'),
+      { idField: 'id' }
+    ).pipe(
+      map((groups: any[]) => {
+        // クライアント側でソートとリミット
+        return (groups as Group[])
+          .sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+            return dateB.getTime() - dateA.getTime();
+          })
+          .slice(0, 50);
+      })
     ) as Observable<Group[]>;
   }
 
@@ -248,6 +276,27 @@ export class GroupService {
       completedTasks: 0,
       overdueTasks: 0
     };
+  }
+
+  // グループに参加
+  async joinGroup(groupId: string, userId: string): Promise<void> {
+    const user = await this.getUserProfile(userId);
+    
+    // GroupMembershipを作成
+    await addDoc(collection(this.firestore, 'groupMemberships'), {
+      groupId,
+      userId,
+      userName: user?.displayName || user?.email?.split('@')[0] || 'ユーザー',
+      userEmail: user?.email || '',
+      role: 'member',
+      joinedAt: serverTimestamp()
+    });
+  }
+
+  // ユーザープロファイルを取得
+  private async getUserProfile(userId: string): Promise<any> {
+    const userDoc = await getDoc(doc(this.firestore, 'users', userId));
+    return userDoc.exists() ? userDoc.data() : null;
   }
 
   private getCurrentUserId(): string {
