@@ -9,7 +9,6 @@ import { GroupCreatePage } from './group-create.page';
 import { GroupDetailPage } from './group-detail.page';
 import { GroupsPage } from './groups.page';
 import { NotificationsPage } from './notifications.page';
-import { MilestonePage } from './milestone.page';
 import { ProgressReportCreatePage } from './progress-report-create.page';
 import { ProgressReportsPage } from './progress-reports.page';
 import { ProgressReportDetailPage } from './progress-report-detail.page';
@@ -21,7 +20,6 @@ export const routes: Routes = [
   { path: 'groups', component: GroupsPage, canActivate: [authGuard] },
   { path: 'group/create', component: GroupCreatePage, canActivate: [authGuard] },
   { path: 'group/:id', component: GroupDetailPage, canActivate: [authGuard] },
-  { path: 'milestones', component: MilestonePage, canActivate: [authGuard] },
   { path: 'progress-report-create', component: ProgressReportCreatePage, canActivate: [authGuard] },
   { path: 'progress-reports', component: ProgressReportsPage, canActivate: [authGuard] },
   { path: 'progress-report-detail/:id', component: ProgressReportDetailPage, canActivate: [authGuard] },

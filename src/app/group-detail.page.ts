@@ -7,9 +7,8 @@ import { TaskService } from './task.service';
 import { AuthService } from './auth.service';
 import { UserService } from './user.service';
 import { JoinRequestService } from './join-request.service';
-import { MilestoneService } from './milestone.service';
 import { NotificationService } from './notification.service';
-import { Group, TaskItem, GroupMembership, JoinRequest, Milestone } from './models';
+import { Group, TaskItem, GroupMembership, JoinRequest } from './models';
 import { Observable, Subject, combineLatest, of } from 'rxjs';
 import { takeUntil, map, switchMap, take } from 'rxjs/operators';
 
@@ -43,16 +42,6 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
           >
             <span class="btn-icon">📈</span>
             タイムライン
-          </button>
-          <button 
-            class="btn btn-secondary" 
-            (click)="viewGroupMilestones()"
-          >
-            <span class="btn-icon">🎯</span>
-            マイルストーン
-            <span *ngIf="(groupMilestones$ | async)?.length" class="milestone-count">
-              {{ (groupMilestones$ | async)?.length }}
-            </span>
           </button>
           <button 
             *ngIf="isGroupOwner" 
@@ -97,6 +86,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 [class]="'priority-' + item.priority"
                 [style.left.px]="item.left"
                 [style.width.px]="item.width"
+                (click)="openTaskFromTimeline(item.id)"
               >
                 <div class="bar-tooltip">
                   <div class="tooltip-title">{{ item.title }}</div>
@@ -111,78 +101,76 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       </div>
 
 
-      <!-- メンバー一覧 -->
-      <div class="members-section" *ngIf="showMembers">
-        <div class="section-header">
-          <h2 class="section-title">メンバー一覧</h2>
-          <button class="close-btn" (click)="showMembers = false">×</button>
-        </div>
-        
-        <div class="members-list" *ngIf="(members$ | async) as members; else noMembers">
-          <div class="member-item" *ngFor="let member of members">
-            <div class="member-info">
-              <div class="member-avatar">
-                <span class="avatar-text">{{ getMemberInitial(getMemberDisplayName(member.userId, member.userName, member.userEmail)) }}</span>
-              </div>
-              <div class="member-details">
-                <h4 class="member-name">{{ getMemberDisplayName(member.userId, member.userName, member.userEmail) }}</h4>
-                <p class="member-email">{{ member.userEmail }}</p>
-                <span class="member-role" [class]="member.role">
-                  {{ getRoleLabel(member.role) }}
-                </span>
+      <!-- メンバー一覧（モーダル） -->
+      <div class="modal-overlay" *ngIf="showMembers" (click)="showMembers = false">
+        <div class="modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h2 class="modal-title">メンバー一覧</h2>
+            <button class="modal-close" (click)="showMembers = false">×</button>
+          </div>
+          <div class="modal-form">
+            <div class="members-list" *ngIf="(members$ | async) as members; else noMembers">
+              <div class="member-item" *ngFor="let member of members">
+                <div class="member-info">
+                  <div class="member-avatar">
+                    <span class="avatar-text">{{ getMemberInitial(getMemberDisplayName(member.userId, member.userName, member.userEmail)) }}</span>
+                  </div>
+                  <div class="member-details">
+                    <h4 class="member-name">{{ getMemberDisplayName(member.userId, member.userName, member.userEmail) }}</h4>
+                    <p class="member-email">{{ member.userEmail }}</p>
+                    <span class="member-role" [class]="member.role">
+                      {{ getRoleLabel(member.role) }}
+                    </span>
+                  </div>
+                </div>
+                <div class="member-meta">
+                  <span class="join-date">参加日: {{ formatDate(member.joinedAt) }}</span>
+                </div>
               </div>
             </div>
-            <div class="member-meta">
-              <span class="join-date">参加日: {{ formatDate(member.joinedAt) }}</span>
-            </div>
+            <ng-template #noMembers>
+              <div class="empty-state">
+                <div class="empty-icon">👥</div>
+                <h3 class="empty-title">メンバーがいません</h3>
+                <p class="empty-description">グループにメンバーが参加するとここに表示されます</p>
+              </div>
+            </ng-template>
           </div>
         </div>
-        
-        <ng-template #noMembers>
-          <div class="empty-state">
-            <div class="empty-icon">👥</div>
-            <h3 class="empty-title">メンバーがいません</h3>
-            <p class="empty-description">グループにメンバーが参加するとここに表示されます</p>
-          </div>
-        </ng-template>
       </div>
 
-      <!-- 参加リクエスト管理 -->
-      <div class="join-requests-section" *ngIf="showJoinRequests && isGroupOwner">
-        <div class="section-header">
-          <h2 class="section-title">参加リクエスト</h2>
-          <button class="close-btn" (click)="showJoinRequests = false">×</button>
-        </div>
-        
-        <div class="join-requests-list" *ngIf="(joinRequests$ | async) as requests; else noJoinRequests">
-          <div class="join-request-item" *ngFor="let request of requests">
-            <div class="request-info">
-              <div class="request-header">
-                <h4 class="request-user">{{ request.userName }}</h4>
-                <span class="request-date">{{ formatDate(request.createdAt) }}</span>
+      <!-- 参加リクエスト管理（モーダル） -->
+      <div class="modal-overlay" *ngIf="showJoinRequests && isGroupOwner" (click)="showJoinRequests = false">
+        <div class="modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h2 class="modal-title">参加リクエスト</h2>
+            <button class="modal-close" (click)="showJoinRequests = false">×</button>
+          </div>
+          <div class="modal-form">
+            <div class="join-requests-list" *ngIf="(joinRequests$ | async) as requests; else noJoinRequests">
+              <div class="join-request-item" *ngFor="let request of requests">
+                <div class="request-info">
+                  <div class="request-header">
+                    <h4 class="request-user">{{ request.userName }}</h4>
+                    <span class="request-date">{{ formatDate(request.createdAt) }}</span>
+                  </div>
+                  <p class="request-email">{{ request.userEmail }}</p>
+                </div>
+                <div class="request-actions">
+                  <button class="btn btn-success" (click)="approveJoinRequest(request.id!)">承認</button>
+                  <button class="btn btn-danger" (click)="rejectJoinRequest(request.id!)">拒否</button>
+                </div>
               </div>
-              <p class="request-email">{{ request.userEmail }}</p>
             </div>
-            <div class="request-actions">
-              <button class="btn btn-success" (click)="approveJoinRequest(request.id!)">
-                <span class="btn-icon">✓</span>
-                承認
-              </button>
-              <button class="btn btn-danger" (click)="rejectJoinRequest(request.id!)">
-                <span class="btn-icon">✗</span>
-                拒否
-              </button>
-            </div>
+            <ng-template #noJoinRequests>
+              <div class="empty-state">
+                <div class="empty-icon">👥</div>
+                <h3 class="empty-title">参加リクエストがありません</h3>
+                <p class="empty-description">グループへの参加リクエストが届くとここに表示されます</p>
+              </div>
+            </ng-template>
           </div>
         </div>
-        
-        <ng-template #noJoinRequests>
-          <div class="empty-state">
-            <div class="empty-icon">👥</div>
-            <h3 class="empty-title">参加リクエストがありません</h3>
-            <p class="empty-description">グループへの参加リクエストが届くとここに表示されます</p>
-          </div>
-        </ng-template>
       </div>
 
       <!-- 課題一覧 -->
@@ -361,6 +349,14 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
           </div>
 
           <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">発生日</label>
+              <input 
+                type="date" 
+                formControlName="occurredOn" 
+                class="form-input"
+              />
+            </div>
             <div class="form-group">
               <label class="form-label">期限</label>
               <input 
@@ -649,39 +645,47 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     .timeline-legend { display:flex; gap:12px; color:#6b7280; font-size: 13px; }
     .legend-item { display:flex; align-items:center; gap:6px; }
     .legend-color { width:12px; height:12px; border-radius:3px; display:inline-block; }
-    .legend-color.priority-low { background:#dbeafe; }
-    .legend-color.priority-medium { background:#fef3c7; }
-    .legend-color.priority-high { background:#fed7d7; }
-    .legend-color.priority-urgent { background:#fecaca; }
+    .legend-color.priority-low { background:#60a5fa; }
+    .legend-color.priority-medium { background:#34d399; }
+    .legend-color.priority-high { background:#fb923c; }
+    .legend-color.priority-urgent { background:#ef4444; }
 
-    .timeline-container { overflow-x: auto; overflow-y: visible; padding-bottom: 8px; }
-    .timeline-grid { position: relative; display:flex; min-width: 800px; border-bottom:1px solid #e5e7eb; padding-bottom: 8px; }
+    .timeline-container { overflow-x: visible; overflow-y: visible; padding-bottom: 8px; position: relative; }
+    .timeline-grid { position: relative; display:flex; min-width: 800px; border-bottom:1px solid #e5e7eb; padding-bottom: 8px; overflow: visible; }
     .timeline-day { flex: 0 0 40px; text-align:center; color:#9ca3af; font-size: 12px; position: relative; }
     .timeline-day::after { content:''; position:absolute; right:0; top:0; bottom:0; width:1px; background:#f1f5f9; }
     .day-label { display:inline-block; }
     .today-marker { position:absolute; top:0; bottom:-8px; width:2px; background:#ef4444; }
 
-    .timeline-rows { position: relative; overflow: visible; }
-    .timeline-row { position: relative; height: 28px; margin: 8px 0; }
-    .timeline-bar { position:absolute; top:2px; height: 24px; border-radius: 6px; background:#e5e7eb; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05); }
-    .timeline-bar.priority-low { background:#bfdbfe; }
-    .timeline-bar.priority-medium { background:#fde68a; }
-    .timeline-bar.priority-high { background:#fca5a5; }
-    .timeline-bar.priority-urgent { background:#f87171; }
+    .timeline-rows { position: relative; overflow: visible; pointer-events: none; }
+    .timeline-row, .timeline-bar { pointer-events: auto; }
+    .timeline-row { position: relative; height: 16px; margin: 8px 0; }
+    .timeline-bar { position:absolute; top:2px; height: 12px; border-radius: 6px; background:#e5e7eb; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05); }
+    /* タイムラインも同配色に統一（低=青, 中=緑, 高=オレンジ, 緊急=赤） */
+    .timeline-bar.priority-low { background:#60a5fa; }
+    .timeline-bar.priority-medium { background:#34d399; }
+    .timeline-bar.priority-high { background:#fb923c; }
+    .timeline-bar.priority-urgent { background:#ef4444; }
 
     .timeline-bar { position: relative; }
     .bar-tooltip { 
       position:absolute; 
-      top: -8px; left: 100%; 
-      transform: translateX(8px); 
+      bottom: 100%; left: 50%; 
+      transform: translate(-50%, -8px); 
       background: rgba(17,24,39,0.95); 
       color:#fff; 
-      padding:8px 10px; 
+      padding:10px 12px; 
       border-radius:8px; 
       font-size:12px; 
+      line-height: 1.4;
       display:none; 
-      white-space: nowrap;
-      z-index: 50; /* 前面に表示 */
+      width: 260px; /* 固定幅 */
+      white-space: normal; /* 折り返し */
+      word-break: break-word;
+      text-align: left;
+      z-index: 100; /* 前面に表示 */
+      pointer-events: none;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.25);
     }
     .timeline-bar:hover .bar-tooltip { display:block; }
     .tooltip-title { font-weight:700; margin-bottom:4px; }
@@ -832,18 +836,18 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     }
 
     .priority-medium {
-      background: #fef3c7;
-      color: #d97706;
+      background: #d1fae5; /* 緑 */
+      color: #065f46;
     }
 
     .priority-high {
-      background: #fed7d7;
-      color: #dc2626;
+      background: #ffedd5; /* オレンジ */
+      color: #9a3412;
     }
 
     .priority-urgent {
-      background: #fecaca;
-      color: #b91c1c;
+      background: #fee2e2; /* 赤 */
+      color: #991b1b;
     }
 
     .task-progress-cell {
@@ -1009,10 +1013,11 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       font-weight: 600;
     }
 
-    .priority-low { background: #c6f6d5; color: #2f855a; }
-    .priority-medium { background: #bee3f8; color: #2b6cb0; }
-    .priority-high { background: #feebc8; color: #dd6b20; }
-    .priority-urgent { background: #fed7d7; color: #c53030; }
+    /* 統一: 低=青, 中=緑, 高=オレンジ, 緊急=赤 */
+    .priority-low { background: #dbeafe; color: #1e40af; }
+    .priority-medium { background: #d1fae5; color: #065f46; }
+    .priority-high { background: #ffedd5; color: #9a3412; }
+    .priority-urgent { background: #fee2e2; color: #991b1b; }
 
     .task-progress {
       margin-bottom: 16px;
@@ -1517,7 +1522,6 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private userService = inject(UserService);
   private joinRequestService = inject(JoinRequestService);
-  private milestoneService = inject(MilestoneService);
   private notificationService = inject(NotificationService);
 
   private destroy$ = new Subject<void>();
@@ -1528,10 +1532,9 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   memberNameById: { [userId: string]: string } = {}; // ユーザー名キャッシュ
   tasks$: Observable<TaskItem[]> = of([]);
   filteredTasks: TaskItem[] = [];
-  groupMilestones$: Observable<Milestone[]> = of([]);
   showTimeline = false;
   timelineDays: Date[] = [];
-  timelineItems: Array<{ title:string; priority:string; left:number; width:number; due: any; assignee: string; progress:number }>=[];
+  timelineItems: Array<{ id:string; title:string; priority:string; left:number; width:number; due: any; assignee: string; progress:number }>=[];
   timelineTodayOffset = -1;
   private notifiedDueSoonTaskIds = new Set<string>();
 
@@ -1557,6 +1560,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     content: [''],
     assigneeId: [''],
     priority: ['medium', [Validators.required]],
+    occurredOn: [''],
     dueDate: [''],
     progress: [0, [Validators.min(0), Validators.max(100)]]
   });
@@ -1584,7 +1588,6 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       if (group) {
         this.members$ = this.groupService.getGroupMembers(group.id);
         this.tasks$ = this.taskService.getTasksByGroup(group.id);
-        this.groupMilestones$ = this.milestoneService.getGroupMilestones(group.id);
         
         // グループオーナーチェック
         this.auth.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
@@ -1655,11 +1658,15 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   }
 
   private buildTimeline(tasks: TaskItem[]) {
-    // 対象期間: 今日を中心に過去7日〜先14日 = 22日分
-    const today = new Date();
-    const start = new Date(today);
+    // 日付をローカルの0時に正規化
+    const toMidnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+    // 対象期間: 今日を中心に過去7日〜先14日 = 22日分（いずれも0時基準）
+    const now = new Date();
+    const today = toMidnight(now);
+    const start = toMidnight(new Date(today));
     start.setDate(start.getDate() - 7);
-    const end = new Date(today);
+    const end = toMidnight(new Date(today));
     end.setDate(end.getDate() + 14);
 
     // 目盛り生成
@@ -1675,22 +1682,27 @@ export class GroupDetailPage implements OnInit, OnDestroy {
 
     // バーに必要な位置と幅を計算（1日=40px）。
     // 既存データ: occurredOn(開始)〜dueDate(終了)。
-    const items: Array<{ title:string; priority:string; left:number; width:number; due:any; assignee:string; progress:number }>=[];
+    const items: Array<{ id:string; title:string; priority:string; left:number; width:number; due:any; assignee:string; progress:number }>=[];
     const toDate = (v:any) => v?.toDate ? v.toDate() : (v ? new Date(v) : undefined);
     (tasks || []).forEach(t => {
       if (t.status === 'completed') return; // 完了は非表示
-      const startDate = toDate(t.occurredOn) || today;
-      const endDate = toDate(t.dueDate) || new Date(startDate.getTime() + dayMs); // 期限未設定は+1日
+      // 0時基準に正規化
+      const startDateRaw = toDate(t.occurredOn) || today;
+      const endDateRaw = toDate(t.dueDate) || new Date(startDateRaw.getTime() + dayMs); // 期限未設定は+1日
+      const startDate = toMidnight(startDateRaw);
+      const endDate = toMidnight(endDateRaw);
       // 可視範囲外はスキップ
       if (endDate < start || startDate > end) return;
 
       const clampedStart = startDate < start ? start : startDate;
       const clampedEnd = endDate > end ? end : endDate;
       const left = Math.max(0, Math.floor((clampedStart.getTime() - start.getTime()) / dayMs) * 40);
-      const widthDays = Math.max(1, Math.ceil((clampedEnd.getTime() - clampedStart.getTime()) / dayMs));
+      // 終了日を含む幅（同日なら1日幅）
+      const widthDays = Math.max(1, Math.round(((clampedEnd.getTime() - clampedStart.getTime()) / dayMs)) + 1);
       const width = widthDays * 40 - 6; // 少し余白
 
       items.push({
+        id: t.id,
         title: t.title,
         priority: t.priority,
         left,
@@ -1820,6 +1832,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       content: '',
       assigneeId: '',
       priority: 'medium',
+      occurredOn: this.formatDateForInput(new Date()),
       dueDate: '',
       progress: 0
     });
@@ -1850,10 +1863,10 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         content: taskData.content || '',
         assigneeId: taskData.assigneeId || '',
         priority: taskData.priority as any,
+        occurredOn: taskData.occurredOn ? new Date(taskData.occurredOn) : new Date(),
         dueDate: taskData.dueDate ? new Date(taskData.dueDate) : undefined,
         progress: taskData.progress || 0,
         status: 'not_started',
-        occurredOn: new Date(),
         isRecurring: false
       });
       
@@ -1895,6 +1908,21 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       status: task.status
     });
     this.showEditModal = true;
+  }
+
+  openTaskFromTimeline(taskId: string) {
+    if (!taskId) return;
+    // 現在のfilteredTasksから該当を検索
+    const target = this.filteredTasks.find(t => t.id === taskId);
+    if (target) {
+      this.editTask(target);
+    } else {
+      // 非同期で取得してから開くフォールバック
+      this.tasks$.pipe(take(1)).subscribe(tasks => {
+        const t = (tasks || []).find(x => x.id === taskId);
+        if (t) this.editTask(t);
+      });
+    }
   }
 
   hideEditTaskModal() {
@@ -2023,11 +2051,5 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   }
 
   // マイルストーン表示メソッド
-  viewGroupMilestones() {
-    if (this.group) {
-      this.router.navigate(['/milestones'], { 
-        queryParams: { groupId: this.group.id } 
-      });
-    }
-  }
+  
 }

@@ -187,7 +187,7 @@ export interface MilestoneTask {
 
 
 export interface ReportAttachment {
-  type: 'group' | 'milestone' | 'task_list';
+  type: 'group' | 'task_list';
   id: Id;
   name: string;
 }
@@ -234,7 +234,7 @@ export interface CalendarEvent {
   description?: string;
   startDate: Timestamp;
   endDate: Timestamp;
-  type: 'personal' | 'task_due' | 'milestone';
+  type: 'personal' | 'task_due';
   relatedId?: Id; // 関連するタスクやマイルストーンのID
   color?: string; // '#RRGGBB' など
   createdAt: Timestamp;
@@ -280,7 +280,7 @@ export interface UserSettings {
 export interface ExportData {
   groups: Group[];
   tasks: TaskItem[];
-  milestones: Milestone[];
+  milestones: any[];
   reports: ProgressReport[];
   exportedAt: Timestamp;
   exportedBy: Id;

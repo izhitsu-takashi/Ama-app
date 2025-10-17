@@ -49,9 +49,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
           <button class="action-btn primary" routerLink="/progress-reports">
             📊 進捗報告
           </button>
-          <button class="action-btn secondary" (click)="createMilestone()">
-            🎯 マイルストーン作成
-          </button>
+          
           <button class="action-btn secondary" routerLink="/group/create">
             👥 グループ作成
           </button>
@@ -240,10 +238,10 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
               <p>予定はありません</p>
             </div>
               <div class="events-list" *ngIf="selectedDayEvents.length > 0">
-                <div class="event-row" *ngFor="let ev of selectedDayEvents" [style.background]="ev.type === 'task_due' ? '#fecaca' : (ev.color || '#3b82f6')" [style.color]="'#ffffff'">
+                <div class="event-row" *ngFor="let ev of selectedDayEvents" [style.background]="ev.type === 'task_due' ? '#ef4444' : (ev.color || '#3b82f6')" [style.color]="'#ffffff'">
                 <div class="event-time">{{ formatTimeRange(ev.startDate, ev.endDate) }}</div>
                 <div class="event-title">{{ ev.title }}</div>
-                <div class="event-actions" *ngIf="ev.type === 'personal'">
+                <div class="event-actions" *ngIf="ev.type !== 'task_due'">
                   <button class="btn small success" (click)="openEditEvent(ev)">編集</button>
                   <button class="btn small danger" (click)="deleteEvent(ev)">削除</button>
                 </div>
@@ -269,8 +267,8 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
                 <div class="event-time">{{ formatTimeRange(ev.startDate, ev.endDate) }}</div>
                 <div class="event-title">{{ ev.title }}</div>
                 <div class="event-type">{{ getEventTypeLabel(ev.type) }}</div>
-                <div class="event-actions">
-                  <button class="btn secondary small" (click)="openEditEvent(ev)">編集</button>
+                <div class="event-actions" *ngIf="ev.type !== 'task_due'">
+                  <button class="btn small success" (click)="openEditEvent(ev)">編集</button>
                   <button class="btn danger small" (click)="deleteEvent(ev)">削除</button>
                 </div>
               </div>
@@ -637,7 +635,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
 
     .event-personal { background: #4299e1; }
     .event-task_due { background: #e53e3e; }
-    .event-milestone { background: #38a169; }
+    /* milestone color removed */
 
     .more-events {
       font-size: 0.625rem;
@@ -665,6 +663,8 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       justify-content:center;
       line-height: 1;
     }
+    .event-actions .btn.success { background-color:#3b82f6 !important; } /* 明るめの青 */
+    .event-actions .btn.success:hover { background-color:#2563eb !important; }
     .btn.tertiary { background: rgba(255,255,255,0.15); color:#fff; }
     .btn.tertiary:hover { background: rgba(255,255,255,0.28); }
     .btn.success { background-color: #16a34a !important; color:#ffffff !important; border:none !important; }
@@ -1137,7 +1137,7 @@ export class MainPage implements OnInit, OnDestroy {
             endDate: t.dueDate,
             type: 'task_due',
             relatedId: t.id,
-            color: '#fecaca',
+            color: '#ef4444',
             createdAt: new Date() as any
           }));
         this._taskDueEventsCache = dueEvents;
@@ -1262,9 +1262,7 @@ export class MainPage implements OnInit, OnDestroy {
   }
 
 
-  createMilestone() {
-    this.router.navigate(['/milestones']);
-  }
+  
 
   showGroupManagement() {
     this.router.navigate(['/groups']);
@@ -1400,8 +1398,6 @@ export class MainPage implements OnInit, OnDestroy {
         return '予定';
       case 'task_due':
         return '課題期限';
-      case 'milestone':
-        return 'マイルストーン';
       default:
         return 'イベント';
     }

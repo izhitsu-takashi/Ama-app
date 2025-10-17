@@ -78,10 +78,9 @@ import { takeUntil, switchMap } from 'rxjs/operators';
                 </span>
               </div>
 
-              <div class="notification-actions" *ngIf="!notification.isRead">
-                <button class="btn btn-small" (click)="markAsRead(notification.id); $event.stopPropagation()">
-                  既読にする
-                </button>
+              <div class="notification-actions">
+                <button class="btn btn-small" *ngIf="!notification.isRead" (click)="markAsRead(notification.id); $event.stopPropagation()">既読にする</button>
+                <button class="btn btn-small btn-danger" (click)="deleteNotification(notification.id); $event.stopPropagation()">削除</button>
               </div>
             </div>
 
@@ -100,43 +99,7 @@ import { takeUntil, switchMap } from 'rxjs/operators';
         </ng-template>
       </div>
 
-      <!-- 参加リクエスト管理 -->
-      <div class="join-requests-section">
-        <div class="section-header">
-          <h2 class="section-title">参加リクエスト管理</h2>
-        </div>
-        
-        <div class="join-requests-list" *ngIf="(joinRequests$ | async) as requests; else noJoinRequests">
-          <div class="join-request-item" *ngFor="let request of requests">
-            <div class="request-info">
-              <div class="request-header">
-                <h4 class="request-user">{{ request.userName }}</h4>
-                <span class="request-date">{{ formatDate(request.createdAt) }}</span>
-              </div>
-              <p class="request-group">グループ: {{ getGroupName(request.groupId) }}</p>
-              <p class="request-email">{{ request.userEmail }}</p>
-            </div>
-            <div class="request-actions">
-              <button class="btn btn-success" (click)="approveJoinRequest(request.id!)">
-                <span class="btn-icon">✓</span>
-                承認
-              </button>
-              <button class="btn btn-danger" (click)="rejectJoinRequest(request.id!)">
-                <span class="btn-icon">✗</span>
-                拒否
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <ng-template #noJoinRequests>
-          <div class="empty-state">
-            <div class="empty-icon">👥</div>
-            <h3 class="empty-title">参加リクエストがありません</h3>
-            <p class="empty-description">グループへの参加リクエストが届くとここに表示されます</p>
-          </div>
-        </ng-template>
-      </div>
+      
 
       <!-- リマインド設定 -->
       <div class="reminders-section">
@@ -780,6 +743,20 @@ export class NotificationsPage implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  async deleteNotification(id: string) {
+    try {
+      await this.notificationService.deleteNotification(id);
+      this.reloadNotifications();
+    } catch (e) {
+      console.error('通知削除エラー:', e);
+    }
+  }
+
+  private reloadNotifications() {
+    // 再購読せずとも、通知一覧はcollectionDataでライブ更新される場合は不要。
+    // 明示的にリロードが必要な場合のみ実装を強化。
   }
 
   getNotificationIcon(type: string): string {
