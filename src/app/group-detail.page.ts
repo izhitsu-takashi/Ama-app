@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { UserService } from './user.service';
 import { JoinRequestService } from './join-request.service';
 import { MilestoneService } from './milestone.service';
+import { NotificationService } from './notification.service';
 import { Group, TaskItem, GroupMembership, JoinRequest, Milestone } from './models';
 import { Observable, Subject, combineLatest, of } from 'rxjs';
 import { takeUntil, map, switchMap, take } from 'rxjs/operators';
@@ -38,6 +39,13 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
           </button>
           <button 
             class="btn btn-secondary" 
+            (click)="toggleTimeline()"
+          >
+            <span class="btn-icon">📈</span>
+            タイムライン
+          </button>
+          <button 
+            class="btn btn-secondary" 
             (click)="viewGroupMilestones()"
           >
             <span class="btn-icon">🎯</span>
@@ -64,7 +72,44 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
         </div>
       </div>
 
-      
+      <!-- タイムライン -->
+      <div class="timeline-section" *ngIf="showTimeline">
+        <div class="timeline-header">
+          <h2 class="section-title">タイムライン</h2>
+          <div class="timeline-legend">
+            <span class="legend-item"><span class="legend-color priority-low"></span>低</span>
+            <span class="legend-item"><span class="legend-color priority-medium"></span>中</span>
+            <span class="legend-item"><span class="legend-color priority-high"></span>高</span>
+            <span class="legend-item"><span class="legend-color priority-urgent"></span>緊急</span>
+          </div>
+        </div>
+        <div class="timeline-container">
+          <div class="timeline-grid">
+            <div class="timeline-day" *ngFor="let d of timelineDays">
+              <span class="day-label">{{ d | date:'MM/dd' }}</span>
+            </div>
+            <div class="today-marker" *ngIf="timelineTodayOffset >= 0" [style.left.px]="timelineTodayOffset"></div>
+          </div>
+          <div class="timeline-rows">
+            <div class="timeline-row" *ngFor="let item of timelineItems">
+              <div 
+                class="timeline-bar" 
+                [class]="'priority-' + item.priority"
+                [style.left.px]="item.left"
+                [style.width.px]="item.width"
+              >
+                <div class="bar-tooltip">
+                  <div class="tooltip-title">{{ item.title }}</div>
+                  <div class="tooltip-line">期限: {{ item.due | date:'MM/dd' }}</div>
+                  <div class="tooltip-line">担当: {{ item.assignee }}</div>
+                  <div class="tooltip-line">進捗: {{ item.progress || 0 }}%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
 
       <!-- メンバー一覧 -->
       <div class="members-section" *ngIf="showMembers">
@@ -214,7 +259,10 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 <td class="task-date-cell">
                   {{ formatDate(task.occurredOn) }}
                 </td>
-                <td class="task-due-cell" [class.due-soon]="isDueSoon(task.dueDate)" [class.overdue]="isOverdue(task.dueDate)">
+                <td class="task-due-cell" 
+                    [class.due-warning]="isDueWithinDays(task.dueDate, 7) && !isDueWithinDays(task.dueDate, 3) && !isOverdue(task.dueDate)"
+                    [class.due-danger]="isDueWithinDays(task.dueDate, 3) && !isOverdue(task.dueDate)"
+                    [class.overdue]="isOverdue(task.dueDate)">
                   {{ formatDate(task.dueDate) }}
                 </td>
                 <td class="task-assignee-cell">
@@ -236,13 +284,10 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 <td class="task-actions-cell">
                   <div class="action-buttons">
                     <button class="btn btn-small btn-success" (click)="markTaskComplete(task.id)" *ngIf="task.status !== 'completed'" title="完了">
-                      ✓
+                      完了
                     </button>
                     <button class="btn btn-small btn-primary" (click)="editTask(task)" title="編集">
-                      ✏️
-                    </button>
-                    <button class="btn btn-small btn-danger" (click)="deleteTask(task.id)" title="削除">
-                      🗑️
+                      編集
                     </button>
                   </div>
                 </td>
@@ -401,6 +446,14 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
           </div>
 
           <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">発生日</label>
+              <input 
+                type="date" 
+                formControlName="occurredOn" 
+                class="form-input"
+              />
+            </div>
             <div class="form-group">
               <label class="form-label">期限</label>
               <input 
@@ -576,6 +629,64 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
 
+    /* タイムライン */
+    .timeline-section {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 24px;
+      overflow: visible; /* ツールチップがはみ出せるように */
+    }
+
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .timeline-legend { display:flex; gap:12px; color:#6b7280; font-size: 13px; }
+    .legend-item { display:flex; align-items:center; gap:6px; }
+    .legend-color { width:12px; height:12px; border-radius:3px; display:inline-block; }
+    .legend-color.priority-low { background:#dbeafe; }
+    .legend-color.priority-medium { background:#fef3c7; }
+    .legend-color.priority-high { background:#fed7d7; }
+    .legend-color.priority-urgent { background:#fecaca; }
+
+    .timeline-container { overflow-x: auto; overflow-y: visible; padding-bottom: 8px; }
+    .timeline-grid { position: relative; display:flex; min-width: 800px; border-bottom:1px solid #e5e7eb; padding-bottom: 8px; }
+    .timeline-day { flex: 0 0 40px; text-align:center; color:#9ca3af; font-size: 12px; position: relative; }
+    .timeline-day::after { content:''; position:absolute; right:0; top:0; bottom:0; width:1px; background:#f1f5f9; }
+    .day-label { display:inline-block; }
+    .today-marker { position:absolute; top:0; bottom:-8px; width:2px; background:#ef4444; }
+
+    .timeline-rows { position: relative; overflow: visible; }
+    .timeline-row { position: relative; height: 28px; margin: 8px 0; }
+    .timeline-bar { position:absolute; top:2px; height: 24px; border-radius: 6px; background:#e5e7eb; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05); }
+    .timeline-bar.priority-low { background:#bfdbfe; }
+    .timeline-bar.priority-medium { background:#fde68a; }
+    .timeline-bar.priority-high { background:#fca5a5; }
+    .timeline-bar.priority-urgent { background:#f87171; }
+
+    .timeline-bar { position: relative; }
+    .bar-tooltip { 
+      position:absolute; 
+      top: -8px; left: 100%; 
+      transform: translateX(8px); 
+      background: rgba(17,24,39,0.95); 
+      color:#fff; 
+      padding:8px 10px; 
+      border-radius:8px; 
+      font-size:12px; 
+      display:none; 
+      white-space: nowrap;
+      z-index: 50; /* 前面に表示 */
+    }
+    .timeline-bar:hover .bar-tooltip { display:block; }
+    .tooltip-title { font-weight:700; margin-bottom:4px; }
+    .tooltip-line { opacity: .9; }
+
     .tasks-header {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -684,20 +795,16 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     .task-due-cell {
       white-space: nowrap;
       font-size: 16px; /* 文字サイズアップ */
+      color: #111827; /* 黒 */
     }
 
-    .task-due-cell.due-soon {
-      color: #f59e0b;
-      font-weight: 600;
-    }
-
-    .task-due-cell.overdue {
-      color: #ef4444;
-      font-weight: 600;
-    }
+    .task-due-cell.due-warning { color: #f59e0b; font-weight: 600; }
+    .task-due-cell.due-danger { color: #ef4444; font-weight: 600; }
+    .task-due-cell.overdue { color: #ef4444; font-weight: 600; }
 
     .task-assignee-cell {
       font-size: 16px; /* 文字サイズアップ */
+      color: #111827; /* 黒 */
     }
 
     .task-priority-cell {
@@ -781,12 +888,19 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     }
 
     .btn-small {
-      padding: 6px 8px;
-      font-size: 12px;
+      padding: 6px 10px;
+      font-size: 14px;
       border-radius: 6px;
       border: none;
       cursor: pointer;
       transition: all 0.2s ease;
+      min-width: 48px; /* ボタン幅を統一 */
+      white-space: nowrap; /* 折り返し防止 */
+      height: 32px; /* 高さを統一 */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center; /* 文字を中央に */
+      line-height: 1;
     }
 
     .btn-success {
@@ -1404,6 +1518,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   private userService = inject(UserService);
   private joinRequestService = inject(JoinRequestService);
   private milestoneService = inject(MilestoneService);
+  private notificationService = inject(NotificationService);
 
   private destroy$ = new Subject<void>();
 
@@ -1414,6 +1529,11 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   tasks$: Observable<TaskItem[]> = of([]);
   filteredTasks: TaskItem[] = [];
   groupMilestones$: Observable<Milestone[]> = of([]);
+  showTimeline = false;
+  timelineDays: Date[] = [];
+  timelineItems: Array<{ title:string; priority:string; left:number; width:number; due: any; assignee: string; progress:number }>=[];
+  timelineTodayOffset = -1;
+  private notifiedDueSoonTaskIds = new Set<string>();
 
   showCreateModal = false;
   showEditModal = false;
@@ -1446,6 +1566,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     content: [''],
     assigneeId: [''],
     priority: ['medium', [Validators.required]],
+    occurredOn: [''],
     dueDate: [''],
     progress: [0, [Validators.min(0), Validators.max(100)]],
     status: ['not_started', [Validators.required]]
@@ -1496,6 +1617,8 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         this.tasks$.pipe(takeUntil(this.destroy$)).subscribe(tasks => {
           this.filteredTasks = tasks;
           this.applyFilters();
+          this.buildTimeline(tasks);
+          this.notifyDueSoon(tasks);
         });
       }
     });
@@ -1522,6 +1645,91 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     this.priorityFilter = '';
     this.assigneeFilter = '';
     this.applyFilters();
+  }
+
+  toggleTimeline() {
+    this.showTimeline = !this.showTimeline;
+    if (this.showTimeline) {
+      this.tasks$.pipe(take(1)).subscribe(tasks => this.buildTimeline(tasks));
+    }
+  }
+
+  private buildTimeline(tasks: TaskItem[]) {
+    // 対象期間: 今日を中心に過去7日〜先14日 = 22日分
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(start.getDate() - 7);
+    const end = new Date(today);
+    end.setDate(end.getDate() + 14);
+
+    // 目盛り生成
+    const days: Date[] = [];
+    const dayMs = 24 * 60 * 60 * 1000;
+    for (let d = new Date(start); d <= end; d = new Date(d.getTime() + dayMs)) {
+      days.push(new Date(d));
+    }
+    this.timelineDays = days;
+
+    // today marker offset
+    this.timelineTodayOffset = Math.round(((today.getTime() - start.getTime()) / dayMs) * 40);
+
+    // バーに必要な位置と幅を計算（1日=40px）。
+    // 既存データ: occurredOn(開始)〜dueDate(終了)。
+    const items: Array<{ title:string; priority:string; left:number; width:number; due:any; assignee:string; progress:number }>=[];
+    const toDate = (v:any) => v?.toDate ? v.toDate() : (v ? new Date(v) : undefined);
+    (tasks || []).forEach(t => {
+      if (t.status === 'completed') return; // 完了は非表示
+      const startDate = toDate(t.occurredOn) || today;
+      const endDate = toDate(t.dueDate) || new Date(startDate.getTime() + dayMs); // 期限未設定は+1日
+      // 可視範囲外はスキップ
+      if (endDate < start || startDate > end) return;
+
+      const clampedStart = startDate < start ? start : startDate;
+      const clampedEnd = endDate > end ? end : endDate;
+      const left = Math.max(0, Math.floor((clampedStart.getTime() - start.getTime()) / dayMs) * 40);
+      const widthDays = Math.max(1, Math.ceil((clampedEnd.getTime() - clampedStart.getTime()) / dayMs));
+      const width = widthDays * 40 - 6; // 少し余白
+
+      items.push({
+        title: t.title,
+        priority: t.priority,
+        left,
+        width,
+        due: endDate,
+        assignee: this.getAssigneeName(t.assigneeId),
+        progress: t.progress || 0
+      });
+    });
+    this.timelineItems = items;
+  }
+
+  private async notifyDueSoon(tasks: TaskItem[]) {
+    const now = new Date();
+    const limit = new Date();
+    limit.setDate(limit.getDate() + 3);
+    for (const t of tasks || []) {
+      if (!t.assigneeId) continue;
+      if (t.status === 'completed') continue;
+      const due = (t as any).dueDate?.toDate ? (t as any).dueDate.toDate() : (t as any).dueDate ? new Date((t as any).dueDate) : undefined;
+      if (!due) continue;
+      if (due < now) continue; // 期限切れは対象外（別処理）
+      if (due <= limit) {
+        // 重複送信を抑止
+        if (this.notifiedDueSoonTaskIds.has(t.id)) continue;
+        try {
+          await this.notificationService.createTaskNotification(
+            t.assigneeId,
+            'task_due_soon' as any,
+            t.id,
+            t.groupId,
+            { taskTitle: t.title, dueDate: (t as any).dueDate }
+          );
+          this.notifiedDueSoonTaskIds.add(t.id);
+        } catch (e) {
+          console.error('期限間近通知エラー:', e);
+        }
+      }
+    }
   }
 
   getTaskCount(status: string): number {
@@ -1595,6 +1803,15 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return d <= tomorrow && d >= new Date();
+  }
+
+  isDueWithinDays(date: any, days: number): boolean {
+    if (!date) return false;
+    const d = date.toDate ? date.toDate() : new Date(date);
+    const now = new Date();
+    const limit = new Date();
+    limit.setDate(limit.getDate() + days);
+    return d >= now && d <= limit;
   }
 
   showCreateTaskModal() {
@@ -1672,6 +1889,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       content: task.content,
       assigneeId: task.assigneeId || '',
       priority: task.priority,
+      occurredOn: task.occurredOn ? this.formatDateForInput(task.occurredOn) : '',
       dueDate: task.dueDate ? this.formatDateForInput(task.dueDate) : '',
       progress: task.progress || 0,
       status: task.status
@@ -1705,6 +1923,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         content: taskData.content || '',
         assigneeId: taskData.assigneeId || '',
         priority: taskData.priority as any,
+        occurredOn: taskData.occurredOn ? new Date(taskData.occurredOn) : this.editingTask.occurredOn,
         dueDate: taskData.dueDate ? new Date(taskData.dueDate) : undefined,
         progress: taskData.progress || 0,
         status: taskData.status as any
