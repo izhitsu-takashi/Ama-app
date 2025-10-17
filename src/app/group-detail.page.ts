@@ -35,9 +35,6 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
           >
             <span class="btn-icon">👥</span>
             メンバー
-            <span class="member-count">
-              {{ (members$ | async)?.length || 0 }}
-            </span>
           </button>
           <button 
             class="btn btn-secondary" 
@@ -67,56 +64,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
         </div>
       </div>
 
-      <!-- グループ情報 -->
-      <div class="group-info" *ngIf="group">
-        <div class="info-card">
-          <div class="info-item">
-            <span class="info-label">メンバー数</span>
-            <span class="info-value">{{ (members$ | async)?.length || 0 }}人</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">課題数</span>
-            <span class="info-value">{{ (tasks$ | async)?.length || 0 }}件</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">完了率</span>
-            <span class="info-value">{{ getCompletionRate() }}%</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- フィルター -->
-      <div class="filter-section">
-        <div class="filter-group">
-          <label class="filter-label">ステータス</label>
-          <select class="filter-select" [(ngModel)]="statusFilter" (change)="applyFilters()">
-            <option value="">すべて</option>
-            <option value="not_started">未着手</option>
-            <option value="in_progress">実行中</option>
-            <option value="completed">完了</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label class="filter-label">優先度</label>
-          <select class="filter-select" [(ngModel)]="priorityFilter" (change)="applyFilters()">
-            <option value="">すべて</option>
-            <option value="low">低</option>
-            <option value="medium">中</option>
-            <option value="high">高</option>
-            <option value="urgent">緊急</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label class="filter-label">担当者</label>
-          <select class="filter-select" [(ngModel)]="assigneeFilter" (change)="applyFilters()">
-            <option value="">すべて</option>
-            <option *ngFor="let member of (members$ | async)" [value]="member.userId">
-              {{ member.userName || member.userEmail || 'ユーザー' }}
-            </option>
-          </select>
-        </div>
-        <button class="btn btn-secondary" (click)="clearFilters()">クリア</button>
-      </div>
+      
 
       <!-- メンバー一覧 -->
       <div class="members-section" *ngIf="showMembers">
@@ -195,8 +143,17 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       <!-- 課題一覧 -->
       <div class="tasks-section">
         <div class="tasks-header">
-          <h2 class="section-title">課題一覧</h2>
-          <div class="tasks-stats">
+          <div class="tasks-header-left">
+            <h2 class="section-title">課題一覧</h2>
+            <div class="tasks-stats">
+              <span class="stat-item">
+                <span class="stat-label">課題数:</span>
+                <span class="stat-value">{{ (tasks$ | async)?.length || 0 }}件</span>
+              </span>
+              <span class="stat-item">
+                <span class="stat-label">完了率:</span>
+                <span class="stat-value">{{ getCompletionRate() }}%</span>
+              </span>
             <span class="stat-item">
               <span class="stat-label">未着手:</span>
               <span class="stat-value">{{ getTaskCount('not_started') }}</span>
@@ -209,6 +166,29 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
               <span class="stat-label">完了:</span>
               <span class="stat-value">{{ getTaskCount('completed') }}</span>
             </span>
+            </div>
+          </div>
+          <div class="tasks-filters">
+            <select class="filter-select" [(ngModel)]="statusFilter" (change)="applyFilters()">
+              <option value="">ステータス: すべて</option>
+              <option value="not_started">未着手</option>
+              <option value="in_progress">実行中</option>
+              <option value="completed">完了</option>
+            </select>
+            <select class="filter-select" [(ngModel)]="priorityFilter" (change)="applyFilters()">
+              <option value="">優先度: すべて</option>
+              <option value="low">低</option>
+              <option value="medium">中</option>
+              <option value="high">高</option>
+              <option value="urgent">緊急</option>
+            </select>
+            <select class="filter-select" [(ngModel)]="assigneeFilter" (change)="applyFilters()">
+              <option value="">担当者: すべて</option>
+              <option *ngFor="let member of (members$ | async)" [value]="member.userId">
+                {{ member.userName || member.userEmail || 'ユーザー' }}
+              </option>
+            </select>
+            <button class="btn btn-secondary" (click)="clearFilters()">クリア</button>
           </div>
         </div>
 
@@ -573,60 +553,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       background: #f1f5f9;
     }
 
-    .group-info {
-      margin-bottom: 30px;
-    }
-
-    .info-card {
-      background: white;
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      display: flex;
-      gap: 40px;
-    }
-
-    .info-item {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .info-label {
-      font-size: 14px;
-      color: #6b7280;
-      font-weight: 500;
-    }
-
-    .info-value {
-      font-size: 24px;
-      color: #2d3748;
-      font-weight: 700;
-    }
-
-    .filter-section {
-      background: white;
-      border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 30px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      display: flex;
-      gap: 20px;
-      align-items: end;
-      flex-wrap: wrap;
-    }
-
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .filter-label {
-      font-size: 14px;
-      font-weight: 600;
-      color: #374151;
-    }
+    /* 旧情報カード・旧フィルターのスタイルを削除 */
 
     .filter-select {
       padding: 10px 12px;
@@ -650,9 +577,9 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     }
 
     .tasks-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
       margin-bottom: 24px;
       padding-bottom: 16px;
       border-bottom: 1px solid #e2e8f0;
@@ -668,6 +595,20 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     .tasks-stats {
       display: flex;
       gap: 20px;
+    }
+
+    .tasks-header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .tasks-filters {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
     }
 
     .stat-item {
@@ -715,7 +656,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       border-bottom: 1px solid #f1f5f9;
       vertical-align: top;
       background: white;
-      font-size: 15px;
+      font-size: 16px; /* タイトル以外の文字を大きく */
     }
 
     .task-row:hover {
@@ -742,7 +683,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     .task-date-cell,
     .task-due-cell {
       white-space: nowrap;
-      font-size: 15px;
+      font-size: 16px; /* 文字サイズアップ */
     }
 
     .task-due-cell.due-soon {
@@ -756,11 +697,12 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     }
 
     .task-assignee-cell {
-      font-size: 15px;
+      font-size: 16px; /* 文字サイズアップ */
     }
 
     .task-priority-cell {
-      text-align: center;
+      text-align: left; /* 右寄り解消 */
+      padding-left: 12px;
     }
 
     .priority-badge {
@@ -769,6 +711,12 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       border-radius: 6px;
       font-size: 12px;
       font-weight: 600;
+    }
+
+    /* テーブル内の優先度バッジを大きく表示 */
+    .task-priority-cell .priority-badge {
+      font-size: 16px;
+      padding: 6px 10px;
     }
 
     .priority-low {
@@ -816,7 +764,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     }
 
     .progress-text {
-      font-size: 13px;
+      font-size: 14px; /* 文字サイズアップ */
       font-weight: 600;
       color: #374151;
       min-width: 35px;
