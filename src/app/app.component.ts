@@ -14,13 +14,13 @@ export class AppComponent implements OnInit {
   private autoReportScheduler = inject(AutoReportSchedulerService);
 
   ngOnInit(): void {
-    // 自動送信スケジューラーを一時的に無効化（起動問題のため）
-    // TODO: サーバーサイド実装後に有効化
-    console.log('自動送信スケジューラーは一時的に無効化されています');
+    // 自動送信スケジューラーを無効化（起動問題のため）
+    console.log('自動送信スケジューラーは無効化されています');
     
-    /* 元のコード（起動問題のためコメントアウト）
+    /* 自動送信機能（起動問題のため無効化）
     try {
       this.autoReportScheduler.startScheduler();
+      console.log('自動送信スケジューラーが開始されました');
     } catch (error) {
       console.error('スケジューラー初期化エラー:', error);
     }

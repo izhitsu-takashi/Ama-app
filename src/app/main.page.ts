@@ -1263,8 +1263,11 @@ export class MainPage implements OnInit, OnDestroy {
   createEventForSelectedDate() {
     if (!this.selectedDate) return;
     
-    // 選択された日付の9:00と17:00をデフォルトに設定
-    const selectedDateStr = this.selectedDate.toISOString().split('T')[0];
+    // 選択された日付の9:00と17:00をデフォルトに設定（ローカル時間を使用）
+    const year = this.selectedDate.getFullYear();
+    const month = String(this.selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(this.selectedDate.getDate()).padStart(2, '0');
+    const selectedDateStr = `${year}-${month}-${day}`;
     const startDateTime = `${selectedDateStr}T09:00`;
     const endDateTime = `${selectedDateStr}T17:00`;
     

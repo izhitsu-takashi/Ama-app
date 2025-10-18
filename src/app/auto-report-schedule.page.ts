@@ -24,6 +24,9 @@ import { AutoReportSchedule, Group, User } from './models';
         </button>
         <h1>📅 自動送信設定</h1>
         <p>定期的に進捗報告を自動送信するスケジュールを設定できます</p>
+        <button class="manual-check-btn" (click)="manualCheckSchedules()" [disabled]="loading">
+          🔍 手動でスケジュールをチェック
+        </button>
       </div>
 
       <!-- タブ -->
@@ -265,6 +268,33 @@ import { AutoReportSchedule, Group, User } from './models';
     .back-btn:hover {
       background: rgba(102, 126, 234, 0.2);
       transform: translateY(-50%) scale(1.05);
+    }
+
+    .manual-check-btn {
+      position: absolute;
+      right: 2rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(34, 197, 94, 0.1);
+      border: 2px solid rgba(34, 197, 94, 0.3);
+      color: #22c55e;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .manual-check-btn:hover:not(:disabled) {
+      background: rgba(34, 197, 94, 0.2);
+      transform: translateY(-50%) scale(1.05);
+    }
+
+    .manual-check-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: translateY(-50%);
     }
 
     .header h1 {
@@ -642,6 +672,12 @@ import { AutoReportSchedule, Group, User } from './models';
 
       .back-btn {
         left: 1rem;
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+
+      .manual-check-btn {
+        right: 1rem;
         padding: 6px 12px;
         font-size: 12px;
       }
@@ -1053,5 +1089,39 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
 
   goBack(): void {
     this.router.navigate(['/progress-reports']);
+  }
+
+  async manualCheckSchedules(): Promise<void> {
+    this.loading = true;
+    try {
+      console.log('手動でスケジュールをチェック中...');
+      const schedulesToSend = await this.autoReportScheduleService.getSchedulesToSend();
+      console.log('送信予定のスケジュール数:', schedulesToSend.length);
+      
+      if (schedulesToSend.length === 0) {
+        alert('現在送信予定のスケジュールはありません');
+        return;
+      }
+      
+      let sentCount = 0;
+      for (const schedule of schedulesToSend) {
+        try {
+          console.log('スケジュール送信開始:', schedule.title);
+          await this.autoReportScheduleService.sendScheduledReport(schedule);
+          console.log(`自動送信完了: ${schedule.title} (ID: ${schedule.id})`);
+          sentCount++;
+        } catch (error) {
+          console.error(`自動送信エラー: ${schedule.title} (ID: ${schedule.id})`, error);
+        }
+      }
+      
+      alert(`${sentCount}件のスケジュールを送信しました`);
+      this.loadSchedules(); // リストを更新
+    } catch (error) {
+      console.error('手動チェックエラー:', error);
+      alert('スケジュールのチェックに失敗しました: ' + (error as Error).message);
+    } finally {
+      this.loading = false;
+    }
   }
 }

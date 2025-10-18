@@ -18,7 +18,6 @@ export class AutoReportSchedulerService {
     }, 60000); // 60秒 = 1分
 
     console.log('自動送信スケジューラーが開始されました');
-    console.log('注意: バックグラウンドでの自動送信は現在無効化されています（権限の問題のため）');
   }
 
   // スケジューラー停止
@@ -32,17 +31,21 @@ export class AutoReportSchedulerService {
 
   // 送信予定のレポートをチェックして送信
   private async checkAndSendScheduledReports(): Promise<void> {
-    // 現在は権限の問題でバックグラウンド自動送信を無効化
-    // 将来的には、サーバーサイドでの実装または適切な認証コンテキストの設定が必要
-    console.log('バックグラウンド自動送信は現在無効化されています');
+    // 自動送信機能は無効化されています
+    console.log('自動送信機能は無効化されています');
     return;
     
-    /* 元のコード（権限問題のためコメントアウト）
+    /* 自動送信機能（起動問題のため無効化）
     try {
+      const now = new Date();
+      console.log('スケジュールチェック開始:', now.toISOString());
+      
       const schedulesToSend = await this.autoReportScheduleService.getSchedulesToSend();
+      console.log('送信予定のスケジュール数:', schedulesToSend.length);
       
       for (const schedule of schedulesToSend) {
         try {
+          console.log('スケジュール送信開始:', schedule.title);
           await this.autoReportScheduleService.sendScheduledReport(schedule);
           console.log(`自動送信完了: ${schedule.title} (ID: ${schedule.id})`);
         } catch (error) {
