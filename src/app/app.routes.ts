@@ -12,6 +12,7 @@ import { NotificationsPage } from './notifications.page';
 import { ProgressReportCreatePage } from './progress-report-create.page';
 import { ProgressReportsPage } from './progress-reports.page';
 import { ProgressReportDetailPage } from './progress-report-detail.page';
+import { AutoReportSchedulePage } from './auto-report-schedule.page';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, canActivate: [authGuard] },
@@ -23,6 +24,7 @@ export const routes: Routes = [
   { path: 'progress-report-create', component: ProgressReportCreatePage, canActivate: [authGuard] },
   { path: 'progress-reports', component: ProgressReportsPage, canActivate: [authGuard] },
   { path: 'progress-report-detail/:id', component: ProgressReportDetailPage, canActivate: [authGuard] },
+  { path: 'auto-report-schedule', component: AutoReportSchedulePage, canActivate: [authGuard] },
   { path: 'login', component: LoginComponent },
   { path: 'signup', component: SignupComponent },
   { path: 'reset-password', component: ResetPasswordComponent },

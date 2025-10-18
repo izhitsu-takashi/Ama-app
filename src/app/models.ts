@@ -217,6 +217,27 @@ export interface Notification {
   createdAt: Timestamp;
 }
 
+export interface AutoReportSchedule {
+  id: Id;
+  userId: Id;
+  title: string;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  startDate: Timestamp;
+  sendTime: string; // HH:MM format
+  recipientType: 'person' | 'group';
+  recipientId?: Id;
+  recipientName?: string;
+  groupId?: Id;
+  groupName?: string;
+  attachedGroupId?: Id;
+  attachedGroupName?: string;
+  isActive: boolean;
+  lastSentAt?: Timestamp;
+  nextSendAt: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface Reminder {
   id: Id;
   userId: Id;

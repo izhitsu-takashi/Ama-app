@@ -21,6 +21,9 @@ import { takeUntil, take } from 'rxjs/operators';
         </button>
         <h1 class="page-title">進捗報告</h1>
         <div class="header-actions">
+          <button class="btn secondary" routerLink="/auto-report-schedule">
+            ⚙️ 自動送信設定
+          </button>
           <button class="btn primary" routerLink="/progress-report-create">
             + 進捗報告作成
           </button>

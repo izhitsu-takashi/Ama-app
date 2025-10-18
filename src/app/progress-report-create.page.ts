@@ -19,7 +19,7 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
     <div class="page-container">
       <!-- ヘッダー -->
       <div class="page-header">
-        <button class="back-btn" routerLink="/main">
+        <button class="back-btn" routerLink="/progress-reports">
           <span class="back-icon">←</span>
           戻る
         </button>
