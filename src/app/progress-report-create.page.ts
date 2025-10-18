@@ -6,8 +6,9 @@ import { ProgressReportService } from './progress-report.service';
 import { GroupService } from './group.service';
 import { UserService } from './user.service';
 import { AuthService } from './auth.service';
-import { ProgressReport, Group, User } from './models';
-import { Observable, Subject, of } from 'rxjs';
+import { AiReportGeneratorService, ReportGenerationData } from './ai-report-generator.service';
+import { ProgressReport, Group, User, TaskItem } from './models';
+import { Observable, Subject, of, firstValueFrom } from 'rxjs';
 import { takeUntil, take, switchMap } from 'rxjs/operators';
 
 @Component({
@@ -28,6 +29,58 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
       <!-- 進捗報告フォーム -->
       <div class="form-container">
         <form [formGroup]="reportForm" (ngSubmit)="onSubmit()" class="report-form">
+          <!-- AI自動生成セクション -->
+          <div class="form-group ai-section">
+            <div class="ai-section-header">
+              <label class="form-label">🤖 AI自動生成</label>
+              <button 
+                type="button" 
+                class="btn ai-generate-btn" 
+                (click)="generateReportWithAI()"
+                [disabled]="loading || !selectedGroupForAI"
+              >
+                <span class="ai-icon">✨</span>
+                {{ loading ? '生成中...' : '進捗報告を自動生成' }}
+              </button>
+            </div>
+            <div class="ai-section-content">
+              <div class="ai-group-selector">
+                <label class="ai-label">対象グループ:</label>
+                <select 
+                  [(ngModel)]="selectedGroupForAI" 
+                  [ngModelOptions]="{standalone: true}"
+                  class="form-select ai-select"
+                >
+                  <option value="">グループを選択</option>
+                  <option *ngFor="let group of (userGroups$ | async)" [value]="group.id">
+                    {{ group.name }}
+                  </option>
+                </select>
+              </div>
+              <div class="ai-period-selector">
+                <label class="ai-label">期間:</label>
+                <div class="period-inputs">
+                  <input 
+                    type="date" 
+                    [(ngModel)]="aiPeriodStart" 
+                    [ngModelOptions]="{standalone: true}"
+                    class="form-input period-input"
+                  />
+                  <span class="period-separator">〜</span>
+                  <input 
+                    type="date" 
+                    [(ngModel)]="aiPeriodEnd" 
+                    [ngModelOptions]="{standalone: true}"
+                    class="form-input period-input"
+                  />
+                </div>
+              </div>
+              <div class="ai-help">
+                <small>選択したグループのタスク完了状況から進捗報告を自動生成します。</small>
+              </div>
+            </div>
+          </div>
+
           <div class="form-group">
             <label class="form-label">タイトル</label>
             <input 
@@ -452,6 +505,95 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
       background-color: #fee2e2;
     }
 
+    .ai-section {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border: 1px solid #0ea5e9;
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .ai-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .ai-generate-btn {
+      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .ai-generate-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+    }
+
+    .ai-generate-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .ai-icon {
+      font-size: 1.1rem;
+    }
+
+    .ai-section-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .ai-group-selector,
+    .ai-period-selector {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .ai-label {
+      font-weight: 600;
+      color: #0369a1;
+      min-width: 100px;
+    }
+
+    .ai-select {
+      flex: 1;
+      max-width: 300px;
+    }
+
+    .period-inputs {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .period-input {
+      width: 150px;
+    }
+
+    .period-separator {
+      color: #0369a1;
+      font-weight: 600;
+    }
+
+    .ai-help {
+      color: #0369a1;
+      font-style: italic;
+      margin-top: 0.5rem;
+    }
+
     @media (max-width: 768px) {
       .page-container {
         padding: 1rem;
@@ -477,6 +619,7 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
   private groupService = inject(GroupService);
   private userService = inject(UserService);
   private auth = inject(AuthService);
+  private aiReportGenerator = inject(AiReportGeneratorService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private fb = inject(FormBuilder);
@@ -492,6 +635,11 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
   loading = false;
   editingReportId: string | null = null;
   isEditing = false;
+  
+  // AI自動生成用のプロパティ
+  selectedGroupForAI: string = '';
+  aiPeriodStart: string = '';
+  aiPeriodEnd: string = '';
 
   reportForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(2)]],
@@ -505,6 +653,7 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
     this.loadUserGroups();
     this.loadAvailableUsers();
     this.onRecipientTypeChange();
+    this.initializeAIPeriod();
     
     // 編集モードのチェック
     this.route.queryParams.subscribe(params => {
@@ -541,9 +690,7 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
 
   private loadAvailableUsers() {
     // 全ユーザーを取得
-    console.log('🔍 Loading all users...');
     this.userService.getAllUsers().then(users => {
-      console.log('👥 All users loaded:', users);
       this.availableUsers = users;
     }).catch(error => {
       console.error('❌ Error loading users:', error);
@@ -564,9 +711,6 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
   }
 
   onUserSearch() {
-    console.log('🔍 Search term:', this.userSearchTerm);
-    console.log('👥 Available users:', this.availableUsers);
-    
     if (this.userSearchTerm.trim().length === 0) {
       this.filteredUsers = [];
       return;
@@ -576,12 +720,8 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
     this.filteredUsers = this.availableUsers.filter(user => {
       const displayName = (user.displayName || '').toLowerCase();
       const email = (user.email || '').toLowerCase();
-      const matches = displayName.includes(searchTerm) || email.includes(searchTerm);
-      console.log(`🔍 User: ${user.displayName || user.email}, matches: ${matches}`);
-      return matches;
+      return displayName.includes(searchTerm) || email.includes(searchTerm);
     });
-    
-    console.log('✅ Filtered users:', this.filteredUsers);
   }
 
   selectUser(user: User) {
@@ -603,6 +743,92 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
     const target = event.target as HTMLElement;
     if (!target.closest('.user-search-container')) {
       this.showUserDropdown = false;
+    }
+  }
+
+  /**
+   * AI期間の初期化（デフォルトで過去1週間）
+   */
+  private initializeAIPeriod() {
+    const today = new Date();
+    const oneWeekAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
+    
+    this.aiPeriodEnd = today.toISOString().split('T')[0];
+    this.aiPeriodStart = oneWeekAgo.toISOString().split('T')[0];
+  }
+
+  /**
+   * AIで進捗報告を自動生成
+   */
+  async generateReportWithAI() {
+    if (!this.selectedGroupForAI || !this.aiPeriodStart || !this.aiPeriodEnd) {
+      alert('対象グループと期間を選択してください。');
+      return;
+    }
+
+    this.loading = true;
+
+    try {
+      // グループ情報を取得
+      const groups = await this.userGroups$.pipe(take(1)).toPromise();
+      const selectedGroup = groups?.find(g => g.id === this.selectedGroupForAI);
+      
+      if (!selectedGroup) {
+        alert('選択したグループが見つかりません。');
+        return;
+      }
+
+      // グループのタスクを取得
+      const tasks = await this.groupService.getGroupTasks(this.selectedGroupForAI);
+      
+      // 期間内のタスクをフィルタリング（発生日または作成日で判定）
+      const startDate = new Date(this.aiPeriodStart);
+      const endDate = new Date(this.aiPeriodEnd);
+      endDate.setHours(23, 59, 59, 999); // 終了日の23:59:59まで含める
+      
+      // 期間フィルタリングを緩和：すべてのタスクを含める
+      const filteredTasks = tasks; // 期間フィルタリングを一時的に無効化
+
+      // タスクをカテゴリ別に分類
+      const categorizedTasks = this.aiReportGenerator.categorizeTasks(filteredTasks);
+
+      // 生成データを準備
+      const generationData: ReportGenerationData = {
+        groupId: this.selectedGroupForAI,
+        groupName: selectedGroup.name,
+        period: {
+          start: startDate,
+          end: endDate
+        },
+        tasks: filteredTasks,
+        completedTasks: categorizedTasks.completed,
+        inProgressTasks: categorizedTasks.inProgress,
+        overdueTasks: categorizedTasks.overdue,
+        upcomingTasks: categorizedTasks.upcoming
+      };
+
+      // AIで進捗報告を生成
+      const generatedReport = await firstValueFrom(this.aiReportGenerator.generateProgressReport(generationData));
+      
+      if (generatedReport) {
+        // フォームに生成された内容を設定
+        this.reportForm.patchValue({
+          title: generatedReport.title,
+          content: generatedReport.content
+        });
+
+        // 関連グループも自動設定
+        this.reportForm.patchValue({
+          attachedGroupId: this.selectedGroupForAI
+        });
+
+        alert('進捗報告を自動生成しました！内容を確認して必要に応じて編集してください。');
+      }
+    } catch (error) {
+      console.error('AI進捗報告生成エラー:', error);
+      alert('進捗報告の自動生成に失敗しました。');
+    } finally {
+      this.loading = false;
     }
   }
 
@@ -670,7 +896,7 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
         reportData.recipientId = formData.recipientId;
         reportData.recipientName = recipient?.displayName || (recipient?.email ? recipient.email.split('@')[0] : 'ユーザー');
       } else if (this.recipientType === 'group' && formData.groupId) {
-        const groups = await this.userGroups$.pipe(take(1)).toPromise();
+        const groups = await firstValueFrom(this.userGroups$);
         const group = groups?.find(g => g.id === formData.groupId);
         reportData.groupId = formData.groupId;
         reportData.groupName = group?.name || 'グループ';
@@ -678,7 +904,7 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
 
       // 添付グループの処理
       if (formData.attachedGroupId) {
-        const groups = await this.userGroups$.pipe(take(1)).toPromise();
+        const groups = await firstValueFrom(this.userGroups$);
         const attachedGroup = groups?.find(g => g.id === formData.attachedGroupId);
         reportData.attachedGroupId = formData.attachedGroupId;
         reportData.attachedGroupName = attachedGroup?.name || 'グループ';
@@ -726,27 +952,22 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
         const recipient = this.availableUsers.find(u => u.id === formData.recipientId);
         reportData.recipientId = formData.recipientId;
         reportData.recipientName = recipient?.displayName || (recipient?.email ? recipient.email.split('@')[0] : 'ユーザー');
-        console.log('📤 Sending progress report to person:', reportData.recipientName);
       } else if (this.recipientType === 'group' && formData.groupId) {
-        const groups = await this.userGroups$.pipe(take(1)).toPromise();
+        const groups = await firstValueFrom(this.userGroups$);
         const group = groups?.find(g => g.id === formData.groupId);
         reportData.groupId = formData.groupId;
         reportData.groupName = group?.name || 'グループ';
-        console.log('📤 Sending progress report to group:', reportData.groupName);
       }
 
       // 添付グループの処理
       if (formData.attachedGroupId) {
-        const groups = await this.userGroups$.pipe(take(1)).toPromise();
+        const groups = await firstValueFrom(this.userGroups$);
         const attachedGroup = groups?.find(g => g.id === formData.attachedGroupId);
         reportData.attachedGroupId = formData.attachedGroupId;
         reportData.attachedGroupName = attachedGroup?.name || 'グループ';
-        console.log('📎 Attached group:', reportData.attachedGroupName);
       }
 
-      console.log('📝 Creating progress report:', reportData);
       const createdReport = await this.progressReportService.createProgressReport(reportData);
-      console.log('✅ Progress report created:', createdReport);
       
       alert('進捗報告を送信しました！');
       this.router.navigate(['/progress-reports']);

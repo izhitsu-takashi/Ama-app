@@ -102,8 +102,8 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
 
 
       <!-- メンバー一覧（モーダル） -->
-      <div class="modal-overlay" *ngIf="showMembers" (click)="showMembers = false">
-        <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-overlay" *ngIf="showMembers">
+        <div class="modal">
           <div class="modal-header">
             <h2 class="modal-title">メンバー一覧</h2>
             <button class="modal-close" (click)="showMembers = false">×</button>
@@ -140,8 +140,8 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       </div>
 
       <!-- 参加リクエスト管理（モーダル） -->
-      <div class="modal-overlay" *ngIf="showJoinRequests && isGroupOwner" (click)="showJoinRequests = false">
-        <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-overlay" *ngIf="showJoinRequests && isGroupOwner">
+        <div class="modal">
           <div class="modal-header">
             <h2 class="modal-title">参加リクエスト</h2>
             <button class="modal-close" (click)="showJoinRequests = false">×</button>
@@ -298,8 +298,8 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     </div>
 
     <!-- 課題作成モーダル -->
-    <div class="modal-overlay" *ngIf="showCreateModal" (click)="hideCreateTaskModal()">
-      <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-overlay" *ngIf="showCreateModal">
+      <div class="modal">
         <div class="modal-header">
           <h3 class="modal-title">新しい課題を作成</h3>
           <button class="modal-close" (click)="hideCreateTaskModal()">×</button>
@@ -364,6 +364,9 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 formControlName="dueDate" 
                 class="form-input"
               />
+              <div *ngIf="taskForm.hasError('dateInvalid')" class="error-message">
+                期限は発生日より後に設定してください
+              </div>
             </div>
 
             <div class="form-group">
@@ -392,8 +395,8 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     </div>
 
     <!-- 課題編集モーダル -->
-    <div class="modal-overlay" *ngIf="showEditModal" (click)="hideEditTaskModal()">
-      <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-overlay" *ngIf="showEditModal">
+      <div class="modal">
         <div class="modal-header">
           <h2 class="modal-title">課題を編集</h2>
           <button class="modal-close" (click)="hideEditTaskModal()">×</button>
@@ -457,6 +460,9 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 formControlName="dueDate" 
                 class="form-input"
               />
+              <div *ngIf="editForm.hasError('dateInvalid')" class="error-message">
+                期限は発生日より後に設定してください
+              </div>
             </div>
 
             <div class="form-group">
@@ -1173,6 +1179,12 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       border-color: #667eea;
     }
 
+    .error-message {
+      color: #ef4444;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
     .form-textarea {
       resize: vertical;
     }
@@ -1563,7 +1575,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     occurredOn: [''],
     dueDate: [''],
     progress: [0, [Validators.min(0), Validators.max(100)]]
-  });
+  }, { validators: this.dateValidator });
 
   editForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(2)]],
@@ -1574,7 +1586,24 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     dueDate: [''],
     progress: [0, [Validators.min(0), Validators.max(100)]],
     status: ['not_started', [Validators.required]]
-  });
+  }, { validators: this.dateValidator });
+
+  // 日付バリデーター：期限が発生日より前にならないようにする
+  dateValidator(group: any) {
+    const occurredOn = group.get('occurredOn')?.value;
+    const dueDate = group.get('dueDate')?.value;
+    
+    if (occurredOn && dueDate) {
+      const occurredDate = new Date(occurredOn);
+      const dueDateObj = new Date(dueDate);
+      
+      if (dueDateObj < occurredDate) {
+        return { dateInvalid: true };
+      }
+    }
+    
+    return null;
+  }
 
   ngOnInit() {
     this.route.params.pipe(

@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Firestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, query, where, collectionData, setDoc, orderBy, limit, getDocs, docData } from '@angular/fire/firestore';
 import { Observable, from, combineLatest, of } from 'rxjs';
 import { map, switchMap, take } from 'rxjs/operators';
-import { Group, GroupMembership, GroupJoinRequest, User } from './models';
+import { Group, GroupMembership, GroupJoinRequest, User, TaskItem } from './models';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
@@ -297,6 +297,31 @@ export class GroupService {
   private async getUserProfile(userId: string): Promise<any> {
     const userDoc = await getDoc(doc(this.firestore, 'users', userId));
     return userDoc.exists() ? userDoc.data() : null;
+  }
+
+  // グループのタスク一覧取得
+  async getGroupTasks(groupId: string): Promise<TaskItem[]> {
+    const tasksQuery = query(
+      collection(this.firestore, 'tasks'),
+      where('groupId', '==', groupId)
+    );
+    
+    const tasksSnapshot = await getDocs(tasksQuery);
+    return tasksSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as TaskItem));
+  }
+
+  // グループのメンバー数を取得
+  async getGroupMemberCount(groupId: string): Promise<number> {
+    const membersQuery = query(
+      collection(this.firestore, 'groupMemberships'),
+      where('groupId', '==', groupId)
+    );
+    
+    const membersSnapshot = await getDocs(membersQuery);
+    return membersSnapshot.size;
   }
 
   private getCurrentUserId(): string {

@@ -55,9 +55,11 @@ export interface TaskItem {
   status: 'not_started' | 'in_progress' | 'completed';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   assigneeId?: Id;
+  assigneeName?: string; // 担当者名
   createdBy: Id;
   occurredOn: Timestamp;
   dueDate?: Timestamp;
+  completedAt?: Timestamp; // 完了日時
   progress?: number; // 進捗率 (0-100)
   templateId?: Id; // テンプレートから作成された場合
   isRecurring: boolean;
