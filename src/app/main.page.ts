@@ -6,6 +6,8 @@ import { UserService } from './user.service';
 import { GroupService } from './group.service';
 import { TaskService } from './task.service';
 import { NotificationService } from './notification.service';
+import { MessageNotificationService } from './message-notification.service';
+import { MessageService } from './message.service';
 import { User, Group, TaskItem, Notification, CalendarEvent } from './models';
 import { Observable, Subscription, combineLatest, of, Subject } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -48,6 +50,21 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
         <div class="action-buttons">
           <button class="action-btn primary" routerLink="/progress-reports">
             📊 進捗報告
+          </button>
+          
+          <button class="action-btn secondary" routerLink="/google-calendar-settings">
+            📅 Googleカレンダー連携
+          </button>
+          
+          <button class="action-btn secondary" routerLink="/user-search">
+            🔍 ユーザー検索
+          </button>
+          
+          <button class="action-btn secondary" routerLink="/messages">
+            💬 メッセージ
+            <div class="message-badge" *ngIf="unreadMessageCount > 0">
+              {{ unreadMessageCount }}
+            </div>
           </button>
           
           <button class="action-btn secondary" routerLink="/group/create">
@@ -443,6 +460,28 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .action-btn.small {
       padding: 0.5rem 1rem;
       font-size: 0.875rem;
+    }
+
+    .action-btn {
+      position: relative;
+    }
+
+    .message-badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #ef4444;
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
     .content-grid {
@@ -865,6 +904,8 @@ export class MainPage implements OnInit, OnDestroy {
   private groupService = inject(GroupService);
   private taskService = inject(TaskService);
   private notificationService = inject(NotificationService);
+  private messageNotificationService = inject(MessageNotificationService);
+  private messageService = inject(MessageService);
   private firestore = inject(Firestore);
 
   currentUser: User | null = null;
@@ -872,6 +913,7 @@ export class MainPage implements OnInit, OnDestroy {
   private userGroupsCache: Group[] = [];
   recentTasks$: Observable<TaskItem[]> = of([]);
   unreadNotifications = 0;
+  unreadMessageCount = 0;
   private destroy$ = new Subject<void>();
   currentMonth = '';
   calendarDays: any[] = [];
@@ -1015,13 +1057,20 @@ export class MainPage implements OnInit, OnDestroy {
 
   private loadNotifications() {
     if (this.currentUser) {
-      const sub = this.notificationService.getUnreadCount(this.currentUser.id).subscribe({
-        next: (count) => {
-          this.unreadNotifications = count;
+      // 通常の通知とメッセージ通知の両方を取得
+      const regularNotifications$ = this.notificationService.getUnreadCount(this.currentUser.id);
+      const messageNotifications$ = this.messageNotificationService.getUnreadMessageNotificationCount();
+      const unreadMessages$ = this.messageService.getUnreadCount();
+      
+      const sub = combineLatest([regularNotifications$, messageNotifications$, unreadMessages$]).subscribe({
+        next: ([regularCount, messageCount, unreadMessageCount]) => {
+          this.unreadNotifications = regularCount + messageCount;
+          this.unreadMessageCount = unreadMessageCount;
         },
         error: (error) => {
           console.error('Error loading notifications:', error);
           this.unreadNotifications = 0;
+          this.unreadMessageCount = 0;
         }
       });
       this.subscriptions.push(sub);

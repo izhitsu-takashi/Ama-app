@@ -6,6 +6,7 @@ import { NotificationService } from './notification.service';
 import { AuthService } from './auth.service';
 import { JoinRequestService } from './join-request.service';
 import { GroupService } from './group.service';
+import { MessageNotificationService } from './message-notification.service';
 import { Notification, JoinRequest } from './models';
 import { Observable, Subject, of } from 'rxjs';
 import { takeUntil, switchMap } from 'rxjs/operators';
@@ -50,7 +51,7 @@ import { takeUntil, switchMap } from 'rxjs/operators';
           <div class="notification-item" 
                *ngFor="let notification of notifications" 
                [class.unread]="!notification.isRead"
-               (click)="markAsRead(notification.id)">
+               (click)="handleNotificationClick(notification)">
             
             <div class="notification-icon">
               <span [class]="getNotificationIcon(notification.type)">
@@ -64,7 +65,7 @@ import { takeUntil, switchMap } from 'rxjs/operators';
                 <span class="notification-time">{{ formatTime(notification.createdAt) }}</span>
               </div>
               
-              <p class="notification-message">{{ notification.message }}</p>
+              <p class="notification-message">{{ getNotificationDisplayMessage(notification) }}</p>
               
               <div class="notification-meta" *ngIf="notification.metadata">
                 <span class="meta-item" *ngIf="notification.metadata.groupName">
@@ -643,9 +644,26 @@ export class NotificationsPage implements OnInit, OnDestroy {
     const emojis = {
       task: '📋',
       group: '👥',
-      system: '🔔'
+      system: '🔔',
+      message_received: '💬'
     };
     return emojis[type as keyof typeof emojis] || '🔔';
+  }
+
+  getNotificationDisplayMessage(notification: Notification): string {
+    // メッセージ通知の場合は特別な処理
+    if (notification.type === 'message_received') {
+      const senderName = notification.metadata?.senderName || notification.data?.senderName || 'Unknown User';
+      const messageContent = notification.metadata?.messageContent || notification.data?.messageContent;
+      const subject = notification.metadata?.subject || notification.data?.subject;
+      
+      // メッセージ内容がある場合はそれを使用、なければ件名を使用
+      const content = messageContent || subject || 'メッセージ';
+      return `${senderName}：${content}`;
+    }
+    
+    // その他の通知は既存のmessageフィールドを使用
+    return notification.message || notification.content || '';
   }
 
 
@@ -676,6 +694,18 @@ export class NotificationsPage implements OnInit, OnDestroy {
       this.loadUnreadCount();
     } catch (error) {
       console.error('既読マークエラー:', error);
+    }
+  }
+
+  async handleNotificationClick(notification: Notification) {
+    // メッセージ通知の場合はメッセージやり取り画面に遷移
+    if (notification.type === 'message_received' && notification.metadata?.relatedUserId) {
+      this.router.navigate(['/chat', notification.metadata.relatedUserId]);
+    }
+    
+    // 既読にする
+    if (!notification.isRead) {
+      await this.markAsRead(notification.id);
     }
   }
 

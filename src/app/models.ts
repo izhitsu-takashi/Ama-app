@@ -198,7 +198,7 @@ export interface ReportAttachment {
 export interface Notification {
   id: Id;
   userId: Id;
-  type: 'task_assigned' | 'task_due' | 'task_comment' | 'task_reaction' | 'group_invite' | 'progress_report' | 'progress_report_comment' | 'reminder' | 'task_due_soon' | 'group_join_request';
+  type: 'task_assigned' | 'task_due' | 'task_comment' | 'task_reaction' | 'group_invite' | 'progress_report' | 'progress_report_comment' | 'reminder' | 'task_due_soon' | 'group_join_request' | 'message_received';
   title: string;
   content: string;
   message: string;
@@ -211,6 +211,10 @@ export interface Notification {
     groupName?: string;
     userName?: string;
     dueDate?: any;
+    messageId?: Id;
+    senderName?: string;
+    messageContent?: string;
+    subject?: string;
   };
   isRead: boolean;
   readAt?: Timestamp;
@@ -261,6 +265,16 @@ export interface CalendarEvent {
   relatedId?: Id; // 関連するタスクやマイルストーンのID
   color?: string; // '#RRGGBB' など
   createdAt: Timestamp;
+  // Google Calendar連携用フィールド
+  googleEventId?: string; // GoogleカレンダーのイベントID
+  source?: 'app' | 'google'; // イベントの作成元
+  location?: string; // 場所
+  attendees?: Array<{
+    email: string;
+    displayName?: string;
+  }>; // 参加者
+  allDay?: boolean; // 終日イベントかどうか
+  updatedAt?: Timestamp; // 更新日時（同期用）
 }
 
 // 統計・分析関連
@@ -322,4 +336,47 @@ export interface JoinRequest {
   updatedAt: Date;
   reviewedAt?: Date;
   reviewedBy?: string;
+}
+
+// メッセージ関連
+export interface Message {
+  id: Id;
+  senderId: Id;
+  senderName: string;
+  senderEmail: string;
+  recipientId: Id;
+  recipientName: string;
+  recipientEmail: string;
+  subject: string;
+  content: string;
+  isRead: boolean;
+  readAt?: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  attachments?: MessageAttachment[];
+  isTemporary?: boolean; // 一時的なメッセージ（送信中）のフラグ
+}
+
+export interface MessageAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+  uploadedAt: Timestamp;
+}
+
+export interface MessageThread {
+  id: Id;
+  participants: Id[]; // 参加者のユーザーID配列
+  participantNames: string[]; // 参加者の名前配列
+  lastMessage?: {
+    content: string;
+    senderId: Id;
+    senderName: string;
+    createdAt: Timestamp;
+  };
+  unreadCount: number; // 未読メッセージ数
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }

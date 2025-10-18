@@ -19,6 +19,12 @@
             "polyfills": [
               "zone.js"
             ],
+            "allowedCommonJsDependencies": [
+              "googleapis",
+              "google-auth-library",
+              "google-logging-utils",
+              "gcp-metadata"
+            ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
               "src/favicon.ico",
