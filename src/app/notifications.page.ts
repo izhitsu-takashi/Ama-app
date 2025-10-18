@@ -101,120 +101,8 @@ import { takeUntil, switchMap } from 'rxjs/operators';
 
       
 
-      <!-- リマインド設定 -->
-      <div class="reminders-section">
-        <div class="section-header">
-          <h2 class="section-title">リマインド設定</h2>
-          <button class="btn btn-primary" (click)="showCreateReminderModal()">
-            <span class="btn-icon">+</span>
-            リマインド作成
-          </button>
-        </div>
-
-        <div class="reminders-list" *ngIf="(reminders$ | async) as reminders; else emptyReminders">
-          <div class="reminder-item" *ngFor="let reminder of reminders">
-            <div class="reminder-icon">
-              <span class="reminder-emoji">⏰</span>
-            </div>
-            
-            <div class="reminder-content">
-              <h3 class="reminder-title">{{ reminder.title }}</h3>
-              <p class="reminder-message">{{ reminder.message }}</p>
-              <div class="reminder-meta">
-                <span class="meta-item">
-                  📅 {{ formatDate(reminder.remindAt) }}
-                </span>
-                <span class="meta-item" *ngIf="reminder.frequency">
-                  🔄 {{ getFrequencyLabel(reminder.frequency) }}
-                </span>
-              </div>
-            </div>
-
-            <div class="reminder-actions">
-              <button class="btn btn-small btn-secondary" (click)="editReminder(reminder)">
-                編集
-              </button>
-              <button class="btn btn-small btn-danger" (click)="deleteReminder(reminder.id)">
-                削除
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <ng-template #emptyReminders>
-          <div class="empty-state">
-            <div class="empty-icon">⏰</div>
-            <h3 class="empty-title">リマインドがありません</h3>
-            <p class="empty-description">新しいリマインドを作成して、重要なタスクを忘れないようにしましょう</p>
-            <button class="btn btn-primary" (click)="showCreateReminderModal()">
-              リマインドを作成
-            </button>
-          </div>
-        </ng-template>
-      </div>
     </div>
 
-    <!-- リマインド作成モーダル -->
-    <div class="modal-overlay" *ngIf="showCreateModal" (click)="hideCreateReminderModal()">
-      <div class="modal" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h3 class="modal-title">新しいリマインドを作成</h3>
-          <button class="modal-close" (click)="hideCreateReminderModal()">×</button>
-        </div>
-        
-        <form [formGroup]="reminderForm" (ngSubmit)="createReminder()" class="modal-form">
-          <div class="form-group">
-            <label class="form-label">タイトル</label>
-            <input 
-              type="text" 
-              formControlName="title" 
-              class="form-input"
-              placeholder="リマインドのタイトル"
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">メッセージ</label>
-            <textarea 
-              formControlName="message" 
-              class="form-textarea"
-              placeholder="リマインドの内容"
-              rows="3"
-            ></textarea>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">通知日時</label>
-              <input 
-                type="datetime-local" 
-                formControlName="remindAt" 
-                class="form-input"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">繰り返し</label>
-              <select formControlName="frequency" class="form-select">
-                <option value="">なし</option>
-                <option value="daily">毎日</option>
-                <option value="weekly">毎週</option>
-                <option value="monthly">毎月</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" (click)="hideCreateReminderModal()">
-              キャンセル
-            </button>
-            <button type="submit" class="btn btn-primary" [disabled]="reminderForm.invalid || loading">
-              {{ loading ? '作成中...' : 'リマインドを作成' }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   `,
   styles: [`
     .page-container {
@@ -375,7 +263,7 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       gap: 8px;
     }
 
-    .notifications-section, .reminders-section, .join-requests-section {
+    .notifications-section {
       background: white;
       border-radius: 16px;
       padding: 24px;
@@ -423,13 +311,13 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       color: #ef4444;
     }
 
-    .notifications-list, .reminders-list {
+    .notifications-list {
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
 
-    .notification-item, .reminder-item {
+    .notification-item {
       display: flex;
       align-items: flex-start;
       gap: 16px;
@@ -440,7 +328,7 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       cursor: pointer;
     }
 
-    .notification-item:hover, .reminder-item:hover {
+    .notification-item:hover {
       border-color: #667eea;
       transform: translateY(-2px);
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
@@ -451,7 +339,7 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       background: #f8faff;
     }
 
-    .notification-icon, .reminder-icon {
+    .notification-icon {
       flex-shrink: 0;
       width: 48px;
       height: 48px;
@@ -478,11 +366,8 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       background: #fef3c7;
     }
 
-    .reminder-icon {
-      background: #fef3c7;
-    }
 
-    .notification-content, .reminder-content {
+    .notification-content {
       flex: 1;
     }
 
@@ -493,7 +378,7 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       margin-bottom: 8px;
     }
 
-    .notification-title, .reminder-title {
+    .notification-title {
       margin: 0;
       color: #2d3748;
       font-size: 16px;
@@ -505,13 +390,13 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       color: #6b7280;
     }
 
-    .notification-message, .reminder-message {
+    .notification-message {
       margin: 0 0 12px 0;
       color: #4a5568;
       line-height: 1.5;
     }
 
-    .notification-meta, .reminder-meta {
+    .notification-meta {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
@@ -526,7 +411,7 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       border-radius: 6px;
     }
 
-    .notification-actions, .reminder-actions {
+    .notification-actions {
       display: flex;
       gap: 8px;
     }
@@ -695,23 +580,10 @@ export class NotificationsPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   notifications$: Observable<Notification[]> = of([]);
-  reminders$: Observable<any[]> = of([]);
   joinRequests$: Observable<JoinRequest[]> = of([]);
   unreadCount = 0;
   totalCount = 0;
   hasUnreadNotifications = false;
-
-  showCreateModal = false;
-  loading = false;
-
-  private fb = inject(FormBuilder);
-
-  reminderForm = this.fb.group({
-    title: ['', [Validators.required, Validators.minLength(2)]],
-    message: ['', [Validators.required]],
-    remindAt: ['', [Validators.required]],
-    frequency: ['']
-  });
 
   ngOnInit() {
     this.auth.currentUser$.pipe(
@@ -719,7 +591,6 @@ export class NotificationsPage implements OnInit, OnDestroy {
       switchMap(user => {
         if (user) {
           this.notifications$ = this.notificationService.getUserNotifications(user.uid);
-          this.reminders$ = this.notificationService.getUserReminders(user.uid);
           this.joinRequests$ = this.joinRequestService.getUserOwnedGroupJoinRequests(user.uid);
           
           // 未読通知数を取得
@@ -777,14 +648,6 @@ export class NotificationsPage implements OnInit, OnDestroy {
     return emojis[type as keyof typeof emojis] || '🔔';
   }
 
-  getFrequencyLabel(frequency: string): string {
-    const labels = {
-      daily: '毎日',
-      weekly: '毎週',
-      monthly: '毎月'
-    };
-    return labels[frequency as keyof typeof labels] || frequency;
-  }
 
   formatTime(timestamp: any): string {
     if (!timestamp) return '';
@@ -839,59 +702,6 @@ export class NotificationsPage implements OnInit, OnDestroy {
     }
   }
 
-  showCreateReminderModal() {
-    this.showCreateModal = true;
-  }
-
-  hideCreateReminderModal() {
-    this.showCreateModal = false;
-    this.reminderForm.reset();
-  }
-
-  async createReminder() {
-    if (this.reminderForm.invalid) return;
-    
-    this.loading = true;
-    const reminderData = this.reminderForm.getRawValue();
-    const currentUser = this.auth.currentUser;
-    
-    if (!currentUser) {
-      this.loading = false;
-      return;
-    }
-    
-    try {
-      await this.notificationService.createReminder({
-        userId: currentUser.uid,
-        title: reminderData.title!,
-        message: reminderData.message!,
-        remindAt: new Date(reminderData.remindAt!),
-        frequency: reminderData.frequency as 'once' | 'daily' | 'weekly' | 'monthly' || 'once',
-        isActive: true
-      });
-      
-      this.hideCreateReminderModal();
-    } catch (error) {
-      console.error('リマインド作成エラー:', error);
-    } finally {
-      this.loading = false;
-    }
-  }
-
-  editReminder(reminder: any) {
-    // TODO: リマインド編集機能を実装
-    console.log('編集:', reminder);
-  }
-
-  async deleteReminder(reminderId: string) {
-    if (confirm('このリマインドを削除しますか？')) {
-      try {
-        await this.notificationService.deleteReminder(reminderId);
-      } catch (error) {
-        console.error('リマインド削除エラー:', error);
-      }
-    }
-  }
 
   // 参加リクエストを承認
   async approveJoinRequest(requestId: string) {

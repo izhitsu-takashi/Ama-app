@@ -226,30 +226,6 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
         </div>
       </div>
 
-      <!-- 日の予定一覧モーダル -->
-      <div class="modal-overlay" *ngIf="showDayEventsModal" (click)="hideDayEventsModal()">
-        <div class="modal" (click)="$event.stopPropagation()">
-          <div class="modal-header">
-            <h2 class="modal-title">{{ selectedDate | date:'yyyy/MM/dd (EEE)' }} の予定</h2>
-            <button class="modal-close" (click)="hideDayEventsModal()">×</button>
-          </div>
-          <div class="modal-form">
-            <div *ngIf="selectedDayEvents.length === 0" class="empty-state">
-              <p>予定はありません</p>
-            </div>
-              <div class="events-list" *ngIf="selectedDayEvents.length > 0">
-                <div class="event-row" *ngFor="let ev of selectedDayEvents" [style.background]="ev.type === 'task_due' ? '#ef4444' : (ev.color || '#3b82f6')" [style.color]="'#ffffff'">
-                <div class="event-time">{{ formatTimeRange(ev.startDate, ev.endDate) }}</div>
-                <div class="event-title">{{ ev.title }}</div>
-                <div class="event-actions" *ngIf="ev.type !== 'task_due'">
-                  <button class="btn small success" (click)="openEditEvent(ev)">編集</button>
-                  <button class="btn small danger" (click)="deleteEvent(ev)">削除</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- 日の予定一覧モーダル -->
       <div class="modal-overlay" *ngIf="showDayEventsModal" (click)="hideDayEventsModal()">
@@ -259,6 +235,11 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             <button class="modal-close" (click)="hideDayEventsModal()">×</button>
           </div>
           <div class="modal-form">
+            <div class="day-events-actions">
+              <button class="btn primary" (click)="createEventForSelectedDate()">
+                + この日に予定を作成
+              </button>
+            </div>
             <div *ngIf="selectedDayEvents.length === 0" class="empty-state">
               <p>予定はありません</p>
             </div>
@@ -685,6 +666,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .form-input, .form-textarea { width:100%; max-width:100%; box-sizing:border-box; padding:.625rem .75rem; border:1px solid #d1d5db; border-radius:.5rem; font-size:.95rem; }
     .form-textarea { min-height: 80px; }
     .modal-actions { display:flex; justify-content:flex-end; gap:.75rem; margin-top: 1rem; }
+    .day-events-actions { margin-bottom: 1rem; }
     .btn.primary { background:#667eea; color:#fff; border:none; padding:.5rem 1rem; border-radius:.5rem; }
     .btn.secondary { background:#e5e7eb; color:#374151; border:none; padding:.5rem 1rem; border-radius:.5rem; }
 
@@ -1276,6 +1258,29 @@ export class MainPage implements OnInit, OnDestroy {
 
   hideCreateEventModal() {
     this.showEventModal = false;
+  }
+
+  createEventForSelectedDate() {
+    if (!this.selectedDate) return;
+    
+    // 選択された日付の9:00と17:00をデフォルトに設定
+    const selectedDateStr = this.selectedDate.toISOString().split('T')[0];
+    const startDateTime = `${selectedDateStr}T09:00`;
+    const endDateTime = `${selectedDateStr}T17:00`;
+    
+    // フォームをリセットしてから値を設定
+    this.eventForm.reset();
+    this.eventForm.patchValue({
+      title: '',
+      description: '',
+      start: startDateTime,
+      end: endDateTime,
+      color: '#3b82f6'
+    });
+    
+    // 日付選択モーダルを閉じて、予定作成モーダルを開く
+    this.hideDayEventsModal();
+    this.showEventModal = true;
   }
 
   previousMonth() {
