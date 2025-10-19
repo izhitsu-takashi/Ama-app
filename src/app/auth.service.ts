@@ -1,10 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { Auth, user, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, User } from '@angular/fire/auth';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { UserService } from './user.service';
+import { map, switchMap, catchError } from 'rxjs/operators';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private auth = inject(Auth);
+  private userService = inject(UserService);
 
   currentUser$: Observable<User | null> = user(this.auth);
 
@@ -29,6 +32,44 @@ export class AuthService {
       // エラーが発生してもログアウト処理を続行
       throw error;
     }
+  }
+
+  // 管理者権限チェック
+  isAdmin(): Observable<boolean> {
+    const currentUser = this.currentUser;
+    if (!currentUser) {
+      return of(false);
+    }
+
+    return new Observable<boolean>(observer => {
+      this.userService.getUserProfile(currentUser.uid).then(userProfile => {
+        const isAdmin = (userProfile as any)?.role === 'admin';
+        observer.next(isAdmin);
+        observer.complete();
+      }).catch(() => {
+        observer.next(false);
+        observer.complete();
+      });
+    });
+  }
+
+  // 管理者権限チェック（同期版）
+  isAdminSync(): boolean {
+    // 注意: このメソッドはFirestoreのデータを直接参照しないため、
+    // ユーザープロファイルのroleが変更された場合、再ログインが必要
+    const currentUser = this.currentUser;
+    if (!currentUser) {
+      return false;
+    }
+    
+    // ローカルストレージから管理者フラグを取得
+    const isAdmin = localStorage.getItem('isAdmin') === 'true';
+    return isAdmin;
+  }
+
+  // 管理者権限を設定（ログイン時に呼び出し）
+  setAdminStatus(isAdmin: boolean): void {
+    localStorage.setItem('isAdmin', isAdmin.toString());
   }
 }
 

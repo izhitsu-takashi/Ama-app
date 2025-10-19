@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, collectionData } from '@angular/fire/firestore';
+import { Firestore, doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, collectionData, updateDoc, deleteDoc } from '@angular/fire/firestore';
 import { User } from './models';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
@@ -8,7 +8,9 @@ export interface AppUserProfile {
   uid: string;
   email: string | null;
   displayName?: string | null;
+  role?: 'user' | 'admin';
   createdAt?: unknown;
+  updatedAt?: unknown;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -29,7 +31,9 @@ export class UserService {
       uid,
       email,
       displayName: displayName ?? null,
+      role: 'user', // デフォルトは一般ユーザー
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     };
     await setDoc(ref, profile);
     return profile;
@@ -60,50 +64,41 @@ export class UserService {
     return users;
   }
 
-  async getAllUsers(): Promise<User[]> {
-    try {
-      const usersCollection = collection(this.firestore, 'users');
-      const snapshot = await getDocs(usersCollection);
-      
-      const users: User[] = [];
-      snapshot.forEach(doc => {
-        const data = doc.data() as AppUserProfile;
-        users.push({
-          id: data.uid,
-          email: data.email || '',
-          displayName: data.displayName || undefined,
-          photoURL: undefined,
-          role: 'user',
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
-      });
-      
-      return users;
-    } catch (error) {
-      console.error('Error fetching all users:', error);
-      return [];
-    }
-  }
+  // 管理者用メソッド
 
-  getAllUsersObservable(): Observable<User[]> {
-    return collectionData(collection(this.firestore, 'users'), { idField: 'uid' }).pipe(
-      map((userProfiles: any[]) => {
-        return userProfiles.map(profile => ({
-          id: profile.uid,
-          email: profile.email || '',
-          displayName: profile.displayName || undefined,
-          photoURL: undefined,
-          role: 'user' as const,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }));
-      }),
+  // 全ユーザーを取得（管理者用）
+  getAllUsers(): Observable<User[]> {
+    const usersQuery = query(collection(this.firestore, 'users'));
+    return collectionData(usersQuery, { idField: 'uid' }).pipe(
+      map((users: any[]) => users.map((user: any) => ({
+        id: user.uid,
+        email: user['email'] || '',
+        displayName: user['displayName'] || undefined,
+        photoURL: undefined,
+        role: user['role'] || 'user',
+        createdAt: user['createdAt'] || new Date(),
+        updatedAt: user['updatedAt'] || new Date()
+      }))),
       catchError(error => {
         console.error('Error fetching all users:', error);
         return of([]);
       })
     );
+  }
+
+  // ユーザーの権限を更新
+  async updateUserRole(userId: string, newRole: 'user' | 'admin'): Promise<void> {
+    const userRef = doc(this.firestore, 'users', userId);
+    await updateDoc(userRef, {
+      role: newRole,
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  // ユーザーを削除
+  async deleteUser(userId: string): Promise<void> {
+    const userRef = doc(this.firestore, 'users', userId);
+    await deleteDoc(userRef);
   }
 }
 

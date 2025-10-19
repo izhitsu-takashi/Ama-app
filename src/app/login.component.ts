@@ -392,6 +392,12 @@ export class LoginComponent {
     const { email, password } = this.form.getRawValue();
     try {
       await this.auth.signInWithEmail(email!, password!);
+      
+      // 管理者権限をチェックして設定
+      this.auth.isAdmin().subscribe(isAdmin => {
+        this.auth.setAdminStatus(isAdmin);
+      });
+      
       await this.router.navigateByUrl('/main');
     } catch (e: any) {
       this.error = e?.message ?? 'ログインに失敗しました';

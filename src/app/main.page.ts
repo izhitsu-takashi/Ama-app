@@ -74,6 +74,16 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
           <button class="action-btn secondary" routerLink="/groups">
             📋 グループ一覧
           </button>
+          
+          <!-- 管理者メニュー -->
+          <button 
+            class="action-btn admin-btn" 
+            routerLink="/admin"
+            *ngIf="isAdmin$ | async"
+            title="管理者ダッシュボード"
+          >
+            👑 管理者
+          </button>
         </div>
 
         <!-- コンテンツエリア -->
@@ -494,6 +504,18 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .action-btn.secondary:hover {
       border-color: #667eea;
       color: #667eea;
+    }
+
+    .action-btn.admin-btn {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
+      font-weight: 600;
+      border: none;
+    }
+
+    .action-btn.admin-btn:hover {
+      background: linear-gradient(135deg, #d97706, #b45309);
+      transform: translateY(-1px);
     }
 
     .action-btn.small {
@@ -1106,6 +1128,7 @@ export class MainPage implements OnInit, OnDestroy {
   unreadNotifications = 0;
   unreadMessageCount = 0;
   todayTodos$: Observable<TodoItem[]> = of([]);
+  isAdmin$: Observable<boolean> = of(false);
   private destroy$ = new Subject<void>();
   currentMonth = '';
   calendarDays: any[] = [];
@@ -1142,6 +1165,7 @@ export class MainPage implements OnInit, OnDestroy {
     this.initializeCalendar();
     this.initializeTodayInfo();
     this.loadTodayTodos();
+    this.checkAdminStatus();
     
     // 通知ページから戻ってきた時に通知数を更新
     this.router.events.pipe(
@@ -1272,6 +1296,10 @@ export class MainPage implements OnInit, OnDestroy {
 
   private loadTodayTodos() {
     this.todayTodos$ = this.todoService.getTodayTodos();
+  }
+
+  private checkAdminStatus() {
+    this.isAdmin$ = this.auth.isAdmin();
   }
 
   // Todoを完了して削除

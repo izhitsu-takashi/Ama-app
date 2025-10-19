@@ -21,6 +21,10 @@ import { MessageComposePage } from './message-compose.page';
 import { MessageViewPage } from './message-view.page';
 import { ChatRoomPage } from './chat-room.page';
 import { TasksPage } from './tasks.page';
+import { AdminDashboardPage } from './admin-dashboard.page';
+import { AdminUsersPage } from './admin-users.page';
+import { AdminGroupsPage } from './admin-groups.page';
+import { AdminGuard } from './admin.guard';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, canActivate: [authGuard] },
@@ -41,6 +45,9 @@ export const routes: Routes = [
   { path: 'messages/view/:id', component: MessageViewPage, canActivate: [authGuard] },
   { path: 'chat/:userId', component: ChatRoomPage, canActivate: [authGuard] },
   { path: 'tasks', component: TasksPage, canActivate: [authGuard] },
+  { path: 'admin', component: AdminDashboardPage, canActivate: [AdminGuard] },
+  { path: 'admin/users', component: AdminUsersPage, canActivate: [AdminGuard] },
+  { path: 'admin/groups', component: AdminGroupsPage, canActivate: [AdminGuard] },
   { path: 'login', component: LoginComponent },
   { path: 'signup', component: SignupComponent },
   { path: 'reset-password', component: ResetPasswordComponent },

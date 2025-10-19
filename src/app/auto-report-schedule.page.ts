@@ -821,7 +821,7 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
   }
 
   private loadAllUsers(): void {
-    this.allUsers$ = this.userService.getAllUsersObservable();
+    this.allUsers$ = this.userService.getAllUsers();
   }
 
   onUserSearch(): void {

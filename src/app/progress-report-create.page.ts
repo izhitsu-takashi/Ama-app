@@ -690,11 +690,14 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
 
   private loadAvailableUsers() {
     // 全ユーザーを取得
-    this.userService.getAllUsers().then(users => {
-      this.availableUsers = users;
-    }).catch(error => {
-      console.error('❌ Error loading users:', error);
-      this.availableUsers = [];
+    this.userService.getAllUsers().subscribe({
+      next: (users: User[]) => {
+        this.availableUsers = users;
+      },
+      error: (error: any) => {
+        console.error('❌ Error loading users:', error);
+        this.availableUsers = [];
+      }
     });
   }
 

@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, query, where, collectionData, setDoc, orderBy, limit, getDocs, docData } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, query, where, collectionData, setDoc, orderBy, limit, getDocs, docData, writeBatch } from '@angular/fire/firestore';
 import { Observable, from, combineLatest, of } from 'rxjs';
 import { map, switchMap, take } from 'rxjs/operators';
 import { Group, GroupMembership, GroupJoinRequest, User, TaskItem } from './models';
@@ -77,10 +77,6 @@ export class GroupService {
     });
   }
 
-  // グループ削除
-  async deleteGroup(groupId: string): Promise<void> {
-    await deleteDoc(doc(this.firestore, 'groups', groupId));
-  }
 
   // グループメンバー一覧取得
   getGroupMembers(groupId: string): Observable<GroupMembership[]> {
@@ -322,6 +318,49 @@ export class GroupService {
     
     const membersSnapshot = await getDocs(membersQuery);
     return membersSnapshot.size;
+  }
+
+  // グループ削除（管理者用）
+  async deleteGroup(groupId: string): Promise<void> {
+    // グループに関連するデータも削除
+    const batch = writeBatch(this.firestore);
+    
+    // グループ自体を削除
+    const groupRef = doc(this.firestore, 'groups', groupId);
+    batch.delete(groupRef);
+    
+    // グループメンバーシップを削除
+    const membersQuery = query(
+      collection(this.firestore, 'groupMemberships'),
+      where('groupId', '==', groupId)
+    );
+    const membersSnapshot = await getDocs(membersQuery);
+    membersSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    // グループ参加リクエストを削除
+    const requestsQuery = query(
+      collection(this.firestore, 'groupJoinRequests'),
+      where('groupId', '==', groupId)
+    );
+    const requestsSnapshot = await getDocs(requestsQuery);
+    requestsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    // グループのタスクを削除
+    const tasksQuery = query(
+      collection(this.firestore, 'tasks'),
+      where('groupId', '==', groupId)
+    );
+    const tasksSnapshot = await getDocs(tasksQuery);
+    tasksSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    // バッチ実行
+    await batch.commit();
   }
 
   private getCurrentUserId(): string {

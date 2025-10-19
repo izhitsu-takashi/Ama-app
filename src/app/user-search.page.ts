@@ -487,17 +487,20 @@ export class UserSearchPage implements OnInit, OnDestroy {
     this.router.navigate(['/main']);
   }
 
-  async loadUsers(): Promise<void> {
+  loadUsers(): void {
     this.loading = true;
-    try {
-      this.allUsers = await this.userService.getAllUsers();
-      this.filteredUsers = [...this.allUsers];
-    } catch (error) {
-      console.error('ユーザー取得エラー:', error);
-      alert('ユーザーの取得に失敗しました: ' + (error as Error).message);
-    } finally {
-      this.loading = false;
-    }
+    this.userService.getAllUsers().subscribe({
+      next: (users: User[]) => {
+        this.allUsers = users;
+        this.filteredUsers = [...this.allUsers];
+        this.loading = false;
+      },
+      error: (error: any) => {
+        console.error('ユーザー取得エラー:', error);
+        alert('ユーザーの取得に失敗しました: ' + (error as Error).message);
+        this.loading = false;
+      }
+    });
   }
 
   onSearch(): void {

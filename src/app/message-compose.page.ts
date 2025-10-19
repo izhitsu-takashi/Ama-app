@@ -448,15 +448,17 @@ export class MessageComposePage implements OnInit, OnDestroy {
       return;
     }
 
-    try {
-      const users = await this.userService.getAllUsers();
-      this.filteredUsers = users.filter(user => 
-        (user.displayName && user.displayName.toLowerCase().includes(this.searchTerm.toLowerCase())) ||
-        user.email.toLowerCase().includes(this.searchTerm.toLowerCase())
-      ).slice(0, 10); // 最大10件まで表示
-    } catch (error) {
-      console.error('ユーザー検索エラー:', error);
-    }
+    this.userService.getAllUsers().subscribe({
+      next: (users: User[]) => {
+        this.filteredUsers = users.filter((user: User) => 
+          (user.displayName && user.displayName.toLowerCase().includes(this.searchTerm.toLowerCase())) ||
+          user.email.toLowerCase().includes(this.searchTerm.toLowerCase())
+        ).slice(0, 10); // 最大10件まで表示
+      },
+      error: (error: any) => {
+        console.error('ユーザー検索エラー:', error);
+      }
+    });
   }
 
   selectUser(user: User): void {
