@@ -116,3 +116,4 @@ export class GoogleAuthCallbackComponent implements OnInit {
     window.location.href = '/google-calendar-settings';
   }
 }
+

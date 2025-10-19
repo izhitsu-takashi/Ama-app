@@ -110,3 +110,4 @@ export const GOOGLE_CALENDAR_CONFIG = {
 - [Google Calendar API ドキュメント](https://developers.google.com/calendar/api)
 - [Google Cloud Console](https://console.cloud.google.com/)
 - [OAuth 2.0 設定ガイド](https://developers.google.com/identity/protocols/oauth2)
+

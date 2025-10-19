@@ -1,14 +1,18 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, query, where, collectionData, setDoc, orderBy, limit, getDocs } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, query, where, collectionData, setDoc, orderBy, limit, getDocs, writeBatch } from '@angular/fire/firestore';
 import { Observable, from, combineLatest, of } from 'rxjs';
 import { map, switchMap, take, catchError } from 'rxjs/operators';
 import { TaskItem, TaskTemplate, TaskComment, TaskReaction, CommentReaction, RecurringPattern } from './models';
 import { NotificationService } from './notification.service';
+import { AuthService } from './auth.service';
+import { UserService } from './user.service';
 
 @Injectable({ providedIn: 'root' })
 export class TaskService {
   private firestore = inject(Firestore);
   private notificationService = inject(NotificationService);
+  private authService = inject(AuthService);
+  private userService = inject(UserService);
 
   // 課題作成
   async createTask(groupId: string, taskData: Omit<TaskItem, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'groupId'>): Promise<TaskItem> {
@@ -244,52 +248,6 @@ export class TaskService {
     );
   }
 
-  // 課題リアクション追加
-  async addTaskReaction(taskId: string, type: TaskReaction['type']): Promise<void> {
-    const userId = this.getCurrentUserId();
-    if (!userId) throw new Error('Not authenticated');
-
-    // 既存のリアクションをチェック
-    const existingReactionQuery = query(
-      collection(this.firestore, 'taskReactions'),
-      where('taskId', '==', taskId),
-      where('userId', '==', userId),
-      where('type', '==', type)
-    );
-
-    const existingReactions = await getDocs(existingReactionQuery);
-
-    if (existingReactions.empty) {
-      // リアクションが存在しない場合は追加
-      await addDoc(collection(this.firestore, 'taskReactions'), {
-        taskId,
-        userId,
-        type,
-        createdAt: serverTimestamp()
-      });
-    } else {
-      // リアクションが存在する場合は削除（トグル）
-      const reactionDoc = existingReactions.docs[0];
-      await deleteDoc(reactionDoc.ref);
-    }
-  }
-
-  // 課題リアクション一覧取得
-  getTaskReactions(taskId: string): Observable<TaskReaction[]> {
-    return collectionData(
-      query(
-        collection(this.firestore, 'taskReactions'),
-        where('taskId', '==', taskId)
-      ),
-      { idField: 'id' }
-    ).pipe(
-      map(reactions => reactions as TaskReaction[]),
-      catchError(error => {
-        console.error('Error loading task reactions:', error);
-        return of([]);
-      })
-    );
-  }
 
   // コメントリアクション追加
   async addCommentReaction(commentId: string, type: CommentReaction['type'], groupId?: string): Promise<void> {
@@ -501,5 +459,87 @@ export class TaskService {
   private getCurrentUserId(): string {
     // TODO: 現在のユーザーIDを取得
     return 'current-user-id';
+  }
+
+  // リアクション機能
+  async addTaskReaction(taskId: string, reactionType: 'thumbs_up' = 'thumbs_up'): Promise<void> {
+    const currentUser = this.authService.currentUser;
+    if (!currentUser) throw new Error('Not authenticated');
+
+    try {
+      // ユーザー名を取得
+      const userProfile = await this.userService.getUserProfile(currentUser.uid);
+      const userName = userProfile?.displayName || currentUser.email || 'Unknown User';
+
+      // 既存のリアクションをチェック
+      const existingReactionQuery = query(
+        collection(this.firestore, 'taskReactions'),
+        where('taskId', '==', taskId),
+        where('userId', '==', currentUser.uid),
+        where('reactionType', '==', reactionType)
+      );
+      
+      const existingReactions = await getDocs(existingReactionQuery);
+      
+      if (existingReactions.empty) {
+        // 新しいリアクションを追加
+        await addDoc(collection(this.firestore, 'taskReactions'), {
+          taskId,
+          userId: currentUser.uid,
+          userName,
+          reactionType,
+          createdAt: serverTimestamp()
+        });
+      } else {
+        // 既存のリアクションを削除（トグル機能）
+        const batch = writeBatch(this.firestore);
+        existingReactions.docs.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+      }
+    } catch (error) {
+      console.error('リアクション追加エラー:', error);
+      throw error;
+    }
+  }
+
+  // 課題のリアクション一覧を取得
+  getTaskReactions(taskId: string): Observable<TaskReaction[]> {
+    const reactionsQuery = query(
+      collection(this.firestore, 'taskReactions'),
+      where('taskId', '==', taskId)
+    );
+    
+    return collectionData(reactionsQuery, { idField: 'id' }).pipe(
+      map(reactions => {
+        // クライアント側でソート
+        return (reactions as TaskReaction[]).sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.() || new Date(0);
+          const bTime = b.createdAt?.toDate?.() || new Date(0);
+          return bTime.getTime() - aTime.getTime();
+        });
+      })
+    );
+  }
+
+  // 課題のリアクション数を取得
+  getTaskReactionCount(taskId: string): Observable<number> {
+    return this.getTaskReactions(taskId).pipe(
+      map(reactions => reactions.length)
+    );
+  }
+
+  // 現在のユーザーがリアクションしているかチェック
+  hasUserReacted(taskId: string, userId: string): Observable<boolean> {
+    const userReactionQuery = query(
+      collection(this.firestore, 'taskReactions'),
+      where('taskId', '==', taskId),
+      where('userId', '==', userId)
+    );
+    
+    return collectionData(userReactionQuery, { idField: 'id' }).pipe(
+      map(reactions => reactions.length > 0)
+    );
   }
 }

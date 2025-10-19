@@ -235,6 +235,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 <th>担当者</th>
                 <th>優先度</th>
                 <th>進捗</th>
+                <th>リアクション</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -267,6 +268,19 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                       <div class="progress-fill" [style.width.%]="task.progress || 0"></div>
                     </div>
                     <span class="progress-text">{{ task.progress || 0 }}%</span>
+                  </div>
+                </td>
+                <td class="task-reaction-cell">
+                  <div class="reaction-container">
+                    <button 
+                      class="reaction-btn" 
+                      [class.active]="hasUserReacted(task.id)"
+                      (click)="toggleReaction(task.id)"
+                      title="👍 リアクション"
+                    >
+                      👍
+                    </button>
+                    <span class="reaction-count">{{ getReactionCount(task.id) }}</span>
                   </div>
                 </td>
                 <td class="task-actions-cell">
@@ -885,6 +899,54 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       font-weight: 600;
       color: #374151;
       min-width: 35px;
+    }
+
+    .task-reaction-cell {
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .reaction-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .reaction-btn {
+      background: #f8f9fa;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 40px;
+      height: 32px;
+    }
+
+    .reaction-btn:hover {
+      background: #e2e8f0;
+      border-color: #cbd5e1;
+      transform: scale(1.05);
+    }
+
+    .reaction-btn.active {
+      background: #dbeafe;
+      border-color: #3b82f6;
+      color: #1e40af;
+      transform: scale(1.1);
+    }
+
+    .reaction-count {
+      font-size: 14px;
+      font-weight: 600;
+      color: #6b7280;
+      min-width: 20px;
+      text-align: center;
     }
 
     .task-actions-cell {
@@ -1567,6 +1629,9 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   // メンバー表示関連
   showMembers = false;
 
+  // リアクション関連
+  taskReactions: { [taskId: string]: { count: number; hasReacted: boolean } } = {};
+
   taskForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(2)]],
     content: [''],
@@ -1651,6 +1716,10 @@ export class GroupDetailPage implements OnInit, OnDestroy {
           this.applyFilters();
           this.buildTimeline(tasks);
           this.notifyDueSoon(tasks);
+          // リアクション状態を初期化（少し遅延させて確実に初期化）
+          setTimeout(() => {
+            this.initializeTaskReactions(tasks);
+          }, 100);
         });
       }
     });
@@ -2080,5 +2149,77 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   }
 
   // マイルストーン表示メソッド
-  
+
+  // リアクション機能
+  async toggleReaction(taskId: string): Promise<void> {
+    try {
+      await this.taskService.addTaskReaction(taskId);
+      // リアクション状態を即座に更新
+      this.refreshTaskReactionState(taskId);
+    } catch (error) {
+      console.error('リアクションエラー:', error);
+    }
+  }
+
+  hasUserReacted(taskId: string): boolean {
+    return this.taskReactions[taskId]?.hasReacted || false;
+  }
+
+  getReactionCount(taskId: string): number {
+    return this.taskReactions[taskId]?.count || 0;
+  }
+
+  private updateTaskReactionState(taskId: string): void {
+    // リアクション数を取得
+    this.taskService.getTaskReactionCount(taskId).pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(count => {
+      this.taskReactions[taskId] = {
+        ...this.taskReactions[taskId],
+        count
+      };
+    });
+
+    // 現在のユーザーがリアクションしているかチェック
+    const currentUser = this.auth.currentUser;
+    if (currentUser) {
+      this.taskService.hasUserReacted(taskId, currentUser.uid).pipe(
+        takeUntil(this.destroy$)
+      ).subscribe(hasReacted => {
+        this.taskReactions[taskId] = {
+          ...this.taskReactions[taskId],
+          hasReacted
+        };
+      });
+    }
+  }
+
+  private refreshTaskReactionState(taskId: string): void {
+    // リアクション状態を即座に更新（リアルタイム）
+    this.taskService.getTaskReactions(taskId).pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(reactions => {
+      const currentUser = this.auth.currentUser;
+      const hasReacted = currentUser ? reactions.some(r => r.userId === currentUser.uid) : false;
+      
+      this.taskReactions[taskId] = {
+        count: reactions.length,
+        hasReacted
+      };
+    });
+  }
+
+  private initializeTaskReactions(tasks: TaskItem[]): void {
+    // 既存のリアクション状態をクリア
+    this.taskReactions = {};
+    
+    // 各課題のリアクション状態を初期化
+    tasks.forEach(task => {
+      this.taskReactions[task.id] = {
+        count: 0,
+        hasReacted: false
+      };
+      this.updateTaskReactionState(task.id);
+    });
+  }
 }

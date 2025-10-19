@@ -64,6 +64,7 @@ export interface TaskItem {
   templateId?: Id; // テンプレートから作成された場合
   isRecurring: boolean;
   recurringPattern?: RecurringPattern;
+  reactions?: TaskReaction[]; // リアクション一覧
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -91,20 +92,21 @@ export interface RecurringPattern {
 }
 
 // コメント・リアクション関連
+export interface TaskReaction {
+  id: Id;
+  taskId: Id;
+  userId: Id;
+  userName: string;
+  reactionType: 'thumbs_up'; // 現在は👍のみ
+  createdAt: Timestamp;
+}
+
 export interface TaskComment {
   id: Id;
   taskId: Id;
   groupId: Id;
   authorId: Id;
   content: string;
-  createdAt: Timestamp;
-}
-
-export interface TaskReaction {
-  id: Id;
-  taskId: Id;
-  userId: Id;
-  type: 'thumbs_up' | 'important' | 'question' | 'check';
   createdAt: Timestamp;
 }
 

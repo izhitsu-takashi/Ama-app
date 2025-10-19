@@ -15,7 +15,7 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     // 自動送信スケジューラーを無効化（起動問題のため）
-    console.log('自動送信スケジューラーは無効化されています');
+    // console.log('自動送信スケジューラーは無効化されています');
     
     /* 自動送信機能（起動問題のため無効化）
     try {

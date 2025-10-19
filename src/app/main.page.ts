@@ -107,6 +107,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
                      [class.has-events]="day.events.length > 0"
                      [class.saturday]="day.isSaturday"
                      [class.sunday]="day.isSunday"
+                     [class.today]="day.isToday"
                      (click)="selectDate(day)">
                   <span class="day-number">{{ day.day }}</span>
                   <div class="day-events" *ngIf="day.events.length > 0">
@@ -632,6 +633,17 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
 
     .calendar-day.sunday {
       background-color: rgba(252, 165, 165, 0.2);
+    }
+
+    .calendar-day.today {
+      background-color: rgba(102, 126, 234, 0.3);
+      border: 2px solid #667eea;
+      box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.2);
+    }
+
+    .calendar-day.today .day-number {
+      font-weight: 700;
+      color: #667eea;
     }
 
     .day-number {
@@ -1237,6 +1249,10 @@ export class MainPage implements OnInit, OnDestroy {
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
     
+    // 今日の日付を取得
+    const today = new Date();
+    const todayString = today.toDateString();
+    
     this.calendarDays = [];
     for (let i = 0; i < 42; i++) {
       const currentDate = new Date(startDate);
@@ -1248,6 +1264,7 @@ export class MainPage implements OnInit, OnDestroy {
         isCurrentMonth: currentDate.getMonth() === month,
         isSaturday: currentDate.getDay() === 6,
         isSunday: currentDate.getDay() === 0,
+        isToday: currentDate.toDateString() === todayString,
         events: this.getEventsForDate(currentDate)
       });
     }
