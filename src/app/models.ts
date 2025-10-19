@@ -279,6 +279,21 @@ export interface CalendarEvent {
   updatedAt?: Timestamp; // 更新日時（同期用）
 }
 
+// Todoリスト関連
+export interface TodoItem {
+  id: Id;
+  title: string;
+  description?: string;
+  type: 'task' | 'event' | 'deadline';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  dueDate?: Timestamp;
+  isCompleted: boolean;
+  relatedId?: Id; // 関連するタスクやイベントのID
+  groupId?: Id; // グループID（タスクの場合）
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 // 統計・分析関連
 export interface GroupStats {
   groupId: Id;

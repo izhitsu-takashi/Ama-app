@@ -8,7 +8,8 @@ import { TaskService } from './task.service';
 import { NotificationService } from './notification.service';
 import { MessageNotificationService } from './message-notification.service';
 import { MessageService } from './message.service';
-import { User, Group, TaskItem, Notification, CalendarEvent } from './models';
+import { TodoService } from './todo.service';
+import { User, Group, TaskItem, Notification, CalendarEvent, TodoItem } from './models';
 import { Observable, Subscription, combineLatest, of, Subject } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Firestore, collection, addDoc, serverTimestamp, query, where, collectionData, updateDoc, doc, deleteDoc } from '@angular/fire/firestore';
@@ -77,6 +78,43 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
 
         <!-- コンテンツエリア -->
         <div class="content-grid">
+          <!-- 今日のTodoリスト -->
+          <div class="todo-section">
+            <div class="section-header">
+              <h2>📝 今日やること</h2>
+            </div>
+            
+            <div class="todo-list" *ngIf="todayTodos$ | async as todos">
+              <div *ngIf="todos.length === 0" class="empty-todos">
+                <p>今日の予定はありません 🎉</p>
+              </div>
+              
+        <div *ngFor="let todo of todos" class="todo-item">
+          <div class="todo-content">
+            <div class="todo-header">
+              <span class="todo-type">{{ getTypeEmoji(todo.type) }}</span>
+              <span class="todo-title">{{ todo.title }}</span>
+              <span class="todo-priority">{{ getPriorityEmoji(todo.priority) }}</span>
+            </div>
+            
+            <div *ngIf="todo.description" class="todo-description">
+              {{ todo.description }}
+            </div>
+            
+            <div *ngIf="todo.dueDate" class="todo-due-date">
+              ⏰ {{ formatTodoDate(todo.dueDate) }}
+            </div>
+          </div>
+          
+          <div class="todo-actions">
+            <button class="complete-btn" (click)="completeTodo(todo)" title="完了">
+              ✅
+            </button>
+          </div>
+        </div>
+            </div>
+          </div>
+
           <!-- 左側：カレンダー -->
           <div class="calendar-section">
             <div class="section-header">
@@ -487,9 +525,129 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
 
     .content-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.5rem;
       margin-bottom: 2rem;
+      max-height: calc(100vh - 200px);
+      overflow: hidden;
+    }
+
+    .todo-section {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .todo-list {
+      margin-top: 1rem;
+      flex: 1;
+      overflow-y: auto;
+      max-height: 400px;
+    }
+
+    .empty-todos {
+      text-align: center;
+      padding: 2rem;
+      color: #6b7280;
+      font-style: italic;
+    }
+
+    .todo-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 1rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      background: #f9fafb;
+      transition: all 0.2s ease;
+    }
+
+    .todo-item:hover {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+    }
+
+    .todo-actions {
+      flex-shrink: 0;
+    }
+
+    .complete-btn {
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 0.5rem;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      height: 36px;
+    }
+
+    .complete-btn:hover {
+      background: #059669;
+      transform: scale(1.05);
+    }
+
+    .todo-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .todo-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .todo-type {
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .todo-title {
+      font-weight: 600;
+      color: #374151;
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
+    }
+
+    .todo-title.completed-text {
+      text-decoration: line-through;
+      color: #9ca3af;
+    }
+
+    .todo-priority {
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .todo-description {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-bottom: 0.25rem;
+      line-height: 1.4;
+    }
+
+    .todo-due-date {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
     }
 
     .calendar-section, .right-section {
@@ -497,6 +655,10 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       border-radius: 1rem;
       padding: 1.5rem;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
     .today-info {
@@ -600,6 +762,9 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       gap: 0.25rem;
+      flex: 1;
+      max-height: 300px;
+      overflow: hidden;
     }
 
     .calendar-day {
@@ -839,13 +1004,18 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
 
     .groups-section,
     .tasks-section {
-      margin-bottom: 2rem;
+      margin-bottom: 1rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
     .groups-container,
     .tasks-container {
-      max-height: 300px;
+      flex: 1;
       overflow-y: auto;
+      max-height: 200px;
       padding-right: 0.5rem;
     }
 
@@ -874,9 +1044,17 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     
 
     /* レスポンシブ */
+    @media (max-width: 1200px) {
+      .content-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+    }
+
     @media (max-width: 1024px) {
       .content-grid {
         grid-template-columns: 1fr;
+        max-height: none;
       }
     }
 
@@ -918,6 +1096,7 @@ export class MainPage implements OnInit, OnDestroy {
   private notificationService = inject(NotificationService);
   private messageNotificationService = inject(MessageNotificationService);
   private messageService = inject(MessageService);
+  private todoService = inject(TodoService);
   private firestore = inject(Firestore);
 
   currentUser: User | null = null;
@@ -926,6 +1105,7 @@ export class MainPage implements OnInit, OnDestroy {
   recentTasks$: Observable<TaskItem[]> = of([]);
   unreadNotifications = 0;
   unreadMessageCount = 0;
+  todayTodos$: Observable<TodoItem[]> = of([]);
   private destroy$ = new Subject<void>();
   currentMonth = '';
   calendarDays: any[] = [];
@@ -961,6 +1141,7 @@ export class MainPage implements OnInit, OnDestroy {
     this.loadUserData();
     this.initializeCalendar();
     this.initializeTodayInfo();
+    this.loadTodayTodos();
     
     // 通知ページから戻ってきた時に通知数を更新
     this.router.events.pipe(
@@ -1087,6 +1268,68 @@ export class MainPage implements OnInit, OnDestroy {
       });
       this.subscriptions.push(sub);
     }
+  }
+
+  private loadTodayTodos() {
+    this.todayTodos$ = this.todoService.getTodayTodos();
+  }
+
+  // Todoを完了して削除
+  async completeTodo(todo: TodoItem) {
+    try {
+      // タスク、期限、イベントすべての完了状態を更新
+      await this.todoService.updateTodoCompletion(todo.id, true);
+      
+      // todoリストを再読み込み（完了したアイテムは表示されなくなる）
+      this.loadTodayTodos();
+    } catch (error) {
+      console.error('Todo完了エラー:', error);
+    }
+  }
+
+  getPriorityEmoji(priority: string): string {
+    const emojis = {
+      urgent: '🔴',
+      high: '🟠',
+      medium: '🟡',
+      low: '🟢'
+    };
+    return emojis[priority as keyof typeof emojis] || '⚪';
+  }
+
+  getTypeEmoji(type: string): string {
+    const emojis = {
+      task: '📋',
+      event: '📅',
+      deadline: '⏰'
+    };
+    return emojis[type as keyof typeof emojis] || '📝';
+  }
+
+  formatTodoDate(date: any): string {
+    if (!date) return '';
+    
+    const dateObj = date.toDate ? date.toDate() : new Date(date);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todoDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+    
+    if (todoDate.getTime() === today.getTime()) {
+      return '今日';
+    }
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (todoDate.getTime() === tomorrow.getTime()) {
+      return '明日';
+    }
+    
+    return dateObj.toLocaleDateString('ja-JP', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
   
@@ -1225,6 +1468,12 @@ export class MainPage implements OnInit, OnDestroy {
     if (!confirm('この予定を削除しますか？')) return;
     try {
       await deleteDoc(doc(this.firestore, 'calendarEvents', ev.id));
+      
+      // 完了したイベントのリストからも削除
+      this.todoService.updateTodoCompletion(`event-${ev.id}`, false);
+      
+      // Todoリストを更新
+      this.loadTodayTodos();
     } catch (e) {
       console.error('予定削除エラー', e);
     }
@@ -1404,6 +1653,8 @@ export class MainPage implements OnInit, OnDestroy {
       }
       (this as any)._editingEventId = undefined;
       this.hideCreateEventModal();
+      // Todoリストを更新
+      this.loadTodayTodos();
     } finally {
       this.loading = false;
     }

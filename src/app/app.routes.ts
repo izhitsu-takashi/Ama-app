@@ -20,6 +20,7 @@ import { MessagesPage } from './messages.page';
 import { MessageComposePage } from './message-compose.page';
 import { MessageViewPage } from './message-view.page';
 import { ChatRoomPage } from './chat-room.page';
+import { TasksPage } from './tasks.page';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, canActivate: [authGuard] },
@@ -39,6 +40,7 @@ export const routes: Routes = [
   { path: 'messages/compose', component: MessageComposePage, canActivate: [authGuard] },
   { path: 'messages/view/:id', component: MessageViewPage, canActivate: [authGuard] },
   { path: 'chat/:userId', component: ChatRoomPage, canActivate: [authGuard] },
+  { path: 'tasks', component: TasksPage, canActivate: [authGuard] },
   { path: 'login', component: LoginComponent },
   { path: 'signup', component: SignupComponent },
   { path: 'reset-password', component: ResetPasswordComponent },
