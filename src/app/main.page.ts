@@ -75,6 +75,10 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             📋 グループ一覧
           </button>
           
+          <button class="action-btn secondary" routerLink="/documents">
+            📄 資料作成
+          </button>
+          
           <!-- 管理者メニュー -->
           <button 
             class="action-btn admin-btn" 

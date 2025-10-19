@@ -25,6 +25,9 @@ import { AdminDashboardPage } from './admin-dashboard.page';
 import { AdminUsersPage } from './admin-users.page';
 import { AdminGroupsPage } from './admin-groups.page';
 import { AdminGuard } from './admin.guard';
+import { DocumentsPage } from './documents.page';
+import { MorningReportPage } from './morning-report.page';
+import { GroupReportPage } from './group-report.page';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, canActivate: [authGuard] },
@@ -48,6 +51,9 @@ export const routes: Routes = [
   { path: 'admin', component: AdminDashboardPage, canActivate: [AdminGuard] },
   { path: 'admin/users', component: AdminUsersPage, canActivate: [AdminGuard] },
   { path: 'admin/groups', component: AdminGroupsPage, canActivate: [AdminGuard] },
+  { path: 'documents', component: DocumentsPage, canActivate: [authGuard] },
+  { path: 'documents/morning-report', component: MorningReportPage, canActivate: [authGuard] },
+  { path: 'documents/group-report', component: GroupReportPage, canActivate: [authGuard] },
   { path: 'login', component: LoginComponent },
   { path: 'signup', component: SignupComponent },
   { path: 'reset-password', component: ResetPasswordComponent },
