@@ -3,8 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { UserService } from './user.service';
-import { User } from './models';
+import { TaskService } from './task.service';
+import { User, CalendarEvent } from './models';
 import { Subject, takeUntil } from 'rxjs';
+import { Firestore, collection, query, where, getDocs } from '@angular/fire/firestore';
 
 @Component({
   selector: 'app-user-search',
@@ -81,7 +83,12 @@ import { Subject, takeUntil } from 'rxjs';
                 </div>
                 
                 <div class="user-info">
-                  <h3 class="user-name">{{ user.displayName || '名前未設定' }}</h3>
+                  <div class="user-name-row">
+                    <h3 class="user-name">{{ user.displayName || '名前未設定' }}</h3>
+                    <span class="busy-status" [class]="'status-' + getUserBusyStatus(user.id)">
+                      {{ getBusyStatusText(user.id) }}
+                    </span>
+                  </div>
                   <p class="user-email">{{ user.email }}</p>
                   <div class="user-meta">
                     <span class="user-role" [class]="'role-' + user.role">
@@ -91,12 +98,31 @@ import { Subject, takeUntil } from 'rxjs';
                       登録日: {{ formatDate(user.createdAt) }}
                     </span>
                   </div>
+                  
+                  <!-- ユーザーの現在の予定 -->
+                  <div class="user-schedule">
+                    <div class="schedule-item" *ngIf="getUserCurrentEvent(user.id); else noSchedule">
+                      <span class="schedule-icon">📅</span>
+                      <span class="schedule-text">{{ getUserCurrentEvent(user.id)?.title }}</span>
+                    </div>
+                    <ng-template #noSchedule>
+                      <div class="schedule-item no-schedule">
+                        <span class="schedule-icon">📅</span>
+                        <span class="schedule-text">予定がありません</span>
+                      </div>
+                    </ng-template>
+                  </div>
+                  
+                  <!-- 直近3日のタスク数 -->
+                  <div class="user-tasks">
+                    <div class="task-count">
+                      <span class="task-icon">📋</span>
+                      <span class="task-text">直近3日: {{ getUserRecentTaskCount(user.id) }}件のタスク</span>
+                    </div>
+                  </div>
                 </div>
                 
                 <div class="user-actions">
-                  <button class="action-btn primary" (click)="viewUserProfile(user)">
-                    プロフィール
-                  </button>
                   <button class="action-btn secondary" (click)="sendMessage(user)">
                     メッセージ
                   </button>
@@ -297,11 +323,44 @@ import { Subject, takeUntil } from 'rxjs';
       min-width: 0;
     }
 
+    .user-name-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+
     .user-name {
-      margin: 0 0 0.25rem 0;
+      margin: 0;
       color: #374151;
       font-size: 1.1rem;
       font-weight: 600;
+    }
+
+    .busy-status {
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.25rem 0.5rem;
+      border-radius: 12px;
+      white-space: nowrap;
+    }
+
+    .status-busy {
+      background: rgba(239, 68, 68, 0.1);
+      color: #dc2626;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .status-working {
+      background: rgba(245, 158, 11, 0.1);
+      color: #d97706;
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .status-free {
+      background: rgba(34, 197, 94, 0.1);
+      color: #16a34a;
+      border: 1px solid rgba(34, 197, 94, 0.2);
     }
 
     .user-email {
@@ -337,6 +396,63 @@ import { Subject, takeUntil } from 'rxjs';
     .user-joined {
       font-size: 0.8rem;
       color: #6b7280;
+    }
+
+    .user-schedule {
+      margin-top: 0.5rem;
+    }
+
+    .schedule-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(16, 185, 129, 0.1);
+      border-radius: 6px;
+      border-left: 3px solid #10b981;
+    }
+
+    .schedule-icon {
+      font-size: 0.9rem;
+    }
+
+    .schedule-text {
+      font-size: 0.85rem;
+      color: #059669;
+      font-weight: 500;
+    }
+
+    .schedule-item.no-schedule {
+      background: rgba(107, 114, 128, 0.1);
+      border-left-color: #6b7280;
+    }
+
+    .schedule-item.no-schedule .schedule-text {
+      color: #6b7280;
+    }
+
+    .user-tasks {
+      margin-top: 0.5rem;
+    }
+
+    .task-count {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: 6px;
+      border-left: 3px solid #3b82f6;
+    }
+
+    .task-icon {
+      font-size: 0.9rem;
+    }
+
+    .task-text {
+      font-size: 0.85rem;
+      color: #2563eb;
+      font-weight: 500;
     }
 
     .user-actions {
@@ -468,10 +584,14 @@ export class UserSearchPage implements OnInit, OnDestroy {
   filteredUsers: User[] = [];
   searchTerm = '';
   loading = false;
+  userCurrentEvents: Map<string, CalendarEvent> = new Map();
+  userRecentTaskCounts: Map<string, number> = new Map();
 
   constructor(
     private userService: UserService,
-    private router: Router
+    private taskService: TaskService,
+    private router: Router,
+    private firestore: Firestore
   ) {}
 
   ngOnInit(): void {
@@ -493,12 +613,89 @@ export class UserSearchPage implements OnInit, OnDestroy {
       next: (users: User[]) => {
         this.allUsers = users;
         this.filteredUsers = [...this.allUsers];
+        this.loadUserData();
         this.loading = false;
       },
       error: (error: any) => {
         console.error('ユーザー取得エラー:', error);
         alert('ユーザーの取得に失敗しました: ' + (error as Error).message);
         this.loading = false;
+      }
+    });
+  }
+
+  private loadUserData(): void {
+    // 各ユーザーの現在の予定とタスク数を取得
+    this.allUsers.forEach(user => {
+      this.loadUserCurrentEvent(user.id);
+      this.loadUserRecentTaskCount(user.id);
+    });
+  }
+
+  private loadUserCurrentEvent(userId: string): void {
+    // 現在時刻の予定を取得
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTime = currentHour * 60 + currentMinute; // 分単位で現在時刻を計算
+    
+    // Firestoreから今日の予定を取得
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const eventsQuery = query(
+      collection(this.firestore, 'calendarEvents'),
+      where('userId', '==', userId)
+    );
+    
+    getDocs(eventsQuery).then(snapshot => {
+      const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CalendarEvent));
+      
+      // 今日の予定をフィルタリング
+      const todayEvents = events.filter(event => {
+        if (!event.startDate) return false;
+        const startDate = event.startDate.toDate ? event.startDate.toDate() : new Date(event.startDate);
+        const endDate = event.endDate?.toDate ? event.endDate.toDate() : new Date(event.endDate || event.startDate);
+        
+        // 今日の日付かチェック
+        const isToday = startDate.toDateString() === now.toDateString();
+        if (!isToday) return false;
+        
+        // 現在時刻が予定の時間内かチェック
+        const startTime = startDate.getHours() * 60 + startDate.getMinutes();
+        const endTime = endDate.getHours() * 60 + endDate.getMinutes();
+        
+        return currentTime >= startTime && currentTime <= endTime;
+      });
+      
+      // 現在進行中の予定があれば設定
+      if (todayEvents.length > 0) {
+        this.userCurrentEvents.set(userId, todayEvents[0]);
+      }
+    }).catch(error => {
+      console.error('予定取得エラー:', error);
+    });
+  }
+
+  private loadUserRecentTaskCount(userId: string): void {
+    // 直近3日のタスク数を取得
+    this.taskService.getUserTasks(userId).subscribe({
+      next: (tasks) => {
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        
+        const recentTasks = tasks.filter(task => {
+          const taskDate = task.dueDate?.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
+          return taskDate >= threeDaysAgo;
+        });
+        
+        this.userRecentTaskCounts.set(userId, recentTasks.length);
+      },
+      error: (error) => {
+        console.error('タスク取得エラー:', error);
+        this.userRecentTaskCounts.set(userId, 0);
       }
     });
   }
@@ -559,9 +756,41 @@ export class UserSearchPage implements OnInit, OnDestroy {
   }
 
 
-  viewUserProfile(user: User): void {
-    // ユーザープロフィール表示機能（将来実装）
-    alert(`${user.displayName || user.email} のプロフィールを表示`);
+
+  getUserCurrentEvent(userId: string): CalendarEvent | undefined {
+    return this.userCurrentEvents.get(userId);
+  }
+
+  getUserRecentTaskCount(userId: string): number {
+    return this.userRecentTaskCounts.get(userId) || 0;
+  }
+
+  getUserBusyStatus(userId: string): string {
+    const hasCurrentEvent = this.getUserCurrentEvent(userId) !== undefined;
+    const hasRecentTasks = this.getUserRecentTaskCount(userId) > 0;
+
+    if (hasCurrentEvent) {
+      return 'busy'; // 予定あり
+    } else if (hasRecentTasks) {
+      return 'working'; // タスク消化中
+    } else {
+      return 'free'; // 予定なし
+    }
+  }
+
+  getBusyStatusText(userId: string): string {
+    const status = this.getUserBusyStatus(userId);
+    
+    switch (status) {
+      case 'busy':
+        return '予定あり';
+      case 'working':
+        return 'タスク消化中';
+      case 'free':
+        return '予定なし';
+      default:
+        return '予定なし';
+    }
   }
 
   sendMessage(user: User): void {

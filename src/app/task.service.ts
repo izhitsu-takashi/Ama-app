@@ -99,12 +99,18 @@ export class TaskService {
     return collectionData(
       query(
         collection(this.firestore, 'tasks'),
-        where('assigneeId', '==', userId),
-        orderBy('createdAt', 'desc')
+        where('assigneeId', '==', userId)
       ),
       { idField: 'id' }
     ).pipe(
-      map(tasks => tasks as TaskItem[]),
+      map(tasks => {
+        // クライアント側でソート
+        return (tasks as TaskItem[]).sort((a, b) => {
+          const aDate = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const bDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return bDate.getTime() - aDate.getTime();
+        });
+      }),
       catchError(error => {
         console.error('Error loading user tasks:', error);
         return of([]);
