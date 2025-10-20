@@ -19,10 +19,15 @@ export class TaskService {
     const createdBy = this.getCurrentUserId();
     if (!createdBy) throw new Error('Not authenticated');
 
+    // 作成者の部門情報を取得
+    const userProfile = await this.userService.getUserProfile(createdBy);
+    const department = userProfile?.department || 'other';
+
     const ref = await addDoc(collection(this.firestore, 'tasks'), {
       ...taskData,
       groupId,
       createdBy,
+      department,
       status: taskData.status ?? 'not_started',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -471,8 +476,9 @@ export class TaskService {
   }
 
   private getCurrentUserId(): string {
-    // TODO: 現在のユーザーIDを取得
-    return 'current-user-id';
+    const currentUser = this.authService.currentUser;
+    if (!currentUser) throw new Error('Not authenticated');
+    return currentUser.uid;
   }
 
   // リアクション機能

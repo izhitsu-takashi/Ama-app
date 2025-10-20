@@ -58,6 +58,7 @@ export interface TaskItem {
   assigneeId?: Id;
   assigneeName?: string; // 担当者名
   createdBy: Id;
+  department?: 'development' | 'consulting' | 'sales' | 'corporate' | 'training' | 'other'; // 作成者の部門
   occurredOn: Timestamp;
   dueDate?: Timestamp;
   completedAt?: Timestamp; // 完了日時

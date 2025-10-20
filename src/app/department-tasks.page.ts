@@ -1,13 +1,12 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { UserService } from './user.service';
 import { AuthService } from './auth.service';
 import { TaskService } from './task.service';
 import { User } from './models';
 import { Subject, takeUntil } from 'rxjs';
-import { Firestore, collection, query, where, getDocs, addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from '@angular/fire/firestore';
+import { Firestore, collection, query, getDocs } from '@angular/fire/firestore';
 
 // 部門課題のインターフェース
 interface DepartmentTask {
@@ -29,71 +28,43 @@ interface DepartmentTask {
 @Component({
   selector: 'app-department-tasks',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   template: `
     <div class="container">
       <div class="header">
         <button class="back-btn" (click)="goBack()">
           ← 戻る
         </button>
-        <h1>🏢 部門課題</h1>
-        <p>部門別の課題を管理します</p>
+        <h1>部門課題</h1>
       </div>
 
       <div class="content">
-        <!-- フィルター・検索 -->
-        <div class="filters-section">
-          <div class="filter-group">
-            <label>部門:</label>
-            <select [(ngModel)]="selectedDepartment" (change)="applyFilters()">
-              <option value="">すべての部門</option>
-              <option value="development">開発</option>
-              <option value="consulting">コンサルティング</option>
-              <option value="sales">営業</option>
-              <option value="corporate">コーポレート</option>
-              <option value="training">研修</option>
-              <option value="other">その他</option>
-            </select>
-          </div>
-          
-          <div class="filter-group">
-            <label>ステータス:</label>
-            <select [(ngModel)]="selectedStatus" (change)="applyFilters()">
-              <option value="">すべてのステータス</option>
-              <option value="not_started">未着手</option>
-              <option value="in_progress">実行中</option>
-              <option value="completed">完了</option>
-            </select>
-          </div>
-          
-          <div class="filter-group">
-            <label>優先度:</label>
-            <select [(ngModel)]="selectedPriority" (change)="applyFilters()">
-              <option value="">すべての優先度</option>
-              <option value="urgent">緊急</option>
-              <option value="high">高</option>
-              <option value="medium">中</option>
-              <option value="low">低</option>
-            </select>
-          </div>
-          
-          <div class="filter-group">
-            <input 
-              type="text" 
-              [(ngModel)]="searchTerm" 
-              (input)="applyFilters()"
-              placeholder="課題を検索..."
-              class="search-input"
-            >
-          </div>
-        </div>
 
-        <!-- 課題作成ボタン -->
-        <div class="actions-section">
-          <button class="create-btn" (click)="showCreateTaskModal()">
-            ➕ 新しい課題を作成
+        <!-- 部門選択ボタン -->
+        <div class="department-buttons">
+          <button 
+            class="dept-btn dept-development" 
+            [class.active]="currentDepartment === 'development'"
+            (click)="selectDepartment('development')"
+          >
+            💻 開発部門
+          </button>
+          <button 
+            class="dept-btn dept-consulting" 
+            [class.active]="currentDepartment === 'consulting'"
+            (click)="selectDepartment('consulting')"
+          >
+            📊 コンサルティング部門
+          </button>
+          <button 
+            class="dept-btn dept-sales" 
+            [class.active]="currentDepartment === 'sales'"
+            (click)="selectDepartment('sales')"
+          >
+            💼 営業部門
           </button>
         </div>
+
 
         <!-- 課題一覧 -->
         <div class="tasks-section">
@@ -102,9 +73,14 @@ interface DepartmentTask {
             <p>課題を読み込み中...</p>
           </div>
           
-          <div *ngIf="!loading && filteredTasks.length === 0" class="no-tasks">
-            <p>課題が見つかりませんでした。</p>
+          <div *ngIf="!loading && currentDepartment && filteredTasks.length === 0" class="no-tasks">
+            <p>{{ getDepartmentLabel(currentDepartment) }}の課題が見つかりませんでした。</p>
           </div>
+          
+          <div *ngIf="!loading && !currentDepartment && filteredTasks.length === 0" class="no-tasks">
+            <p>部門を選択してください。</p>
+          </div>
+
           
           <div *ngIf="!loading && filteredTasks.length > 0" class="tasks-list">
             <div *ngFor="let task of filteredTasks" class="task-item" [class]="'priority-' + task.priority + ' status-' + task.status">
@@ -124,29 +100,20 @@ interface DepartmentTask {
               </div>
               
               <div class="task-content">
-                <p class="task-description">{{ task.description }}</p>
+                <p class="task-description">
+                  <strong>説明:</strong> 
+                  <span *ngIf="task.description && task.description.trim() !== ''; else noDescription">
+                    {{ task.description }}
+                  </span>
+                  <ng-template #noDescription>
+                    <span class="no-description">説明なし</span>
+                  </ng-template>
+                </p>
                 
-                <div class="task-details">
-                  <div class="task-info">
-                    <span class="info-item">
-                      <strong>担当者:</strong> {{ task.assignedToName || '未割り当て' }}
-                    </span>
-                    <span class="info-item">
-                      <strong>期限:</strong> {{ formatDate(task.dueDate) }}
-                    </span>
-                    <span class="info-item">
-                      <strong>作成者:</strong> {{ task.createdByName }}
-                    </span>
-                  </div>
-                  
-                  <div class="task-actions">
-                    <button class="action-btn edit" (click)="editTask(task)">
-                      ✏️ 編集
-                    </button>
-                    <button class="action-btn delete" (click)="deleteTask(task)">
-                      🗑️ 削除
-                    </button>
-                  </div>
+                <div class="task-info">
+                  <span class="info-item">
+                    <strong>作成者:</strong> {{ task.createdByName }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -155,133 +122,6 @@ interface DepartmentTask {
       </div>
     </div>
 
-    <!-- 課題作成・編集モーダル -->
-    <div class="modal-overlay" *ngIf="showTaskModal" (click)="hideTaskModal()">
-      <div class="modal task-modal" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h2 class="modal-title">{{ editingTask ? '課題を編集' : '新しい課題を作成' }}</h2>
-          <button class="modal-close" (click)="hideTaskModal()">×</button>
-        </div>
-        
-        <div class="modal-content">
-          <form (ngSubmit)="saveTask()" #taskForm="ngForm">
-            <div class="form-group">
-              <label for="title">タイトル *</label>
-              <input 
-                type="text" 
-                id="title"
-                [(ngModel)]="formTitle" 
-                name="title"
-                required
-                class="form-input"
-                placeholder="課題のタイトルを入力"
-              >
-            </div>
-            
-            <div class="form-group">
-              <label for="description">説明</label>
-              <textarea 
-                id="description"
-                [(ngModel)]="formDescription" 
-                name="description"
-                class="form-textarea"
-                placeholder="課題の詳細を入力"
-                rows="4"
-              ></textarea>
-            </div>
-            
-            <div class="form-row">
-              <div class="form-group">
-                <label for="department">部門 *</label>
-                <select 
-                  id="department"
-                  [(ngModel)]="formDepartment" 
-                  name="department"
-                  required
-                  class="form-select"
-                >
-                  <option value="development">開発</option>
-                  <option value="consulting">コンサルティング</option>
-                  <option value="sales">営業</option>
-                  <option value="corporate">コーポレート</option>
-                  <option value="training">研修</option>
-                  <option value="other">その他</option>
-                </select>
-              </div>
-              
-              <div class="form-group">
-                <label for="priority">優先度 *</label>
-                <select 
-                  id="priority"
-                  [(ngModel)]="formPriority" 
-                  name="priority"
-                  required
-                  class="form-select"
-                >
-                  <option value="low">低</option>
-                  <option value="medium">中</option>
-                  <option value="high">高</option>
-                  <option value="urgent">緊急</option>
-                </select>
-              </div>
-            </div>
-            
-            <div class="form-row">
-              <div class="form-group">
-                <label for="assignedTo">担当者</label>
-                <select 
-                  id="assignedTo"
-                  [(ngModel)]="formAssignedTo" 
-                  name="assignedTo"
-                  class="form-select"
-                >
-                  <option value="">未割り当て</option>
-                  <option *ngFor="let user of users" [value]="user.id">
-                    {{ user.displayName || user.email }}
-                  </option>
-                </select>
-              </div>
-              
-              <div class="form-group">
-                <label for="dueDate">期限 *</label>
-                <input 
-                  type="datetime-local" 
-                  id="dueDate"
-                  [(ngModel)]="formDueDate" 
-                  name="dueDate"
-                  required
-                  class="form-input"
-                >
-              </div>
-            </div>
-            
-            <div class="form-group" *ngIf="editingTask">
-              <label for="status">ステータス *</label>
-              <select 
-                id="status"
-                [(ngModel)]="formStatus" 
-                name="status"
-                required
-                class="form-select"
-              >
-                <option value="not_started">未着手</option>
-                <option value="in_progress">実行中</option>
-                <option value="completed">完了</option>
-              </select>
-            </div>
-            
-            <div class="modal-actions">
-              <button type="button" class="btn btn-secondary" (click)="hideTaskModal()">
-                キャンセル
-              </button>
-              <button type="submit" class="btn btn-primary" [disabled]="!taskForm.form.valid || saving">
-                {{ saving ? '保存中...' : (editingTask ? '更新' : '作成') }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
   `,
   styles: [`
     .container {
@@ -291,7 +131,9 @@ interface DepartmentTask {
     }
 
     .header {
-      text-align: center;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
       margin-bottom: 2rem;
     }
 
@@ -299,11 +141,11 @@ interface DepartmentTask {
       background: #667eea;
       color: white;
       border: none;
-      padding: 0.5rem 1rem;
+      padding: 0.75rem 1.5rem;
       border-radius: 0.5rem;
+      font-size: 1rem;
       cursor: pointer;
-      margin-bottom: 1rem;
-      transition: background-color 0.2s;
+      transition: background 0.2s;
     }
 
     .back-btn:hover {
@@ -313,12 +155,6 @@ interface DepartmentTask {
     .header h1 {
       font-size: 2.5rem;
       color: #2d3748;
-      margin: 0 0 0.5rem 0;
-    }
-
-    .header p {
-      color: #6b7280;
-      font-size: 1.1rem;
       margin: 0;
     }
 
@@ -329,37 +165,69 @@ interface DepartmentTask {
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
 
-    .filters-section {
+
+    .department-buttons {
       display: flex;
       gap: 1rem;
       margin-bottom: 2rem;
       flex-wrap: wrap;
-      align-items: end;
     }
 
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .filter-group label {
-      font-weight: 600;
+    .dept-btn {
+      background: #f3f4f6;
       color: #374151;
-      font-size: 0.9rem;
-    }
-
-    .filter-group select,
-    .search-input {
-      padding: 0.5rem;
       border: 2px solid #e5e7eb;
-      border-radius: 0.5rem;
+      padding: 1rem 1.5rem;
+      border-radius: 0.75rem;
       font-size: 1rem;
-      min-width: 150px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+      min-width: 200px;
     }
 
-    .search-input {
-      min-width: 200px;
+    .dept-btn:hover {
+      background: #e5e7eb;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .dept-btn.active {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
+    .dept-btn.active:hover {
+      background: #5a67d8;
+    }
+
+    .dept-development.active {
+      background: #3b82f6;
+      border-color: #3b82f6;
+    }
+
+    .dept-development.active:hover {
+      background: #2563eb;
+    }
+
+    .dept-consulting.active {
+      background: #10b981;
+      border-color: #10b981;
+    }
+
+    .dept-consulting.active:hover {
+      background: #059669;
+    }
+
+    .dept-sales.active {
+      background: #f59e0b;
+      border-color: #f59e0b;
+    }
+
+    .dept-sales.active:hover {
+      background: #d97706;
     }
 
     .actions-section {
@@ -406,6 +274,22 @@ interface DepartmentTask {
       text-align: center;
       padding: 3rem;
       color: #6b7280;
+    }
+
+    .probability-info {
+      text-align: center;
+      padding: 1rem;
+      background: #f0f9ff;
+      border: 1px solid #0ea5e9;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .probability-info p {
+      margin: 0;
+      color: #0369a1;
+      font-size: 0.9rem;
+      font-weight: 500;
     }
 
     .tasks-list {
@@ -504,9 +388,20 @@ interface DepartmentTask {
     }
 
     .task-description {
-      color: #4b5563;
+      color: #374151;
       line-height: 1.6;
       margin: 0;
+      font-size: 0.95rem;
+    }
+
+    .task-description strong {
+      color: #1f2937;
+      font-weight: 600;
+    }
+
+    .no-description {
+      color: #9ca3af;
+      font-style: italic;
     }
 
     .task-details {
@@ -542,161 +437,7 @@ interface DepartmentTask {
       transition: all 0.2s;
     }
 
-    .action-btn.edit {
-      background: #3b82f6;
-      color: white;
-    }
 
-    .action-btn.edit:hover {
-      background: #2563eb;
-    }
-
-    .action-btn.delete {
-      background: #ef4444;
-      color: white;
-    }
-
-    .action-btn.delete:hover {
-      background: #dc2626;
-    }
-
-    /* モーダル */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-
-    .task-modal {
-      background: white;
-      border-radius: 1rem;
-      width: 90%;
-      max-width: 600px;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1.5rem;
-      border-bottom: 1px solid #e5e7eb;
-    }
-
-    .modal-title {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: #1f2937;
-      margin: 0;
-    }
-
-    .modal-close {
-      background: none;
-      border: none;
-      font-size: 1.5rem;
-      cursor: pointer;
-      color: #6b7280;
-      padding: 0.25rem;
-    }
-
-    .modal-close:hover {
-      color: #374151;
-    }
-
-    .modal-content {
-      padding: 1.5rem;
-    }
-
-    .form-group {
-      margin-bottom: 1.5rem;
-    }
-
-    .form-row {
-      display: flex;
-      gap: 1rem;
-    }
-
-    .form-row .form-group {
-      flex: 1;
-    }
-
-    .form-group label {
-      display: block;
-      font-weight: 600;
-      color: #374151;
-      margin-bottom: 0.5rem;
-    }
-
-    .form-input,
-    .form-select,
-    .form-textarea {
-      width: 100%;
-      padding: 0.75rem;
-      border: 2px solid #e5e7eb;
-      border-radius: 0.5rem;
-      font-size: 1rem;
-      transition: border-color 0.2s;
-    }
-
-    .form-input:focus,
-    .form-select:focus,
-    .form-textarea:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-
-    .form-textarea {
-      resize: vertical;
-      min-height: 100px;
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 1rem;
-      justify-content: flex-end;
-      margin-top: 2rem;
-    }
-
-    .btn {
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: 0.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-secondary {
-      background: #f3f4f6;
-      color: #374151;
-    }
-
-    .btn-secondary:hover {
-      background: #e5e7eb;
-    }
-
-    .btn-primary {
-      background: #667eea;
-      color: white;
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      background: #5a67d8;
-    }
-
-    .btn-primary:disabled {
-      background: #9ca3af;
-      cursor: not-allowed;
-    }
 
     /* レスポンシブ */
     @media (max-width: 768px) {
@@ -711,6 +452,14 @@ interface DepartmentTask {
 
       .filter-group select,
       .search-input {
+        min-width: auto;
+      }
+
+      .department-buttons {
+        flex-direction: column;
+      }
+
+      .dept-btn {
         min-width: auto;
       }
 
@@ -744,36 +493,10 @@ export class DepartmentTasksPage implements OnInit, OnDestroy {
   users: User[] = [];
   loading = false;
   
-  // フィルター
-  selectedDepartment = '';
-  selectedStatus = '';
-  selectedPriority = '';
-  searchTerm = '';
   
-  // モーダル
-  showTaskModal = false;
-  editingTask: DepartmentTask | null = null;
-  saving = false;
+  // 部門選択
+  currentDepartment: 'development' | 'consulting' | 'sales' | null = null;
   
-  // フォーム
-  taskForm = {
-    title: '',
-    description: '',
-    department: 'development' as 'development' | 'consulting' | 'sales' | 'corporate' | 'training' | 'other',
-    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
-    status: 'not_started' as 'not_started' | 'in_progress' | 'completed',
-    assignedTo: '',
-    dueDate: ''
-  };
-
-  // フォーム用の個別プロパティ
-  formTitle = '';
-  formDescription = '';
-  formDepartment: 'development' | 'consulting' | 'sales' | 'corporate' | 'training' | 'other' = 'development';
-  formPriority: 'low' | 'medium' | 'high' | 'urgent' = 'medium';
-  formStatus: 'not_started' | 'in_progress' | 'completed' = 'not_started';
-  formAssignedTo = '';
-  formDueDate = '';
 
   constructor(
     private router: Router,
@@ -783,9 +506,10 @@ export class DepartmentTasksPage implements OnInit, OnDestroy {
     private firestore: Firestore
   ) {}
 
-  ngOnInit() {
-    this.loadUsers();
-    this.loadDepartmentTasks();
+  async ngOnInit() {
+    console.log('部門課題ページ初期化');
+    await this.loadUsers();
+    await this.loadDepartmentTasks();
   }
 
   ngOnDestroy() {
@@ -797,30 +521,49 @@ export class DepartmentTasksPage implements OnInit, OnDestroy {
     this.router.navigate(['/main']);
   }
 
-  loadUsers() {
-    this.userService.getAllUsers().pipe(
-      takeUntil(this.destroy$)
-    ).subscribe(users => {
-      this.users = users;
+  async loadUsers() {
+    return new Promise<void>((resolve) => {
+      this.userService.getAllUsers().pipe(
+        takeUntil(this.destroy$)
+      ).subscribe(users => {
+        this.users = users;
+        resolve();
+      });
     });
   }
 
   async loadDepartmentTasks() {
     this.loading = true;
     try {
-      const tasksQuery = query(collection(this.firestore, 'departmentTasks'));
+      // グループ課題を読み込み
+      const tasksQuery = query(collection(this.firestore, 'tasks'));
       const querySnapshot = await getDocs(tasksQuery);
       
       this.tasks = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
-          ...data,
+          title: data['title'] || '',
+          description: data['description'] || data['content'] || '',
+          department: data['department'] || 'other',
+          priority: data['priority'] || 'medium',
+          status: data['status'] || 'not_started',
+          assignedTo: data['assignedTo'] || '',
+          assignedToName: data['assignedToName'] || '',
           dueDate: data['dueDate']?.toDate() || new Date(),
           createdAt: data['createdAt']?.toDate() || new Date(),
-          updatedAt: data['updatedAt']?.toDate() || new Date()
+          updatedAt: data['updatedAt']?.toDate() || new Date(),
+          createdBy: data['createdBy'] || '',
+          createdByName: data['createdByName'] || (data['createdBy'] === 'current-user-id' ? 'Loading...' : data['createdBy']) || 'Unknown'
         } as DepartmentTask;
       });
+      
+      
+      // createdByNameが空の場合、createdByのUIDからユーザー名を取得
+      await this.enrichTaskWithCreatorNames();
+      
+      // 部門情報を補完（作成者の部門を取得）
+      this.enrichTaskWithDepartments();
       
       this.applyFilters();
     } catch (error) {
@@ -830,108 +573,95 @@ export class DepartmentTasksPage implements OnInit, OnDestroy {
     }
   }
 
-  applyFilters() {
-    this.filteredTasks = this.tasks.filter(task => {
-      const matchesDepartment = !this.selectedDepartment || task.department === this.selectedDepartment;
-      const matchesStatus = !this.selectedStatus || task.status === this.selectedStatus;
-      const matchesPriority = !this.selectedPriority || task.priority === this.selectedPriority;
-      const matchesSearch = !this.searchTerm || 
-        task.title.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
-        task.description.toLowerCase().includes(this.searchTerm.toLowerCase());
-      
-      return matchesDepartment && matchesStatus && matchesPriority && matchesSearch;
-    });
-  }
-
-  showCreateTaskModal() {
-    this.editingTask = null;
-    this.resetForm();
-    this.showTaskModal = true;
-  }
-
-  editTask(task: DepartmentTask) {
-    this.editingTask = task;
-    this.formTitle = task.title;
-    this.formDescription = task.description;
-    this.formDepartment = task.department;
-    this.formPriority = task.priority;
-    this.formStatus = task.status;
-    this.formAssignedTo = task.assignedTo || '';
-    this.formDueDate = this.formatDateForInput(task.dueDate);
-    this.showTaskModal = true;
-  }
-
-  hideTaskModal() {
-    this.showTaskModal = false;
-    this.editingTask = null;
-    this.resetForm();
-  }
-
-  resetForm() {
-    this.formTitle = '';
-    this.formDescription = '';
-    this.formDepartment = 'development';
-    this.formPriority = 'medium';
-    this.formStatus = 'not_started';
-    this.formAssignedTo = '';
-    this.formDueDate = '';
-  }
-
-  async saveTask() {
-    if (!this.authService.currentUser) return;
-    
-    this.saving = true;
-    try {
-      const assignedUser = this.users.find(u => u.id === this.formAssignedTo);
-      
-      const taskData = {
-        title: this.formTitle,
-        description: this.formDescription,
-        department: this.formDepartment,
-        priority: this.formPriority,
-        status: this.formStatus,
-        assignedTo: this.formAssignedTo || null,
-        assignedToName: assignedUser?.displayName || assignedUser?.email || null,
-        dueDate: new Date(this.formDueDate),
-        createdBy: this.authService.currentUser.uid,
-        createdByName: this.authService.currentUser.displayName || this.authService.currentUser.email || 'Unknown',
-        updatedAt: serverTimestamp()
-      };
-
-      if (this.editingTask) {
-        // 更新
-        const taskRef = doc(this.firestore, 'departmentTasks', this.editingTask.id);
-        await updateDoc(taskRef, taskData);
-      } else {
-        // 新規作成
-        const newTaskData = {
-          ...taskData,
-          createdAt: serverTimestamp()
-        };
-        await addDoc(collection(this.firestore, 'departmentTasks'), newTaskData);
+  getUserDepartment(createdBy: string): 'development' | 'consulting' | 'sales' | 'corporate' | 'training' | 'other' {
+    // 'current-user-id'の場合は現在のユーザーの部門を取得
+    if (createdBy === 'current-user-id') {
+      const currentUser = this.authService.currentUser;
+      if (currentUser) {
+        const currentUserProfile = this.users.find(u => u.id === currentUser.uid);
+        if (currentUserProfile && currentUserProfile.department) {
+          return currentUserProfile.department;
+        }
       }
-      
-      this.hideTaskModal();
-      this.loadDepartmentTasks();
-    } catch (error) {
-      console.error('課題の保存エラー:', error);
-      alert('課題の保存に失敗しました。');
-    } finally {
-      this.saving = false;
+    } else {
+      // 通常のユーザーIDの場合
+      const user = this.users.find(u => u.id === createdBy);
+      if (user && user.department) {
+        return user.department;
+      }
+    }
+    return 'other';
+  }
+
+  async enrichTaskWithCreatorNames() {
+    // createdByNameが空またはUnknownの場合、createdByのUIDからユーザー名を取得
+    for (let task of this.tasks) {
+      if (!task.createdByName || task.createdByName === 'Unknown' || task.createdByName === task.createdBy || task.createdByName === 'Loading...') {
+        // 'current-user-id'の場合は現在のユーザーを使用
+        if (task.createdBy === 'current-user-id') {
+          const currentUser = this.authService.currentUser;
+          if (currentUser) {
+            // 現在のユーザーの詳細情報を取得
+            const currentUserProfile = this.users.find(u => u.id === currentUser.uid);
+            if (currentUserProfile) {
+              task.createdByName = currentUserProfile.displayName || currentUserProfile.email || 'Unknown';
+            } else {
+              task.createdByName = currentUser.displayName || currentUser.email || 'Current User';
+            }
+          } else {
+            task.createdByName = 'Current User';
+          }
+        } else {
+          const user = this.users.find(u => u.id === task.createdBy);
+          
+          if (user) {
+            task.createdByName = user.displayName || user.email || 'Unknown';
+          } else {
+            task.createdByName = 'Unknown';
+          }
+        }
+      }
     }
   }
 
-  async deleteTask(task: DepartmentTask) {
-    if (!confirm(`「${task.title}」を削除しますか？`)) return;
-    
-    try {
-      await deleteDoc(doc(this.firestore, 'departmentTasks', task.id));
-      this.loadDepartmentTasks();
-    } catch (error) {
-      console.error('課題の削除エラー:', error);
-      alert('課題の削除に失敗しました。');
+  enrichTaskWithDepartments() {
+    for (let task of this.tasks) {
+      // 部門が'other'の場合のみ、作成者の部門を取得
+      if (task.department === 'other') {
+        const userDepartment = this.getUserDepartment(task.createdBy);
+        if (userDepartment !== 'other') {
+          task.department = userDepartment;
+        }
+      }
     }
   }
+
+  selectDepartment(department: 'development' | 'consulting' | 'sales') {
+    this.currentDepartment = department;
+    this.applyFilters();
+  }
+
+  applyFilters() {
+    // 部門が選択されていない場合は何も表示しない
+    if (!this.currentDepartment) {
+      this.filteredTasks = [];
+      return;
+    }
+    
+    this.filteredTasks = this.tasks.filter(task => {
+      const matchesDepartment = task.department === this.currentDepartment;
+      return matchesDepartment;
+    });
+
+    // 作成日時で降順ソート（最新順）
+    this.filteredTasks.sort((a, b) => {
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+
+    // 最新の5つに制限
+    this.filteredTasks = this.filteredTasks.slice(0, 5);
+  }
+
 
   formatDate(date: Date): string {
     return date.toLocaleDateString('ja-JP', {
@@ -943,14 +673,6 @@ export class DepartmentTasksPage implements OnInit, OnDestroy {
     });
   }
 
-  formatDateForInput(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  }
 
   getDepartmentLabel(department: string): string {
     const labels: { [key: string]: string } = {
