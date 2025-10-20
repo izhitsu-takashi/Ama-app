@@ -76,6 +76,10 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             📋 グループ一覧
           </button>
           
+          <button class="action-btn secondary" routerLink="/tasks">
+            📝 課題一覧
+          </button>
+          
           <button class="action-btn secondary" routerLink="/documents">
             📄 資料作成
           </button>
@@ -203,9 +207,9 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
                      [class.deadline-red]="getGroupDeadlineStatus(group.id) === 'red'">
                     <div class="group-info">
                       <h3 class="group-name">{{ group.name }}</h3>
-            <div class="group-stats">
-              <span class="member-count">👥 {{ getGroupMemberCount(group.id) }}人</span>
-            </div>
+                      <div class="group-stats">
+                        <span class="member-count">👥 {{ getGroupMemberCount(group.id) }}人</span>
+                      </div>
                     </div>
                     <div class="group-actions">
                       <button class="action-btn small" (click)="openGroup(group); $event.stopPropagation()">
@@ -225,48 +229,6 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
               </div>
             </div>
 
-            <!-- 直近の課題 -->
-            <div class="tasks-section">
-              <div class="section-header">
-                <h2>📋 直近の課題</h2>
-                <button class="view-all-btn" (click)="viewAllTasks()">すべて表示</button>
-              </div>
-              <div class="tasks-container">
-                <div class="tasks-list" *ngIf="recentTasks$ | async as tasks; else noTasks">
-                  <div class="task-item" 
-                       *ngFor="let task of tasks" 
-                       [class]="'priority-' + task.priority"
-                       [class.due-warning]="task.status !== 'completed' && isDueWithinDays(task.dueDate, 3) && !isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
-                       [class.due-danger]="task.status !== 'completed' && isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
-                       [class.overdue]="task.status !== 'completed' && isOverdue(task.dueDate)"
-                       (click)="openTask(task)">
-                    <div class="task-header">
-                      <h4 class="task-title">{{ task.title }}</h4>
-                      <span class="task-status" [class]="'status-' + task.status">
-                        {{ getStatusLabel(task.status) }}
-                      </span>
-                    </div>
-                    <div class="task-meta">
-                      <span class="task-group">📁 {{ getGroupName(task.groupId) }}</span>
-                      <span class="task-due" *ngIf="task.dueDate">
-                        📅 {{ formatDate(task.dueDate) }}
-                      </span>
-                    </div>
-                    <div class="task-progress" *ngIf="task.progress !== undefined">
-                      <div class="progress-bar">
-                        <div class="progress-fill" [style.width.%]="task.progress"></div>
-                      </div>
-                      <span class="progress-text">{{ task.progress }}%</span>
-                    </div>
-                  </div>
-                </div>
-                <ng-template #noTasks>
-                  <div class="empty-state">
-                    <p>直近の課題はありません</p>
-                  </div>
-                </ng-template>
-              </div>
-            </div>
           </div>
         </div>
       </main>
@@ -686,22 +648,19 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       gap: 1.5rem;
       margin-bottom: 2rem;
       max-height: calc(100vh - 200px);
-      overflow: hidden;
     }
 
     .todo-section {
       background: white;
-      border-radius: 12px;
+      border-radius: 1rem;
       padding: 1.5rem;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       height: 100%;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
     }
 
     .todo-list {
-      margin-top: 1rem;
       flex: 1;
       overflow-y: auto;
       max-height: 400px;
@@ -721,7 +680,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       gap: 0.75rem;
       padding: 1rem;
       border: 1px solid #e5e7eb;
-      border-radius: 8px;
+      border-radius: 1rem;
       margin-bottom: 0.75rem;
       background: #f9fafb;
       transition: all 0.2s ease;
@@ -740,7 +699,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       background: #10b981;
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 1rem;
       padding: 0.5rem;
       cursor: pointer;
       font-size: 1rem;
@@ -866,7 +825,6 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       align-items: center;
       margin-bottom: 1.5rem;
       padding-bottom: 0.75rem;
-      border-bottom: 2px solid #f7fafc;
     }
 
     .section-header h2 {
@@ -1106,6 +1064,9 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       cursor: pointer;
       transition: all 0.2s;
       border: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .group-item:hover, .task-item:hover {
@@ -1137,7 +1098,12 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .group-info {
-      margin-bottom: 0.75rem;
+      flex: 1;
+    }
+
+    .group-actions {
+      flex-shrink: 0;
+      margin-left: 1rem;
     }
 
     .group-name, .task-title {
@@ -2216,9 +2182,6 @@ export class MainPage implements OnInit, OnDestroy {
     return taskCount;
   }
 
-  viewAllTasks() {
-    this.router.navigate(['/tasks']);
-  }
 
   openTask(task: TaskItem) {
     this.router.navigate(['/group', task.groupId]);
