@@ -1155,6 +1155,14 @@ export class UserSearchPage implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    
+    // データをクリア
+    this.allUsers = [];
+    this.filteredUsers = [];
+    this.userCurrentEvents.clear();
+    this.userRecentTaskCounts.clear();
+    this.userGroups = [];
+    this.groupMembers = [];
   }
 
   goBack(): void {
@@ -1162,6 +1170,13 @@ export class UserSearchPage implements OnInit, OnDestroy {
   }
 
   loadUsers(): void {
+    // 認証状態をチェック
+    if (!this.authService.currentUser) {
+      console.log('ユーザーがログインしていません');
+      this.loading = false;
+      return;
+    }
+
     this.loading = true;
     this.userService.getAllUsers().subscribe({
       next: (users: User[]) => {
@@ -1172,7 +1187,10 @@ export class UserSearchPage implements OnInit, OnDestroy {
       },
       error: (error: any) => {
         console.error('ユーザー取得エラー:', error);
-        alert('ユーザーの取得に失敗しました: ' + (error as Error).message);
+        // 認証エラーの場合はアラートを表示しない
+        if (!error.message?.includes('permissions')) {
+          alert('ユーザーの取得に失敗しました: ' + (error as Error).message);
+        }
         this.loading = false;
       }
     });
@@ -1187,6 +1205,11 @@ export class UserSearchPage implements OnInit, OnDestroy {
   }
 
   private loadUserCurrentEvent(userId: string): void {
+    // 認証状態をチェック
+    if (!this.authService.currentUser) {
+      return;
+    }
+
     // 現在時刻の予定を取得
     const now = new Date();
     const currentHour = now.getHours();
@@ -1229,11 +1252,19 @@ export class UserSearchPage implements OnInit, OnDestroy {
         this.userCurrentEvents.set(userId, todayEvents[0]);
       }
     }).catch(error => {
-      console.error('予定取得エラー:', error);
+      // 認証エラーの場合はログを出力しない
+      if (!error.message?.includes('permissions')) {
+        console.error('予定取得エラー:', error);
+      }
     });
   }
 
   private loadUserRecentTaskCount(userId: string): void {
+    // 認証状態をチェック
+    if (!this.authService.currentUser) {
+      return;
+    }
+
     // 直近3日のタスク数を取得
     this.taskService.getUserTasks(userId).subscribe({
       next: (tasks) => {
@@ -1248,7 +1279,10 @@ export class UserSearchPage implements OnInit, OnDestroy {
         this.userRecentTaskCounts.set(userId, recentTasks.length);
       },
       error: (error) => {
-        console.error('タスク取得エラー:', error);
+        // 認証エラーの場合はログを出力しない
+        if (!error.message?.includes('permissions')) {
+          console.error('タスク取得エラー:', error);
+        }
         this.userRecentTaskCounts.set(userId, 0);
       }
     });
@@ -1378,7 +1412,10 @@ export class UserSearchPage implements OnInit, OnDestroy {
         updatedAt: doc.data()['updatedAt']?.toDate() || new Date()
       } as UserGroup));
     }).catch(error => {
-      console.error('ユーザーグループ取得エラー:', error);
+      // 認証エラーの場合はログを出力しない
+      if (!error.message?.includes('permissions')) {
+        console.error('ユーザーグループ取得エラー:', error);
+      }
     });
   }
 

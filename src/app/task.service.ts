@@ -96,6 +96,11 @@ export class TaskService {
 
   // ユーザーの課題一覧取得
   getUserTasks(userId: string): Observable<TaskItem[]> {
+    // 認証状態をチェック
+    if (!this.authService.currentUser) {
+      return of([]);
+    }
+
     return collectionData(
       query(
         collection(this.firestore, 'tasks'),
@@ -112,7 +117,10 @@ export class TaskService {
         });
       }),
       catchError(error => {
-        console.error('Error loading user tasks:', error);
+        // 認証エラーの場合はログを出力しない
+        if (!error.message?.includes('permissions')) {
+          console.error('Error loading user tasks:', error);
+        }
         return of([]);
       })
     );
@@ -517,10 +525,11 @@ export class TaskService {
       where('taskId', '==', taskId)
     );
     
-    return collectionData(reactionsQuery, { idField: 'id' }).pipe(
-      map(reactions => {
+    return from(getDocs(reactionsQuery)).pipe(
+      map(snapshot => {
+        const reactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TaskReaction));
         // クライアント側でソート
-        return (reactions as TaskReaction[]).sort((a, b) => {
+        return reactions.sort((a, b) => {
           const aTime = a.createdAt?.toDate?.() || new Date(0);
           const bTime = b.createdAt?.toDate?.() || new Date(0);
           return bTime.getTime() - aTime.getTime();
@@ -544,8 +553,8 @@ export class TaskService {
       where('userId', '==', userId)
     );
     
-    return collectionData(userReactionQuery, { idField: 'id' }).pipe(
-      map(reactions => reactions.length > 0)
+    return from(getDocs(userReactionQuery)).pipe(
+      map(snapshot => snapshot.docs.length > 0)
     );
   }
 }

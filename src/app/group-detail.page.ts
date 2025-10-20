@@ -7,7 +7,6 @@ import { TaskService } from './task.service';
 import { AuthService } from './auth.service';
 import { UserService } from './user.service';
 import { JoinRequestService } from './join-request.service';
-import { NotificationService } from './notification.service';
 import { Group, TaskItem, GroupMembership, JoinRequest } from './models';
 import { Observable, Subject, combineLatest, of } from 'rxjs';
 import { takeUntil, map, switchMap, take } from 'rxjs/operators';
@@ -234,6 +233,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 <th>期限</th>
                 <th>担当者</th>
                 <th>優先度</th>
+                <th>ステータス</th>
                 <th>進捗</th>
                 <th>リアクション</th>
                 <th>操作</th>
@@ -262,6 +262,11 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                     {{ getPriorityLabel(task.priority) }}
                   </span>
                 </td>
+                <td class="task-status-cell">
+                  <span class="status-badge" [class]="'status-' + task.status">
+                    {{ getStatusLabel(task.status) }}
+                  </span>
+                </td>
                 <td class="task-progress-cell">
                   <div class="progress-container">
                     <div class="progress-bar">
@@ -272,14 +277,38 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 </td>
                 <td class="task-reaction-cell">
                   <div class="reaction-container">
-                    <button 
-                      class="reaction-btn" 
-                      [class.active]="hasUserReacted(task.id)"
-                      (click)="toggleReaction(task.id)"
-                      title="👍 リアクション"
-                    >
-                      👍
-                    </button>
+                    <div class="reaction-btn-wrapper">
+                      <button 
+                        class="reaction-btn" 
+                        [class.active]="hasUserReacted(task.id)"
+                        (click)="toggleReaction(task.id)"
+                        (mouseenter)="showReactionTooltip(task.id, $event)"
+                        (mouseleave)="hideReactionTooltip()"
+                      >
+                        👍
+                      </button>
+                      <div 
+                        class="reaction-tooltip" 
+                        *ngIf="showTooltip && tooltipTaskId === task.id"
+                        [style.left.px]="tooltipPosition.x"
+                        [style.top.px]="tooltipPosition.y"
+                      >
+                        <div class="tooltip-header">
+                          <span class="tooltip-title">👍 リアクション</span>
+                          <span class="tooltip-count">{{ getReactionCount(task.id) }}件</span>
+                        </div>
+                        <div class="tooltip-users" *ngIf="getReactionUsers(task.id).length > 0">
+                          <div class="user-list">
+                            <div *ngFor="let user of getReactionUsers(task.id)" class="tooltip-user">
+                              <span class="user-name">{{ user.userName }}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="tooltip-users" *ngIf="getReactionUsers(task.id).length === 0">
+                          <span class="no-reactions">まだリアクションがありません</span>
+                        </div>
+                      </div>
+                    </div>
                     <span class="reaction-count">{{ getReactionCount(task.id) }}</span>
                   </div>
                 </td>
@@ -870,6 +899,35 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       color: #991b1b;
     }
 
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* テーブル内のステータスバッジを大きく表示 */
+    .task-status-cell .status-badge {
+      font-size: 16px;
+      padding: 6px 10px;
+    }
+
+    .status-not_started {
+      background: #f3f4f6; /* グレー */
+      color: #374151;
+    }
+
+    .status-in_progress {
+      background: #dbeafe; /* 青 */
+      color: #1e40af;
+    }
+
+    .status-completed {
+      background: #d1fae5; /* 緑 */
+      color: #065f46;
+    }
+
     .task-progress-cell {
       min-width: 120px;
     }
@@ -918,7 +976,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       border: 2px solid #e2e8f0;
       border-radius: 8px;
       padding: 6px 10px;
-      cursor: pointer;
+      cursor: pointer !important;
       font-size: 16px;
       transition: all 0.2s ease;
       display: flex;
@@ -932,6 +990,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       background: #e2e8f0;
       border-color: #cbd5e1;
       transform: scale(1.05);
+      cursor: pointer !important;
     }
 
     .reaction-btn.active {
@@ -939,6 +998,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       border-color: #3b82f6;
       color: #1e40af;
       transform: scale(1.1);
+      cursor: pointer !important;
     }
 
     .reaction-count {
@@ -947,6 +1007,100 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       color: #6b7280;
       min-width: 20px;
       text-align: center;
+    }
+
+    .reaction-btn-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+
+    .reaction-tooltip {
+      position: fixed;
+      background: rgba(17, 24, 39, 0.95);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 1000;
+      min-width: 200px;
+      max-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(8px);
+      animation: tooltipFadeIn 0.2s ease-out;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    @keyframes tooltipFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .tooltip-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .tooltip-title {
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .tooltip-count {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+
+    .tooltip-users {
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .user-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .tooltip-user {
+      display: flex;
+      align-items: center;
+      padding: 4px 0;
+    }
+
+    .user-name {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .no-reactions {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.7);
+      font-style: italic;
+    }
+
+    /* ツールチップの矢印 */
+    .reaction-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: rgba(17, 24, 39, 0.95);
     }
 
     .task-actions-cell {
@@ -1086,6 +1240,11 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
     .priority-medium { background: #d1fae5; color: #065f46; }
     .priority-high { background: #ffedd5; color: #9a3412; }
     .priority-urgent { background: #fee2e2; color: #991b1b; }
+
+    /* ステータスバッジ（カード表示用） */
+    .status-not_started { background: #f3f4f6; color: #374151; }
+    .status-in_progress { background: #dbeafe; color: #1e40af; }
+    .status-completed { background: #d1fae5; color: #065f46; }
 
     .task-progress {
       margin-bottom: 16px;
@@ -1596,7 +1755,6 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private userService = inject(UserService);
   private joinRequestService = inject(JoinRequestService);
-  private notificationService = inject(NotificationService);
 
   private destroy$ = new Subject<void>();
 
@@ -1610,7 +1768,6 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   timelineDays: Date[] = [];
   timelineItems: Array<{ id:string; title:string; priority:string; left:number; width:number; due: any; assignee: string; progress:number }>=[];
   timelineTodayOffset = -1;
-  private notifiedDueSoonTaskIds = new Set<string>();
 
   showCreateModal = false;
   showEditModal = false;
@@ -1631,6 +1788,13 @@ export class GroupDetailPage implements OnInit, OnDestroy {
 
   // リアクション関連
   taskReactions: { [taskId: string]: { count: number; hasReacted: boolean } } = {};
+  taskReactionUsers: { [taskId: string]: any[] } = {}; // リアクションしたユーザー一覧
+
+  // ツールチップ関連
+  showTooltip = false;
+  tooltipTaskId = '';
+  tooltipPosition = { x: 0, y: 0 };
+
 
   taskForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(2)]],
@@ -1715,7 +1879,6 @@ export class GroupDetailPage implements OnInit, OnDestroy {
           this.filteredTasks = tasks;
           this.applyFilters();
           this.buildTimeline(tasks);
-          this.notifyDueSoon(tasks);
           // リアクション状態を初期化（少し遅延させて確実に初期化）
           setTimeout(() => {
             this.initializeTaskReactions(tasks);
@@ -1813,34 +1976,6 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     this.timelineItems = items;
   }
 
-  private async notifyDueSoon(tasks: TaskItem[]) {
-    const now = new Date();
-    const limit = new Date();
-    limit.setDate(limit.getDate() + 3);
-    for (const t of tasks || []) {
-      if (!t.assigneeId) continue;
-      if (t.status === 'completed') continue;
-      const due = (t as any).dueDate?.toDate ? (t as any).dueDate.toDate() : (t as any).dueDate ? new Date((t as any).dueDate) : undefined;
-      if (!due) continue;
-      if (due < now) continue; // 期限切れは対象外（別処理）
-      if (due <= limit) {
-        // 重複送信を抑止
-        if (this.notifiedDueSoonTaskIds.has(t.id)) continue;
-        try {
-          await this.notificationService.createTaskNotification(
-            t.assigneeId,
-            'task_due_soon' as any,
-            t.id,
-            t.groupId,
-            { taskTitle: t.title, dueDate: (t as any).dueDate }
-          );
-          this.notifiedDueSoonTaskIds.add(t.id);
-        } catch (e) {
-          console.error('期限間近通知エラー:', e);
-        }
-      }
-    }
-  }
 
   getTaskCount(status: string): number {
     return this.filteredTasks.filter(task => task.status === status).length;
@@ -1893,6 +2028,15 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       urgent: '緊急'
     };
     return labels[priority as keyof typeof labels] || priority;
+  }
+
+  getStatusLabel(status: string): string {
+    const labels = {
+      not_started: '未着手',
+      in_progress: '実行中',
+      completed: '完了'
+    };
+    return labels[status as keyof typeof labels] || status;
   }
 
   formatDate(date: any): string {
@@ -2171,9 +2315,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
 
   private updateTaskReactionState(taskId: string): void {
     // リアクション数を取得
-    this.taskService.getTaskReactionCount(taskId).pipe(
-      takeUntil(this.destroy$)
-    ).subscribe(count => {
+    this.taskService.getTaskReactionCount(taskId).subscribe(count => {
       this.taskReactions[taskId] = {
         ...this.taskReactions[taskId],
         count
@@ -2183,22 +2325,48 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     // 現在のユーザーがリアクションしているかチェック
     const currentUser = this.auth.currentUser;
     if (currentUser) {
-      this.taskService.hasUserReacted(taskId, currentUser.uid).pipe(
-        takeUntil(this.destroy$)
-      ).subscribe(hasReacted => {
+      this.taskService.hasUserReacted(taskId, currentUser.uid).subscribe(hasReacted => {
         this.taskReactions[taskId] = {
           ...this.taskReactions[taskId],
           hasReacted
         };
       });
     }
+
+    // リアクションしたユーザー一覧を取得
+    this.taskService.getTaskReactions(taskId).subscribe(reactions => {
+      this.taskReactionUsers[taskId] = reactions;
+    });
+  }
+
+  // ツールチップ機能
+  showReactionTooltip(taskId: string, event: MouseEvent): void {
+    this.tooltipTaskId = taskId;
+    this.showTooltip = true;
+    
+    // ツールチップの位置を計算
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    const tooltipWidth = 200; // ツールチップの幅
+    const tooltipHeight = 80; // ツールチップの高さ（概算）
+    
+    this.tooltipPosition = {
+      x: rect.left + rect.width / 2 - tooltipWidth / 2, // ボタンの中央にツールチップの中央を合わせる
+      y: rect.top - tooltipHeight - 15 // ボタンの上に適切な間隔で表示
+    };
+  }
+
+  hideReactionTooltip(): void {
+    this.showTooltip = false;
+    this.tooltipTaskId = '';
+  }
+
+  getReactionUsers(taskId: string): any[] {
+    return this.taskReactionUsers[taskId] || [];
   }
 
   private refreshTaskReactionState(taskId: string): void {
     // リアクション状態を即座に更新（リアルタイム）
-    this.taskService.getTaskReactions(taskId).pipe(
-      takeUntil(this.destroy$)
-    ).subscribe(reactions => {
+    this.taskService.getTaskReactions(taskId).subscribe(reactions => {
       const currentUser = this.auth.currentUser;
       const hasReacted = currentUser ? reactions.some(r => r.userId === currentUser.uid) : false;
       
@@ -2206,6 +2374,9 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         count: reactions.length,
         hasReacted
       };
+      
+      // リアクションしたユーザー一覧も更新
+      this.taskReactionUsers[taskId] = reactions;
     });
   }
 

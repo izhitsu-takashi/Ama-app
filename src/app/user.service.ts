@@ -68,6 +68,9 @@ export class UserService {
 
   // 全ユーザーを取得（管理者用）
   getAllUsers(): Observable<User[]> {
+    // 認証状態をチェック（AuthServiceをインポートする必要がある）
+    // このメソッドは管理者用なので、認証チェックは呼び出し元で行う
+    
     const usersQuery = query(collection(this.firestore, 'users'));
     return collectionData(usersQuery, { idField: 'uid' }).pipe(
       map((users: any[]) => users.map((user: any) => ({
@@ -80,7 +83,10 @@ export class UserService {
         updatedAt: user['updatedAt'] || new Date()
       }))),
       catchError(error => {
-        console.error('Error fetching all users:', error);
+        // 認証エラーの場合はログを出力しない
+        if (!error.message?.includes('permissions')) {
+          console.error('Error fetching all users:', error);
+        }
         return of([]);
       })
     );
