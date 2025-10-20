@@ -25,3 +25,4 @@ export class AuthGuard implements CanActivate {
 
 // エクスポート用のエイリアス
 export const authGuard = AuthGuard;
+

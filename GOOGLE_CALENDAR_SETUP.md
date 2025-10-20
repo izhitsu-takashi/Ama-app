@@ -111,3 +111,4 @@ export const GOOGLE_CALENDAR_CONFIG = {
 - [Google Cloud Console](https://console.cloud.google.com/)
 - [OAuth 2.0 設定ガイド](https://developers.google.com/identity/protocols/oauth2)
 
+

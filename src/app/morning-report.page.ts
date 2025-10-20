@@ -651,3 +651,4 @@ export class MorningReportPage implements OnInit, OnDestroy {
     this.router.navigate(['/documents']);
   }
 }
+

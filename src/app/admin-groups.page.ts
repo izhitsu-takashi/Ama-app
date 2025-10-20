@@ -644,3 +644,4 @@ export class AdminGroupsPage implements OnInit, OnDestroy {
     this.router.navigate(['/admin']);
   }
 }
+

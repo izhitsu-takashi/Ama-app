@@ -3,10 +3,22 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { UserService } from './user.service';
+import { AuthService } from './auth.service';
 import { TaskService } from './task.service';
 import { User, CalendarEvent } from './models';
 import { Subject, takeUntil } from 'rxjs';
-import { Firestore, collection, query, where, getDocs } from '@angular/fire/firestore';
+import { Firestore, collection, query, where, getDocs, addDoc, deleteDoc, doc, updateDoc } from '@angular/fire/firestore';
+
+// ユーザーグループのインターフェース
+interface UserGroup {
+  id: string;
+  name: string;
+  description?: string;
+  memberIds: string[];
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 @Component({
   selector: 'app-user-search',
@@ -23,87 +35,277 @@ import { Firestore, collection, query, where, getDocs } from '@angular/fire/fire
       </div>
 
       <div class="content">
-        <!-- 検索セクション -->
-        <div class="card">
-          <div class="card-header">
-            <h2>🔍 検索</h2>
+        <!-- タブナビゲーション -->
+        <div class="tabs-container">
+          <div class="tabs">
+            <button 
+              class="tab-button" 
+              [class.active]="activeTab === 'users'"
+              (click)="setActiveTab('users')"
+            >
+              👤 ユーザー一覧
+            </button>
+            <button 
+              class="tab-button" 
+              [class.active]="activeTab === 'groups'"
+              (click)="setActiveTab('groups')"
+            >
+              👥 ユーザーグループ
+            </button>
           </div>
-          <div class="card-content">
-            <div class="search-section">
-              <div class="search-input-group">
-                <input 
-                  type="text" 
-                  [(ngModel)]="searchTerm" 
-                  (input)="onSearch()"
-                  placeholder="ユーザー名またはメールアドレスで検索..."
-                  class="search-input"
-                >
-                <button class="search-btn" (click)="onSearch()">
-                  🔍
-                </button>
+        </div>
+
+        <!-- ユーザー一覧タブ -->
+        <div *ngIf="activeTab === 'users'" class="tab-content">
+          <!-- 検索セクション -->
+          <div class="card">
+            <div class="card-header">
+              <h2>🔍 検索</h2>
+            </div>
+            <div class="card-content">
+              <div class="search-section">
+                <div class="search-input-group">
+                  <input 
+                    type="text" 
+                    [(ngModel)]="searchTerm" 
+                    (input)="onSearch()"
+                    placeholder="ユーザー名またはメールアドレスで検索..."
+                    class="search-input"
+                  >
+                  <button class="search-btn" (click)="onSearch()">
+                    🔍
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ユーザー一覧セクション -->
+          <div class="card">
+            <div class="card-header">
+              <h2>👤 ユーザー一覧</h2>
+              <div class="user-count">
+                {{ filteredUsers.length }} / {{ allUsers.length }} ユーザー
+              </div>
+            </div>
+            <div class="card-content">
+              <div *ngIf="loading" class="loading">
+                <div class="spinner"></div>
+                <span>ユーザーを読み込み中...</span>
               </div>
               
+              <div *ngIf="!loading && filteredUsers.length === 0" class="empty-state">
+                <div *ngIf="searchTerm; else noUsers">
+                  <span>「{{ searchTerm }}」に一致するユーザーが見つかりません</span>
+                  <button class="clear-search-btn" (click)="clearSearch()">
+                    検索をクリア
+                  </button>
+                </div>
+                <ng-template #noUsers>
+                  <span>ユーザーが見つかりません</span>
+                </ng-template>
+              </div>
+              
+              <div *ngIf="!loading && filteredUsers.length > 0" class="users-list">
+                <div *ngFor="let user of filteredUsers" class="user-item">
+                  <div class="user-avatar">
+                    <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || 'ユーザー'">
+                    <div *ngIf="!user.photoURL" class="default-avatar">
+                      {{ getUserInitials(user) }}
+                    </div>
+                  </div>
+                  
+                  <div class="user-info">
+                    <div class="user-name-row">
+                      <h3 class="user-name">{{ user.displayName || '名前未設定' }}</h3>
+                      <span class="busy-status" [class]="'status-' + getUserBusyStatus(user.id)">
+                        {{ getBusyStatusText(user.id) }}
+                      </span>
+                    </div>
+                    <p class="user-email">{{ user.email }}</p>
+                    <div class="user-meta">
+                      <span class="user-role" [class]="'role-' + user.role">
+                        {{ getRoleLabel(user.role) }}
+                      </span>
+                      <span class="user-joined">
+                        登録日: {{ formatDate(user.createdAt) }}
+                      </span>
+                    </div>
+                    
+                    <!-- ユーザーの現在の予定 -->
+                    <div class="user-schedule">
+                      <div class="schedule-item" *ngIf="getUserCurrentEvent(user.id); else noSchedule">
+                        <span class="schedule-icon">📅</span>
+                        <span class="schedule-text">{{ getUserCurrentEvent(user.id)?.title }}</span>
+                      </div>
+                      <ng-template #noSchedule>
+                        <div class="schedule-item no-schedule">
+                          <span class="schedule-icon">📅</span>
+                          <span class="schedule-text">予定がありません</span>
+                        </div>
+                      </ng-template>
+                    </div>
+                    
+                    <!-- 直近3日のタスク数 -->
+                    <div class="user-tasks">
+                      <div class="task-count">
+                        <span class="task-icon">📋</span>
+                        <span class="task-text">直近3日: {{ getUserRecentTaskCount(user.id) }}件のタスク</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="user-actions">
+                    <button class="action-btn secondary" (click)="sendMessage(user)">
+                      メッセージ
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- ユーザー一覧セクション -->
-        <div class="card">
-          <div class="card-header">
-            <h2>👤 ユーザー一覧</h2>
-            <div class="user-count">
-              {{ filteredUsers.length }} / {{ allUsers.length }} ユーザー
+        <!-- ユーザーグループタブ -->
+        <div *ngIf="activeTab === 'groups'" class="tab-content">
+          <!-- グループ作成セクション -->
+          <div class="card">
+            <div class="card-header">
+              <h2>👥 ユーザーグループ</h2>
+              <button class="action-btn primary" (click)="toggleCreateGroupForm()">
+                ➕ グループ作成
+              </button>
+            </div>
+            <div class="card-content">
+              <!-- グループ作成フォーム -->
+              <div *ngIf="showCreateGroupForm" class="create-group-form">
+                <h3>新しいグループを作成</h3>
+                <div class="form-group">
+                  <label for="groupName">グループ名</label>
+                  <input 
+                    type="text" 
+                    id="groupName"
+                    [(ngModel)]="newGroupName" 
+                    placeholder="グループ名を入力..."
+                    class="form-input"
+                  >
+                </div>
+                <div class="form-group">
+                  <label for="groupDescription">説明（任意）</label>
+                  <textarea 
+                    id="groupDescription"
+                    [(ngModel)]="newGroupDescription" 
+                    placeholder="グループの説明を入力..."
+                    class="form-textarea"
+                    rows="3"
+                  ></textarea>
+                </div>
+                <div class="form-group">
+                  <label>メンバーを選択</label>
+                  <div class="member-selection">
+                    <div *ngFor="let user of allUsers" class="member-option">
+                      <label class="checkbox-label">
+                        <input 
+                          type="checkbox" 
+                          [value]="user.id"
+                          (change)="toggleMemberSelection(user.id)"
+                          [checked]="selectedGroupMembers.includes(user.id)"
+                        >
+                        <span class="checkbox-text">
+                          {{ user.displayName || '名前未設定' }} ({{ user.email }})
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button class="action-btn primary" (click)="createUserGroup()" [disabled]="!newGroupName.trim() || selectedGroupMembers.length === 0">
+                    グループ作成
+                  </button>
+                  <button class="action-btn secondary" (click)="cancelCreateGroup()">
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+
+              <!-- グループ一覧 -->
+              <div class="groups-list">
+                <h3>作成されたグループ</h3>
+                <div *ngIf="userGroups.length === 0" class="empty-state">
+                  <span>まだグループが作成されていません</span>
+                </div>
+                <div *ngIf="userGroups.length > 0" class="groups-grid">
+                  <div *ngFor="let group of userGroups" class="group-item">
+                    <div class="group-header">
+                      <h4 class="group-name">{{ group.name }}</h4>
+                      <div class="group-actions">
+                        <button class="action-btn small secondary" (click)="viewGroupMembers(group)">
+                          表示
+                        </button>
+                        <button class="action-btn small danger" (click)="deleteUserGroup(group.id)">
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                    <p *ngIf="group.description" class="group-description">{{ group.description }}</p>
+                    <div class="group-members">
+                      <span class="member-count">{{ group.memberIds.length }}名のメンバー</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="card-content">
-            <div *ngIf="loading" class="loading">
+        </div>
+
+      </div>
+
+      <!-- グループメンバー表示ポップアップ -->
+      <div *ngIf="showGroupMembersPopup" class="popup-overlay" (click)="closeGroupMembersPopup()">
+        <div class="popup-content" (click)="$event.stopPropagation()">
+          <div class="popup-header">
+            <h2>👥 {{ selectedGroup?.name }} のメンバー</h2>
+            <button class="close-btn" (click)="closeGroupMembersPopup()">×</button>
+          </div>
+          <div class="popup-body">
+            <div *ngIf="groupMembersLoading" class="loading">
               <div class="spinner"></div>
-              <span>ユーザーを読み込み中...</span>
+              <span>メンバーを読み込み中...</span>
             </div>
-            
-            <div *ngIf="!loading && filteredUsers.length === 0" class="empty-state">
-              <div *ngIf="searchTerm; else noUsers">
-                <span>「{{ searchTerm }}」に一致するユーザーが見つかりません</span>
-                <button class="clear-search-btn" (click)="clearSearch()">
-                  検索をクリア
-                </button>
-              </div>
-              <ng-template #noUsers>
-                <span>ユーザーが見つかりません</span>
-              </ng-template>
+            <div *ngIf="!groupMembersLoading && groupMembers.length === 0" class="empty-state">
+              <span>メンバーが見つかりません</span>
             </div>
-            
-            <div *ngIf="!loading && filteredUsers.length > 0" class="users-list">
-              <div *ngFor="let user of filteredUsers" class="user-item">
+            <div *ngIf="!groupMembersLoading && groupMembers.length > 0" class="members-list">
+              <div *ngFor="let member of groupMembers" class="user-item">
                 <div class="user-avatar">
-                  <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || 'ユーザー'">
-                  <div *ngIf="!user.photoURL" class="default-avatar">
-                    {{ getUserInitials(user) }}
+                  <img *ngIf="member.photoURL" [src]="member.photoURL" [alt]="member.displayName || 'ユーザー'">
+                  <div *ngIf="!member.photoURL" class="default-avatar">
+                    {{ getUserInitials(member) }}
                   </div>
                 </div>
                 
                 <div class="user-info">
                   <div class="user-name-row">
-                    <h3 class="user-name">{{ user.displayName || '名前未設定' }}</h3>
-                    <span class="busy-status" [class]="'status-' + getUserBusyStatus(user.id)">
-                      {{ getBusyStatusText(user.id) }}
+                    <h3 class="user-name">{{ member.displayName || '名前未設定' }}</h3>
+                    <span class="busy-status" [class]="'status-' + getUserBusyStatus(member.id)">
+                      {{ getBusyStatusText(member.id) }}
                     </span>
                   </div>
-                  <p class="user-email">{{ user.email }}</p>
+                  <p class="user-email">{{ member.email }}</p>
                   <div class="user-meta">
-                    <span class="user-role" [class]="'role-' + user.role">
-                      {{ getRoleLabel(user.role) }}
+                    <span class="user-role" [class]="'role-' + member.role">
+                      {{ getRoleLabel(member.role) }}
                     </span>
                     <span class="user-joined">
-                      登録日: {{ formatDate(user.createdAt) }}
+                      登録日: {{ formatDate(member.createdAt) }}
                     </span>
                   </div>
                   
                   <!-- ユーザーの現在の予定 -->
                   <div class="user-schedule">
-                    <div class="schedule-item" *ngIf="getUserCurrentEvent(user.id); else noSchedule">
+                    <div class="schedule-item" *ngIf="getUserCurrentEvent(member.id); else noSchedule">
                       <span class="schedule-icon">📅</span>
-                      <span class="schedule-text">{{ getUserCurrentEvent(user.id)?.title }}</span>
+                      <span class="schedule-text">{{ getUserCurrentEvent(member.id)?.title }}</span>
                     </div>
                     <ng-template #noSchedule>
                       <div class="schedule-item no-schedule">
@@ -117,13 +319,13 @@ import { Firestore, collection, query, where, getDocs } from '@angular/fire/fire
                   <div class="user-tasks">
                     <div class="task-count">
                       <span class="task-icon">📋</span>
-                      <span class="task-text">直近3日: {{ getUserRecentTaskCount(user.id) }}件のタスク</span>
+                      <span class="task-text">直近3日: {{ getUserRecentTaskCount(member.id) }}件のタスク</span>
                     </div>
                   </div>
                 </div>
                 
                 <div class="user-actions">
-                  <button class="action-btn secondary" (click)="sendMessage(user)">
+                  <button class="action-btn secondary" (click)="sendMessage(member)">
                     メッセージ
                   </button>
                 </div>
@@ -131,8 +333,8 @@ import { Firestore, collection, query, where, getDocs } from '@angular/fire/fire
             </div>
           </div>
         </div>
-
       </div>
+
     </div>
   `,
   styles: [`
@@ -186,6 +388,49 @@ import { Firestore, collection, query, where, getDocs } from '@angular/fire/fire
     .content {
       max-width: 1200px;
       margin: 0 auto;
+      display: grid;
+      gap: 2rem;
+    }
+
+    /* タブスタイル */
+    .tabs-container {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .tabs {
+      display: flex;
+      background: rgba(102, 126, 234, 0.05);
+    }
+
+    .tab-button {
+      flex: 1;
+      padding: 1rem 2rem;
+      background: transparent;
+      border: none;
+      color: #6b7280;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-bottom: 3px solid transparent;
+    }
+
+    .tab-button:hover {
+      background: rgba(102, 126, 234, 0.1);
+      color: #667eea;
+    }
+
+    .tab-button.active {
+      background: rgba(102, 126, 234, 0.1);
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .tab-content {
       display: grid;
       gap: 2rem;
     }
@@ -538,6 +783,266 @@ import { Firestore, collection, query, where, getDocs } from '@angular/fire/fire
       transform: translateY(-1px);
     }
 
+    /* ユーザーグループスタイル */
+    .create-group-form {
+      background: rgba(102, 126, 234, 0.05);
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+    }
+
+    .create-group-form h3 {
+      margin: 0 0 1.5rem 0;
+      color: #667eea;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #374151;
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+
+    .form-input, .form-textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+    }
+
+    .form-input:focus, .form-textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .member-selection {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem;
+      background: white;
+    }
+
+    .member-option {
+      margin-bottom: 0.5rem;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      padding: 0.25rem;
+      border-radius: 4px;
+      transition: background-color 0.2s ease;
+    }
+
+    .checkbox-label:hover {
+      background: rgba(102, 126, 234, 0.05);
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      margin: 0;
+    }
+
+    .checkbox-text {
+      font-size: 0.9rem;
+      color: #374151;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+
+    .groups-list h3 {
+      margin: 0 0 1.5rem 0;
+      color: #374151;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .groups-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .group-item {
+      background: rgba(102, 126, 234, 0.05);
+      border: 1px solid rgba(102, 126, 234, 0.1);
+      border-radius: 12px;
+      padding: 1.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .group-item:hover {
+      background: rgba(102, 126, 234, 0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    }
+
+    .group-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .group-name {
+      margin: 0;
+      color: #374151;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .group-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .action-btn.small {
+      padding: 0.375rem 0.75rem;
+      font-size: 0.8rem;
+    }
+
+    .action-btn.danger {
+      background: rgba(239, 68, 68, 0.1);
+      color: #dc2626;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .action-btn.danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    .group-description {
+      margin: 0 0 1rem 0;
+      color: #6b7280;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .group-members {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .member-count {
+      font-size: 0.85rem;
+      color: #667eea;
+      font-weight: 500;
+    }
+
+    /* ポップアップスタイル */
+    .popup-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 2rem;
+      box-sizing: border-box;
+    }
+
+    .popup-content {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 800px;
+      width: 100%;
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .popup-header {
+      background: rgba(102, 126, 234, 0.1);
+      padding: 1.5rem;
+      border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .popup-header h2 {
+      margin: 0;
+      color: #667eea;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 2rem;
+      color: #6b7280;
+      cursor: pointer;
+      padding: 0;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.2s ease;
+    }
+
+    .close-btn:hover {
+      background: rgba(107, 114, 128, 0.1);
+      color: #374151;
+    }
+
+    .popup-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .members-list {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .members-list .user-item {
+      background: rgba(102, 126, 234, 0.05);
+      border: 1px solid rgba(102, 126, 234, 0.1);
+      border-radius: 12px;
+      padding: 1rem;
+      transition: all 0.2s ease;
+    }
+
+    .members-list .user-item:hover {
+      background: rgba(102, 126, 234, 0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    }
+
     @media (max-width: 768px) {
       .container {
         padding: 1rem;
@@ -574,6 +1079,37 @@ import { Firestore, collection, query, where, getDocs } from '@angular/fire/fire
         width: 100%;
         justify-content: center;
       }
+
+      .popup-overlay {
+        padding: 1rem;
+      }
+
+      .popup-content {
+        max-height: 90vh;
+      }
+
+      .popup-header {
+        padding: 1rem;
+      }
+
+      .popup-header h2 {
+        font-size: 1.25rem;
+      }
+
+      .popup-body {
+        padding: 1rem;
+      }
+
+      .members-list .user-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
+      .members-list .user-actions {
+        width: 100%;
+        justify-content: center;
+      }
     }
   `]
 })
@@ -587,8 +1123,25 @@ export class UserSearchPage implements OnInit, OnDestroy {
   userCurrentEvents: Map<string, CalendarEvent> = new Map();
   userRecentTaskCounts: Map<string, number> = new Map();
 
+  // タブ機能
+  activeTab: 'users' | 'groups' = 'users';
+
+  // ユーザーグループ機能
+  userGroups: UserGroup[] = [];
+  showCreateGroupForm = false;
+  newGroupName = '';
+  newGroupDescription = '';
+  selectedGroupMembers: string[] = [];
+
+  // グループメンバー表示ポップアップ
+  showGroupMembersPopup = false;
+  selectedGroup: UserGroup | null = null;
+  groupMembers: User[] = [];
+  groupMembersLoading = false;
+
   constructor(
     private userService: UserService,
+    private authService: AuthService,
     private taskService: TaskService,
     private router: Router,
     private firestore: Firestore
@@ -596,6 +1149,7 @@ export class UserSearchPage implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadUsers();
+    this.loadUserGroups();
   }
 
   ngOnDestroy(): void {
@@ -797,6 +1351,134 @@ export class UserSearchPage implements OnInit, OnDestroy {
     // メッセージ送信ページに遷移
     this.router.navigate(['/messages/compose'], {
       queryParams: { to: user.id }
+    });
+  }
+
+  // タブ機能
+  setActiveTab(tab: 'users' | 'groups'): void {
+    this.activeTab = tab;
+  }
+
+  // ユーザーグループ機能
+  loadUserGroups(): void {
+    // 現在のユーザーが作成したグループを取得
+    const currentUserId = this.authService.currentUser?.uid;
+    if (!currentUserId) return;
+
+    const groupsQuery = query(
+      collection(this.firestore, 'userGroups'),
+      where('createdBy', '==', currentUserId)
+    );
+
+    getDocs(groupsQuery).then(snapshot => {
+      this.userGroups = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data()['createdAt']?.toDate() || new Date(),
+        updatedAt: doc.data()['updatedAt']?.toDate() || new Date()
+      } as UserGroup));
+    }).catch(error => {
+      console.error('ユーザーグループ取得エラー:', error);
+    });
+  }
+
+  toggleCreateGroupForm(): void {
+    this.showCreateGroupForm = !this.showCreateGroupForm;
+    if (!this.showCreateGroupForm) {
+      this.cancelCreateGroup();
+    }
+  }
+
+  toggleMemberSelection(userId: string): void {
+    const index = this.selectedGroupMembers.indexOf(userId);
+    if (index > -1) {
+      this.selectedGroupMembers.splice(index, 1);
+    } else {
+      this.selectedGroupMembers.push(userId);
+    }
+  }
+
+  createUserGroup(): void {
+    if (!this.newGroupName.trim() || this.selectedGroupMembers.length === 0) {
+      alert('グループ名とメンバーを選択してください。');
+      return;
+    }
+
+    const currentUserId = this.authService.currentUser?.uid;
+    if (!currentUserId) {
+      alert('ログインが必要です。');
+      return;
+    }
+
+    const newGroup: Omit<UserGroup, 'id'> = {
+      name: this.newGroupName.trim(),
+      description: this.newGroupDescription.trim() || undefined,
+      memberIds: this.selectedGroupMembers,
+      createdBy: currentUserId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    addDoc(collection(this.firestore, 'userGroups'), newGroup).then(() => {
+      alert('グループが作成されました！');
+      this.cancelCreateGroup();
+      this.loadUserGroups();
+    }).catch(error => {
+      console.error('グループ作成エラー:', error);
+      alert('グループの作成に失敗しました: ' + error.message);
+    });
+  }
+
+  cancelCreateGroup(): void {
+    this.newGroupName = '';
+    this.newGroupDescription = '';
+    this.selectedGroupMembers = [];
+    this.showCreateGroupForm = false;
+  }
+
+  viewGroupMembers(group: UserGroup): void {
+    this.selectedGroup = group;
+    this.showGroupMembersPopup = true;
+    this.loadGroupMembers(group);
+  }
+
+  loadGroupMembers(group: UserGroup): void {
+    this.groupMembersLoading = true;
+    this.groupMembers = [];
+
+    // グループメンバーのユーザー情報を取得
+    this.userService.getUsersByIds(group.memberIds).then(members => {
+      this.groupMembers = members;
+      this.groupMembersLoading = false;
+      
+      // 各メンバーの現在の予定とタスク数を取得
+      members.forEach(member => {
+        this.loadUserCurrentEvent(member.id);
+        this.loadUserRecentTaskCount(member.id);
+      });
+    }).catch(error => {
+      console.error('グループメンバー取得エラー:', error);
+      this.groupMembersLoading = false;
+    });
+  }
+
+  closeGroupMembersPopup(): void {
+    this.showGroupMembersPopup = false;
+    this.selectedGroup = null;
+    this.groupMembers = [];
+  }
+
+  deleteUserGroup(groupId: string): void {
+    if (!confirm('このグループを削除しますか？この操作は取り消せません。')) {
+      return;
+    }
+
+    deleteDoc(doc(this.firestore, 'userGroups', groupId)).then(() => {
+      alert('グループが削除されました。');
+      this.loadUserGroups();
+    }).catch(error => {
+      console.error('グループ削除エラー:', error);
+      alert('グループの削除に失敗しました: ' + error.message);
     });
   }
 }
