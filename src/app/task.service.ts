@@ -23,11 +23,23 @@ export class TaskService {
     const userProfile = await this.userService.getUserProfile(createdBy);
     const department = userProfile?.department || 'other';
 
+    // 担当者名を取得
+    let assigneeName = '';
+    if (taskData.assigneeId) {
+      try {
+        const assigneeProfile = await this.userService.getUserProfile(taskData.assigneeId);
+        assigneeName = assigneeProfile?.displayName || '';
+      } catch (error) {
+        console.error('担当者名取得エラー:', error);
+      }
+    }
+
     const ref = await addDoc(collection(this.firestore, 'tasks'), {
       ...taskData,
       groupId,
       createdBy,
       department,
+      assigneeName,
       status: taskData.status ?? 'not_started',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -59,6 +71,20 @@ export class TaskService {
     const cleanUpdates = Object.fromEntries(
       Object.entries(updates).filter(([_, value]) => value !== undefined)
     );
+
+    // 担当者が変更された場合、担当者名も更新
+    if (updates.assigneeId !== undefined) {
+      let assigneeName = '';
+      if (updates.assigneeId) {
+        try {
+          const assigneeProfile = await this.userService.getUserProfile(updates.assigneeId);
+          assigneeName = assigneeProfile?.displayName || '';
+        } catch (error) {
+          console.error('担当者名取得エラー:', error);
+        }
+      }
+      cleanUpdates['assigneeName'] = assigneeName;
+    }
 
     await updateDoc(doc(this.firestore, 'tasks', taskId), {
       ...cleanUpdates,

@@ -25,8 +25,8 @@ export class GroupService {
       userId: groupData.ownerId,
       role: 'owner',
       joinedAt: serverTimestamp(),
-      userName: currentUser?.displayName || 'グループオーナー',
-      userEmail: currentUser?.email || 'owner@example.com'
+      userName: currentUser?.displayName || currentUser?.email?.split('@')[0] || 'ユーザー',
+      userEmail: currentUser?.email || ''
     });
     
     const snap = await getDoc(doc(this.firestore, 'groups', ref.id));

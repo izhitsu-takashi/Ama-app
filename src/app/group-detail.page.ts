@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
@@ -218,7 +218,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
             <select class="filter-select" [(ngModel)]="assigneeFilter" (change)="applyFilters()">
               <option value="">担当者: すべて</option>
               <option *ngFor="let member of (members$ | async)" [value]="member.userId">
-                {{ member.userName || member.userEmail || 'ユーザー' }}
+                {{ getMemberDisplayName(member.userId, member.userName, member.userEmail) }}
               </option>
             </select>
             <select class="filter-select" [(ngModel)]="taskSortByDueDate" (change)="applyFilters()">
@@ -261,7 +261,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                   {{ formatDate(task.dueDate) }}
                 </td>
                 <td class="task-assignee-cell">
-                  {{ getAssigneeName(task.assigneeId) }}
+                  {{ task.assigneeName || getAssigneeName(task.assigneeId) }}
                 </td>
                 <td class="task-priority-cell">
                   <span class="priority-badge" [class]="'priority-' + task.priority">
@@ -477,7 +477,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
               <select formControlName="assigneeId" class="form-select">
                 <option value="">未設定</option>
                 <option *ngFor="let member of (members$ | async)" [value]="member.userId">
-                  {{ member.userName || member.userEmail || 'ユーザー' }}
+                  {{ getMemberDisplayName(member.userId, member.userName, member.userEmail) }}
                 </option>
               </select>
             </div>
@@ -1762,6 +1762,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   private userService = inject(UserService);
   private joinRequestService = inject(JoinRequestService);
   private notificationService = inject(NotificationService);
+  private cd = inject(ChangeDetectorRef);
 
   private destroy$ = new Subject<void>();
 
@@ -1871,21 +1872,57 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         this.members$.pipe(takeUntil(this.destroy$)).subscribe(async members => {
           this.members = members;
           const uniqueUserIds = Array.from(new Set(members.map(m => m.userId)));
+          let hasUpdates = false;
+          
           for (const uid of uniqueUserIds) {
             try {
               // 既にキャッシュ済みならスキップ
               if (this.memberNameById[uid]) continue;
+              
               const profile = await this.userService.getUserProfile(uid);
               if (profile?.displayName) {
                 this.memberNameById[uid] = profile.displayName;
+                hasUpdates = true;
+              } else {
+                // displayNameが取得できない場合は、メンバーシップの情報から推測
+                const member = members.find(m => m.userId === uid);
+                if (member?.userEmail && member.userEmail !== 'owner@example.com') {
+                  // メールアドレスから名前を抽出してdisplayNameとして保存
+                  const emailName = member.userEmail.split('@')[0];
+                  this.memberNameById[uid] = emailName;
+                  // Firestoreのプロファイルも更新
+                  await this.userService.updateUserProfile(uid, { displayName: emailName });
+                  hasUpdates = true;
+                }
               }
-            } catch (_) {
-              // ignore profile fetch errors
+            } catch (error) {
+              console.error('初期化時ユーザープロファイル取得エラー:', uid, error);
             }
+          }
+          
+          // ユーザー名が更新された場合は変更検知をトリガー
+          if (hasUpdates) {
+            this.cd.detectChanges();
           }
         });
         
-        this.tasks$.pipe(takeUntil(this.destroy$)).subscribe(tasks => {
+        this.tasks$.pipe(takeUntil(this.destroy$)).subscribe(async tasks => {
+          // assigneeNameがない課題の担当者名を補完
+          for (const task of tasks) {
+            if (task.assigneeId && !task.assigneeName) {
+              try {
+                const assigneeProfile = await this.userService.getUserProfile(task.assigneeId);
+                if (assigneeProfile?.displayName) {
+                  // Firestoreの課題データを更新
+                  await this.taskService.updateTask(task.id, { assigneeName: assigneeProfile.displayName });
+                  task.assigneeName = assigneeProfile.displayName;
+                }
+              } catch (error) {
+                console.error('担当者名補完エラー:', error);
+              }
+            }
+          }
+          
           this.filteredTasks = tasks;
           this.applyFilters();
           this.buildTimeline(tasks);
@@ -2064,15 +2101,62 @@ export class GroupDetailPage implements OnInit, OnDestroy {
 
   getAssigneeName(userId: string | undefined): string {
     if (!userId) return '未設定';
+    
     // ユーザープロファイル由来の表示名を最優先
     if (this.memberNameById[userId]) {
       return this.memberNameById[userId];
     }
+    
     // メンバーシップに保存されている名前/メールをフォールバック
     const member = this.members.find(m => m.userId === userId);
     if (member) {
-      return member.userName || member.userEmail || 'ユーザー';
+      // 「グループオーナー」という文字列は無視
+      if (member.userName && member.userName !== 'グループオーナー') {
+        return member.userName;
+      }
+      // メールアドレスから名前を抽出（デフォルトメールは無視）
+      if (member.userEmail && member.userEmail !== 'owner@example.com') {
+        return member.userEmail.split('@')[0];
+      }
     }
+    
+    // ユーザー名が取得できていない場合は、非同期で取得を試行
+    this.loadUserDisplayName(userId);
+    return 'ユーザー';
+  }
+
+  // 非同期でユーザー名を取得するメソッド
+  async getAssigneeNameAsync(userId: string | undefined): Promise<string> {
+    if (!userId) return '未設定';
+    
+    // ユーザープロファイル由来の表示名を最優先
+    if (this.memberNameById[userId]) {
+      return this.memberNameById[userId];
+    }
+    
+    try {
+      const profile = await this.userService.getUserProfile(userId);
+      if (profile?.displayName) {
+        this.memberNameById[userId] = profile.displayName;
+        return profile.displayName;
+      }
+    } catch (error) {
+      console.error('ユーザープロファイル取得エラー:', error);
+    }
+    
+    // メンバーシップに保存されている名前/メールをフォールバック
+    const member = this.members.find(m => m.userId === userId);
+    if (member) {
+      // 「グループオーナー」という文字列は無視
+      if (member.userName && member.userName !== 'グループオーナー') {
+        return member.userName;
+      }
+      // メールアドレスから名前を抽出（デフォルトメールは無視）
+      if (member.userEmail && member.userEmail !== 'owner@example.com') {
+        return member.userEmail.split('@')[0];
+      }
+    }
+    
     return 'ユーザー';
   }
 
@@ -2088,11 +2172,41 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     }
     
     // メールアドレスから名前を抽出
-    if (userEmail) {
+    if (userEmail && userEmail !== 'owner@example.com') {
       return userEmail.split('@')[0];
     }
     
+    // ユーザー名が取得できていない場合は、非同期で取得を試行
+    this.loadUserDisplayName(userId);
     return 'ユーザー';
+  }
+
+  private async loadUserDisplayName(userId: string): Promise<void> {
+    try {
+      // 既にキャッシュ済みならスキップ
+      if (this.memberNameById[userId]) return;
+      
+      const profile = await this.userService.getUserProfile(userId);
+      if (profile?.displayName) {
+        this.memberNameById[userId] = profile.displayName;
+        // 変更検知をトリガー
+        this.cd.detectChanges();
+      } else {
+        // displayNameが取得できない場合は、メンバーシップの情報から推測
+        const member = this.members.find(m => m.userId === userId);
+        if (member?.userEmail && member.userEmail !== 'owner@example.com') {
+          // メールアドレスから名前を抽出してdisplayNameとして保存
+          const emailName = member.userEmail.split('@')[0];
+          this.memberNameById[userId] = emailName;
+          // Firestoreのプロファイルも更新
+          await this.userService.updateUserProfile(userId, { displayName: emailName });
+          // 変更検知をトリガー
+          this.cd.detectChanges();
+        }
+      }
+    } catch (error) {
+      console.error('ユーザー名取得エラー:', error);
+    }
   }
 
   getPriorityLabel(priority: string): string {

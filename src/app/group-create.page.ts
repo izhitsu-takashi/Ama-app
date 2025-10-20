@@ -288,7 +288,7 @@ import { TaskService } from './task.service';
     .page-container {
       min-height: 100vh;
       background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      padding: 20px;
+      padding: 20px 20px 20px 20px;
     }
 
     .page-header {
@@ -521,7 +521,10 @@ import { TaskService } from './task.service';
       gap: 16px;
       justify-content: flex-end;
       margin-top: 40px;
+      margin-bottom: 20px;
       padding-top: 30px;
+      padding-bottom: 10px;
+      padding-right: 10px;
       border-top: 1px solid #e2e8f0;
     }
 
@@ -884,7 +887,7 @@ import { TaskService } from './task.service';
     /* レスポンシブ */
     @media (max-width: 768px) {
       .page-container {
-        padding: 16px;
+        padding: 16px 16px 16px 16px;
       }
 
       .page-header {

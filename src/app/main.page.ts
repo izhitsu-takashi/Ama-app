@@ -663,7 +663,6 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .todo-list {
       flex: 1;
       overflow-y: auto;
-      max-height: 400px;
     }
 
     .empty-todos {
@@ -924,7 +923,6 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       grid-template-columns: repeat(7, 1fr);
       gap: 0.25rem;
       flex: 1;
-      max-height: 300px;
       overflow: hidden;
     }
 
@@ -1240,7 +1238,6 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .tasks-container {
       flex: 1;
       overflow-y: auto;
-      max-height: 200px;
       padding-right: 0.5rem;
     }
 

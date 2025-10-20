@@ -27,7 +27,14 @@ export class UserService {
 
   async ensureUserProfile(uid: string, email: string | null, displayName?: string | null, department?: 'development' | 'consulting' | 'sales' | 'corporate' | 'training' | 'other', photoURL?: string | null) {
     const existing = await this.getUserProfile(uid);
-    if (existing) return existing;
+    if (existing) {
+      // 既存のプロファイルにdisplayNameがない場合は更新
+      if (!existing.displayName && displayName) {
+        await this.updateUserProfile(uid, { displayName });
+        existing.displayName = displayName;
+      }
+      return existing;
+    }
     const ref = doc(this.firestore, 'users', uid);
     const profile: AppUserProfile = {
       uid,
@@ -41,6 +48,14 @@ export class UserService {
     };
     await setDoc(ref, profile);
     return profile;
+  }
+
+  async updateUserProfile(uid: string, updates: Partial<AppUserProfile>) {
+    const ref = doc(this.firestore, 'users', uid);
+    await updateDoc(ref, {
+      ...updates,
+      updatedAt: serverTimestamp()
+    });
   }
 
   async getUsersByIds(userIds: string[]): Promise<User[]> {
