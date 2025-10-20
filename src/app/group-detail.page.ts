@@ -221,6 +221,11 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 {{ member.userName || member.userEmail || 'ユーザー' }}
               </option>
             </select>
+            <select class="filter-select" [(ngModel)]="taskSortByDueDate" (change)="applyFilters()">
+              <option value="">期限: 並べ替えなし</option>
+              <option value="asc">期限: 近い順</option>
+              <option value="desc">期限: 遠い順</option>
+            </select>
             <button class="btn btn-secondary" (click)="clearFilters()">クリア</button>
           </div>
         </div>
@@ -1779,6 +1784,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   statusFilter = '';
   priorityFilter = '';
   assigneeFilter = '';
+  taskSortByDueDate = 'asc'; // デフォルトで期限が近い順
 
   // 参加リクエスト関連
   joinRequests$: Observable<JoinRequest[]> = of([]);
@@ -1905,6 +1911,21 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         const assigneeMatch = !this.assigneeFilter || task.assigneeId === this.assigneeFilter;
         return statusMatch && priorityMatch && assigneeMatch;
       });
+
+      // 期限でソート
+      if (this.taskSortByDueDate) {
+        this.filteredTasks.sort((a, b) => {
+          const aDate = a.dueDate ? (a.dueDate.toDate ? a.dueDate.toDate() : new Date(a.dueDate)) : new Date('9999-12-31');
+          const bDate = b.dueDate ? (b.dueDate.toDate ? b.dueDate.toDate() : new Date(b.dueDate)) : new Date('9999-12-31');
+          
+          if (this.taskSortByDueDate === 'asc') {
+            return aDate.getTime() - bDate.getTime();
+          } else if (this.taskSortByDueDate === 'desc') {
+            return bDate.getTime() - aDate.getTime();
+          }
+          return 0;
+        });
+      }
     });
   }
 
@@ -1912,6 +1933,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     this.statusFilter = '';
     this.priorityFilter = '';
     this.assigneeFilter = '';
+    this.taskSortByDueDate = '';
     this.applyFilters();
   }
 
