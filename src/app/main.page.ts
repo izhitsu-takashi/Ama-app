@@ -188,7 +188,9 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
                 <div class="groups-list" *ngIf="userGroups$ | async as groups; else noGroups">
                   <a class="group-item" 
                      *ngFor="let group of groups" 
-                     [routerLink]="['/group', group.id]">
+                     [routerLink]="['/group', group.id]"
+                     [class.deadline-yellow]="getGroupDeadlineStatus(group.id) === 'yellow'"
+                     [class.deadline-red]="getGroupDeadlineStatus(group.id) === 'red'">
                     <div class="group-info">
                       <h3 class="group-name">{{ group.name }}</h3>
             <div class="group-stats">
@@ -937,6 +939,28 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
 
+    .group-item.deadline-yellow {
+      border-color: #fbbf24;
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    }
+
+    .group-item.deadline-yellow:hover {
+      border-color: #f59e0b;
+      background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+    }
+
+    .group-item.deadline-red {
+      border-color: #ef4444;
+      background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+    }
+
+    .group-item.deadline-red:hover {
+      border-color: #dc2626;
+      background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    }
+
     .group-info {
       margin-bottom: 0.75rem;
     }
@@ -1232,6 +1256,8 @@ export class MainPage implements OnInit, OnDestroy {
         this.userGroupsCache = groups;
         // メンバー数購読を更新
         this.setupMemberCountSubscriptions(groups.map(g => g.id));
+        // 期限状況を更新
+        this.loadGroupDeadlineStatus(groups.map(g => g.id));
       });
     } else {
       this.userGroups$ = of([]);
@@ -1262,10 +1288,63 @@ export class MainPage implements OnInit, OnDestroy {
     this._groupIdToMemberCount = {} as any;
   }
 
+  private loadGroupDeadlineStatus(groupIds: string[]) {
+    groupIds.forEach(groupId => {
+      this.taskService.getGroupTasks(groupId).pipe(
+        take(1),
+        takeUntil(this.destroy$)
+      ).subscribe(tasks => {
+        this._groupIdToDeadlineStatus[groupId] = this.calculateDeadlineStatus(tasks);
+      });
+    });
+  }
+
+  private calculateDeadlineStatus(tasks: any[]): 'normal' | 'yellow' | 'red' {
+    const now = new Date();
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+    const oneDayFromNow = new Date();
+    oneDayFromNow.setDate(oneDayFromNow.getDate() + 1);
+
+    let hasRedDeadline = false;
+    let hasYellowDeadline = false;
+
+    for (const task of tasks) {
+      // 完了済みの課題は期限状況に影響しない
+      if (task.status === 'completed') {
+        continue;
+      }
+
+      if (task.dueDate) {
+        const dueDate = task.dueDate.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
+        
+        // 期限が1日以内（赤色）
+        if (dueDate <= oneDayFromNow && dueDate >= now) {
+          hasRedDeadline = true;
+          // 赤色が見つかったら即座に返す（最優先）
+          return 'red';
+        }
+        // 期限が3日以内（黄色）- 1日以内は除外
+        else if (dueDate <= threeDaysFromNow && dueDate > oneDayFromNow) {
+          hasYellowDeadline = true;
+        }
+      }
+    }
+
+    if (hasRedDeadline) return 'red';
+    if (hasYellowDeadline) return 'yellow';
+    return 'normal';
+  }
+
   private _groupIdToMemberCount: Record<string, number> = {};
+  private _groupIdToDeadlineStatus: Record<string, 'normal' | 'yellow' | 'red'> = {};
 
   getGroupMemberCount(groupId: string): number {
     return this._groupIdToMemberCount[groupId] ?? 0;
+  }
+
+  getGroupDeadlineStatus(groupId: string): 'normal' | 'yellow' | 'red' {
+    return this._groupIdToDeadlineStatus[groupId] ?? 'normal';
   }
 
   private loadRecentTasks() {

@@ -74,7 +74,11 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
         </div>
 
         <div class="groups-grid" *ngIf="(userGroups$ | async) as groups; else emptyGroups">
-          <div class="group-card" *ngFor="let group of filteredGroups" [class.restricted]="!isUserInGroup(group.id)">
+          <div class="group-card" 
+               *ngFor="let group of filteredGroups" 
+               [class.restricted]="!isUserInGroup(group.id)"
+               [class.deadline-yellow]="isUserInGroup(group.id) && getGroupDeadlineStatus(group.id) === 'yellow'"
+               [class.deadline-red]="isUserInGroup(group.id) && getGroupDeadlineStatus(group.id) === 'red'">
             <div class="group-header">
               <h3 class="group-name">{{ group.name }}</h3>
               <!-- 参加しているグループのみ公開/非公開を表示 -->
@@ -512,6 +516,28 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
       opacity: 0.8;
     }
 
+    .group-card.deadline-yellow {
+      border-color: #fbbf24;
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    }
+
+    .group-card.deadline-yellow:hover {
+      border-color: #f59e0b;
+      background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+      box-shadow: 0 12px 30px rgba(245, 158, 11, 0.2);
+    }
+
+    .group-card.deadline-red {
+      border-color: #ef4444;
+      background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+    }
+
+    .group-card.deadline-red:hover {
+      border-color: #dc2626;
+      background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+      box-shadow: 0 12px 30px rgba(239, 68, 68, 0.2);
+    }
+
     .empty-state {
       text-align: center;
       padding: 60px 20px;
@@ -567,6 +593,7 @@ export class GroupsPage implements OnInit, OnDestroy {
   filteredGroups: Group[] = [];
   searchTerm = '';
   groupTaskCounts: { [groupId: string]: number } = {};
+  groupDeadlineStatus: { [groupId: string]: 'normal' | 'yellow' | 'red' } = {};
   showAllGroups = false;
   isJoiningGroup = false;
   requestingJoinGroups: Set<string> = new Set();
@@ -584,6 +611,7 @@ export class GroupsPage implements OnInit, OnDestroy {
           ).subscribe(groups => {
             this.allGroups = groups;
             this.loadGroupTaskCounts(groups);
+            this.loadGroupDeadlineStatus(groups);
             this.applySearch();
           });
 
@@ -769,8 +797,60 @@ export class GroupsPage implements OnInit, OnDestroy {
     });
   }
 
+  loadGroupDeadlineStatus(groups: Group[]) {
+    groups.forEach(group => {
+      this.taskService.getGroupTasks(group.id).pipe(
+        take(1),
+        takeUntil(this.destroy$)
+      ).subscribe(tasks => {
+        this.groupDeadlineStatus[group.id] = this.calculateDeadlineStatus(tasks);
+      });
+    });
+  }
+
+  calculateDeadlineStatus(tasks: any[]): 'normal' | 'yellow' | 'red' {
+    const now = new Date();
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+    const oneDayFromNow = new Date();
+    oneDayFromNow.setDate(oneDayFromNow.getDate() + 1);
+
+    let hasRedDeadline = false;
+    let hasYellowDeadline = false;
+
+    for (const task of tasks) {
+      // 完了済みの課題は期限状況に影響しない
+      if (task.status === 'completed') {
+        continue;
+      }
+
+      if (task.dueDate) {
+        const dueDate = task.dueDate.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
+        
+        // 期限が1日以内（赤色）
+        if (dueDate <= oneDayFromNow && dueDate >= now) {
+          hasRedDeadline = true;
+          // 赤色が見つかったら即座に返す（最優先）
+          return 'red';
+        }
+        // 期限が3日以内（黄色）- 1日以内は除外
+        else if (dueDate <= threeDaysFromNow && dueDate > oneDayFromNow) {
+          hasYellowDeadline = true;
+        }
+      }
+    }
+
+    if (hasRedDeadline) return 'red';
+    if (hasYellowDeadline) return 'yellow';
+    return 'normal';
+  }
+
   getGroupTaskCount(groupId: string): number {
     return this.groupTaskCounts[groupId] || 0;
+  }
+
+  getGroupDeadlineStatus(groupId: string): 'normal' | 'yellow' | 'red' {
+    return this.groupDeadlineStatus[groupId] || 'normal';
   }
 
   formatDate(timestamp: any): string {

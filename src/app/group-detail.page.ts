@@ -250,8 +250,8 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                   {{ formatDate(task.occurredOn) }}
                 </td>
                 <td class="task-due-cell" 
-                    [class.due-warning]="isDueWithinDays(task.dueDate, 7) && !isDueWithinDays(task.dueDate, 3) && !isOverdue(task.dueDate)"
-                    [class.due-danger]="isDueWithinDays(task.dueDate, 3) && !isOverdue(task.dueDate)"
+                    [class.due-warning]="isDueWithinDays(task.dueDate, 3) && !isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
+                    [class.due-danger]="isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
                     [class.overdue]="isOverdue(task.dueDate)">
                   {{ formatDate(task.dueDate) }}
                 </td>
