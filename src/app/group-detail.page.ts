@@ -106,7 +106,17 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
         <div class="modal">
           <div class="modal-header">
             <h2 class="modal-title">メンバー一覧</h2>
-            <button class="modal-close" (click)="showMembers = false">×</button>
+            <div class="header-actions">
+              <button 
+                *ngIf="isGroupOwner" 
+                class="btn btn-invite-header" 
+                (click)="copyInviteLink()"
+                title="招待リンクをコピー"
+              >
+                招待
+              </button>
+              <button class="modal-close" (click)="showMembers = false">×</button>
+            </div>
           </div>
           <div class="modal-form">
             <div class="members-list" *ngIf="(members$ | async) as members; else noMembers">
@@ -1359,6 +1369,12 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       padding: 24px 24px 0;
     }
 
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
     .modal-title {
       margin: 0;
       color: #2d3748;
@@ -1377,6 +1393,27 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
 
     .modal-form {
       padding: 24px;
+    }
+
+    /* ヘッダー招待ボタン */
+    .btn-invite-header {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-invite-header:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
     }
 
     .form-group {
@@ -2467,6 +2504,34 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   // メンバー表示メソッド
   toggleMembers() {
     this.showMembers = !this.showMembers;
+  }
+
+  // 招待リンクをクリップボードにコピー
+  async copyInviteLink() {
+    if (!this.group) return;
+    
+    const inviteUrl = `${window.location.origin}/group/${this.group.id}/join`;
+    
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      // 成功メッセージを表示（簡易的な実装）
+      alert('招待リンクをクリップボードにコピーしました！');
+    } catch (error) {
+      console.error('クリップボードへのコピーに失敗しました:', error);
+      // フォールバック: テキストエリアを使用
+      const textArea = document.createElement('textarea');
+      textArea.value = inviteUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        alert('招待リンクをクリップボードにコピーしました！');
+      } catch (fallbackError) {
+        console.error('フォールバックコピーも失敗しました:', fallbackError);
+        alert('招待リンク: ' + inviteUrl);
+      }
+      document.body.removeChild(textArea);
+    }
   }
 
   getMemberInitial(name: string): string {
