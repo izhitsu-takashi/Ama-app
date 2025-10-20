@@ -57,9 +57,6 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             📊 進捗報告
           </button>
           
-          <button class="action-btn secondary" routerLink="/google-calendar-settings">
-            📅 Googleカレンダー連携
-          </button>
           
           <button class="action-btn secondary" routerLink="/user-search">
             🔍 ユーザー検索
@@ -81,6 +78,10 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
           
           <button class="action-btn secondary" routerLink="/documents">
             📄 資料作成
+          </button>
+          
+          <button class="action-btn secondary" routerLink="/department-tasks">
+            🏢 部門課題
           </button>
           
           <!-- 管理者メニュー -->
@@ -137,7 +138,12 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
           <div class="calendar-section">
             <div class="section-header">
               <h2>📅 カレンダー</h2>
-              <button class="add-event-btn" (click)="showCreateEventModal()">+</button>
+              <div class="calendar-actions">
+                <button class="calendar-btn" routerLink="/google-calendar-settings" title="Googleカレンダー連携">
+                  🔗
+                </button>
+                <button class="add-event-btn" (click)="showCreateEventModal()">+</button>
+              </div>
             </div>
             
             <!-- 今日の情報 -->
@@ -870,7 +876,53 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       font-weight: 600;
     }
 
-    .add-event-btn, .create-group-btn, .view-all-btn {
+    .calendar-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .calendar-btn {
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .calendar-btn:hover {
+      background: #059669;
+      transform: scale(1.1);
+    }
+
+    .add-event-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-size: 1.5rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .add-event-btn:hover {
+      background: #5a67d8;
+      transform: scale(1.1);
+    }
+
+    .create-group-btn, .view-all-btn {
       background: #667eea;
       color: white;
       border: none;
