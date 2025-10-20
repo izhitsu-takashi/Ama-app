@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from './auth.service';
+import { GroupService } from './group.service';
 
 @Component({
   selector: 'app-login',
@@ -376,6 +377,7 @@ export class LoginComponent {
   private fb = inject(FormBuilder);
   private router = inject(Router);
   private auth = inject(AuthService);
+  private groups = inject(GroupService);
 
   loading = false;
   error = '';
@@ -397,6 +399,20 @@ export class LoginComponent {
       this.auth.isAdmin().subscribe(isAdmin => {
         this.auth.setAdminStatus(isAdmin);
       });
+      
+      // 招待リンク経由のハンドオフ
+      const pendingGroupId = localStorage.getItem('pendingInviteGroupId');
+      if (pendingGroupId) {
+        try {
+          const uid = this.auth.currentUser?.uid;
+          if (uid) {
+            await this.groups.joinGroup(pendingGroupId, uid);
+          }
+          localStorage.removeItem('pendingInviteGroupId');
+          await this.router.navigate(['/group', pendingGroupId]);
+          return;
+        } catch {}
+      }
       
       await this.router.navigateByUrl('/main');
     } catch (e: any) {

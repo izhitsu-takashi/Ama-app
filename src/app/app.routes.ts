@@ -29,6 +29,7 @@ import { DocumentsPage } from './documents.page';
 import { MorningReportPage } from './morning-report.page';
 import { GroupReportPage } from './group-report.page';
 import { DepartmentTasksPage } from './department-tasks.page';
+import { GroupInvitePage } from './group-invite.page';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, canActivate: [authGuard] },
@@ -37,6 +38,7 @@ export const routes: Routes = [
   { path: 'groups', component: GroupsPage, canActivate: [authGuard] },
   { path: 'group/create', component: GroupCreatePage, canActivate: [authGuard] },
   { path: 'group/:id', component: GroupDetailPage, canActivate: [authGuard] },
+  { path: 'group/:id/join', component: GroupInvitePage },
   { path: 'progress-report-create', component: ProgressReportCreatePage, canActivate: [authGuard] },
   { path: 'progress-reports', component: ProgressReportsPage, canActivate: [authGuard] },
   { path: 'progress-report-detail/:id', component: ProgressReportDetailPage, canActivate: [authGuard] },
