@@ -127,6 +127,9 @@ interface UserGroup {
                       <span class="user-role" [class]="'role-' + user.role">
                         {{ getRoleLabel(user.role) }}
                       </span>
+                      <span class="user-department">
+                        所属: {{ getDepartmentLabel(user.department) }}
+                      </span>
                       <span class="user-joined">
                         登録日: {{ formatDate(user.createdAt) }}
                       </span>
@@ -295,6 +298,9 @@ interface UserGroup {
                   <div class="user-meta">
                     <span class="user-role" [class]="'role-' + member.role">
                       {{ getRoleLabel(member.role) }}
+                    </span>
+                    <span class="user-department">
+                      所属: {{ getDepartmentLabel(member.department) }}
                     </span>
                     <span class="user-joined">
                       登録日: {{ formatDate(member.createdAt) }}
@@ -626,6 +632,15 @@ interface UserGroup {
       border-radius: 4px;
       font-size: 0.75rem;
       font-weight: 500;
+    }
+
+    .user-department {
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      background: #f3f4f6;
+      color: #374151;
     }
 
     .role-admin {
@@ -1379,6 +1394,18 @@ export class UserSearchPage implements OnInit, OnDestroy {
       default:
         return '予定なし';
     }
+  }
+
+  getDepartmentLabel(department?: string): string {
+    const labels = {
+      'development': '開発',
+      'consulting': 'コンサルティング',
+      'sales': '営業',
+      'corporate': 'コーポレート',
+      'training': '研修',
+      'other': 'その他'
+    };
+    return labels[department as keyof typeof labels] || '未設定';
   }
 
   sendMessage(user: User): void {

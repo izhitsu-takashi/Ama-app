@@ -9,6 +9,7 @@ export interface AppUserProfile {
   email: string | null;
   displayName?: string | null;
   role?: 'user' | 'admin';
+  department?: 'development' | 'consulting' | 'sales' | 'corporate' | 'training' | 'other';
   createdAt?: unknown;
   updatedAt?: unknown;
 }
@@ -23,7 +24,7 @@ export class UserService {
     return snap.exists() ? (snap.data() as AppUserProfile) : null;
   }
 
-  async ensureUserProfile(uid: string, email: string | null, displayName?: string | null) {
+  async ensureUserProfile(uid: string, email: string | null, displayName?: string | null, department?: 'development' | 'consulting' | 'sales' | 'corporate' | 'training' | 'other') {
     const existing = await this.getUserProfile(uid);
     if (existing) return existing;
     const ref = doc(this.firestore, 'users', uid);
@@ -32,6 +33,7 @@ export class UserService {
       email,
       displayName: displayName ?? null,
       role: 'user', // デフォルトは一般ユーザー
+      department: department ?? 'other', // デフォルトはその他
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -53,6 +55,7 @@ export class UserService {
             displayName: userProfile.displayName || undefined,
             photoURL: undefined,
             role: 'user',
+            department: userProfile.department,
             createdAt: new Date(),
             updatedAt: new Date()
           });
@@ -79,6 +82,7 @@ export class UserService {
         displayName: user['displayName'] || undefined,
         photoURL: undefined,
         role: user['role'] || 'user',
+        department: user['department'],
         createdAt: user['createdAt'] || new Date(),
         updatedAt: user['updatedAt'] || new Date()
       }))),

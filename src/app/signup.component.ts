@@ -76,6 +76,30 @@ import { sendEmailVerification } from '@angular/fire/auth';
             </div>
           </div>
 
+          <div class="form-group">
+            <label class="form-label">所属</label>
+            <select 
+              formControlName="department" 
+              class="form-input"
+              [class.error]="form.get('department')?.invalid && form.get('department')?.touched"
+            >
+              <option value="">所属を選択してください</option>
+              <option value="development">開発</option>
+              <option value="consulting">コンサルティング</option>
+              <option value="sales">営業</option>
+              <option value="corporate">コーポレート</option>
+              <option value="training">研修</option>
+              <option value="other">その他</option>
+            </select>
+            <div *ngIf="form.get('department')?.invalid && form.get('department')?.touched" class="error-message">
+              <span *ngIf="form.get('department')?.errors?.['required']">所属を選択してください</span>
+            </div>
+            <div class="department-hint">
+              <span class="hint-icon">🏢</span>
+              所属部門を選択してください
+            </div>
+          </div>
+
           <button 
             type="submit" 
             class="auth-button"
@@ -218,13 +242,17 @@ import { sendEmailVerification } from '@angular/fire/auth';
       color: #9ca3af;
     }
 
+    select.form-input {
+      cursor: pointer;
+    }
+
     .error-message {
       font-size: 12px;
       color: #ef4444;
       font-weight: 500;
     }
 
-    .username-hint, .password-hint {
+    .username-hint, .password-hint, .department-hint {
       display: flex;
       align-items: center;
       gap: 6px;
@@ -421,16 +449,17 @@ export class SignupComponent {
     displayName: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(20)]],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
+    department: ['', [Validators.required]],
   });
 
   async onSubmit() {
     if (this.form.invalid) return;
     this.loading = true;
     this.error = '';
-    const { displayName, email, password } = this.form.getRawValue();
+    const { displayName, email, password, department } = this.form.getRawValue();
     try {
       const cred = await this.auth.signUpWithEmail(email!, password!);
-      await this.users.ensureUserProfile(cred.user.uid, cred.user.email, displayName || cred.user.displayName);
+      await this.users.ensureUserProfile(cred.user.uid, cred.user.email, displayName || cred.user.displayName, department as any);
       try {
         await sendEmailVerification(cred.user);
         alert('確認メールを送信しました。メール内のリンクをクリックして認証を完了してください。');

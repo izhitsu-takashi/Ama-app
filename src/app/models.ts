@@ -9,6 +9,7 @@ export interface User {
   displayName?: string;
   photoURL?: string;
   role: 'user' | 'admin';
+  department?: 'development' | 'consulting' | 'sales' | 'corporate' | 'training' | 'other';
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

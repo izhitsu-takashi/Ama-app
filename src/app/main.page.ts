@@ -11,14 +11,14 @@ import { MessageService } from './message.service';
 import { TodoService } from './todo.service';
 import { User, Group, TaskItem, Notification, CalendarEvent, TodoItem } from './models';
 import { Observable, Subscription, combineLatest, of, Subject } from 'rxjs';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { Firestore, collection, addDoc, serverTimestamp, query, where, collectionData, updateDoc, doc, deleteDoc } from '@angular/fire/firestore';
 import { map, switchMap, take, takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-main',
   standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule],
   template: `
     <div class="main-container">
       <!-- ヘッダー -->
@@ -40,7 +40,9 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             </button>
           </div>
           <div class="user-info">
-            <span class="user-name">{{ getUserDisplayName() }}</span>
+            <div class="user-avatar" (click)="toggleProfileModal()">
+              <span class="avatar-icon">👤</span>
+            </div>
             <button class="logout-btn" (click)="logout()">ログアウト</button>
           </div>
         </div>
@@ -333,6 +335,64 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
           </div>
         </div>
       </div>
+
+      <!-- プロフィールモーダル -->
+      <div class="modal-overlay" *ngIf="showProfileModal" (click)="hideProfileModal()">
+        <div class="modal profile-modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h2 class="modal-title">プロフィール</h2>
+            <button class="modal-close" (click)="hideProfileModal()">×</button>
+          </div>
+          <div class="profile-content" *ngIf="currentUser">
+            <div class="profile-avatar">
+              <span class="avatar-large">👤</span>
+            </div>
+            <div class="profile-info">
+              <h3 class="profile-name">{{ currentUser.displayName || '名前未設定' }}</h3>
+              <p class="profile-email">{{ currentUser.email }}</p>
+              <div class="profile-department">
+                <span class="department-label">所属:</span>
+                <span class="department-value">{{ getDepartmentLabel(currentUser.department) }}</span>
+                <button class="edit-department-btn" (click)="showEditDepartmentModal()">編集</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 所属変更モーダル -->
+      <div class="modal-overlay" *ngIf="showEditDepartmentModalFlag" (click)="hideEditDepartmentModal()">
+        <div class="modal edit-department-modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h2 class="modal-title">所属を変更</h2>
+            <button class="modal-close" (click)="hideEditDepartmentModal()">×</button>
+          </div>
+          <div class="modal-form">
+            <div class="warning-message">
+              <span class="warning-icon">⚠️</span>
+              <p>所属を変更すると、既存のグループや課題へのアクセス権限に影響する可能性があります。本当に変更しますか？</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">新しい所属</label>
+              <select [(ngModel)]="newDepartment" class="form-input">
+                <option value="">所属を選択してください</option>
+                <option value="development">開発</option>
+                <option value="consulting">コンサルティング</option>
+                <option value="sales">営業</option>
+                <option value="corporate">コーポレート</option>
+                <option value="training">研修</option>
+                <option value="other">その他</option>
+              </select>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn secondary" (click)="hideEditDepartmentModal()">キャンセル</button>
+              <button type="button" class="btn primary" (click)="updateDepartment()" [disabled]="!newDepartment || updatingDepartment">
+                {{ updatingDepartment ? '更新中...' : '更新' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
@@ -472,6 +532,29 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       display: flex;
       align-items: center;
       gap: 1rem;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    }
+
+    .user-avatar:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .avatar-icon {
+      font-size: 20px;
+      color: white;
     }
 
     .user-name {
@@ -1195,6 +1278,163 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
         font-size: 0.75rem;
       }
     }
+
+    /* プロフィールモーダル */
+    .profile-modal {
+      max-width: 400px;
+      width: 90%;
+    }
+
+    .profile-content {
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .profile-avatar {
+      margin-bottom: 1.5rem;
+    }
+
+    .avatar-large {
+      font-size: 4rem;
+      display: inline-block;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      color: white;
+    }
+
+    .profile-info {
+      text-align: center;
+    }
+
+    .profile-name {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #2d3748;
+      margin: 0 0 0.5rem 0;
+    }
+
+    .profile-email {
+      color: #6b7280;
+      margin: 0 0 1rem 0;
+      font-size: 1rem;
+    }
+
+    .profile-department {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: #f3f4f6;
+      border-radius: 0.5rem;
+      margin: 0 auto;
+      max-width: 300px;
+      min-width: 250px;
+    }
+
+    .department-label {
+      font-weight: 500;
+      color: #374151;
+    }
+
+    .department-value {
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .edit-department-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      margin-left: 0.5rem;
+      font-weight: 500;
+    }
+
+    .edit-department-btn:hover {
+      background: #5a67d8;
+    }
+
+    /* 所属変更モーダル */
+    .edit-department-modal {
+      max-width: 500px;
+      width: 90%;
+    }
+
+    .warning-message {
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .warning-icon {
+      font-size: 1.25rem;
+      color: #d97706;
+      flex-shrink: 0;
+    }
+
+    .warning-message p {
+      margin: 0;
+      color: #92400e;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+      margin-top: 1.5rem;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.875rem;
+    }
+
+    .btn.primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn.primary:hover:not(:disabled) {
+      background: #5a67d8;
+    }
+
+    .btn.primary:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    .btn.secondary {
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #d1d5db;
+    }
+
+    .btn.secondary:hover {
+      background: #e5e7eb;
+    }
   `]
 })
 export class MainPage implements OnInit, OnDestroy {
@@ -1222,6 +1462,10 @@ export class MainPage implements OnInit, OnDestroy {
   calendarDays: any[] = [];
   allEvents: CalendarEvent[] = [];
   selectedDate: Date | null = null;
+  showProfileModal = false;
+  showEditDepartmentModalFlag = false;
+  newDepartment = '';
+  updatingDepartment = false;
   selectedDayEvents: CalendarEvent[] = [];
   showDayEventsModal = false;
   
@@ -1286,6 +1530,7 @@ export class MainPage implements OnInit, OnDestroy {
             displayName: profile?.displayName || user.displayName || undefined,
             photoURL: user.photoURL || undefined,
             role: 'user',
+            department: profile?.department,
             createdAt: new Date(),
             updatedAt: new Date()
           };
@@ -1948,5 +2193,66 @@ export class MainPage implements OnInit, OnDestroy {
     if (!date) return false;
     const d = date.toDate ? date.toDate() : new Date(date);
     return d < new Date();
+  }
+
+  // プロフィールモーダル
+  toggleProfileModal() {
+    this.showProfileModal = !this.showProfileModal;
+  }
+
+  hideProfileModal() {
+    this.showProfileModal = false;
+  }
+
+  getDepartmentLabel(department?: string): string {
+    const labels = {
+      'development': '開発',
+      'consulting': 'コンサルティング',
+      'sales': '営業',
+      'corporate': 'コーポレート',
+      'training': '研修',
+      'other': 'その他'
+    };
+    return labels[department as keyof typeof labels] || '未設定';
+  }
+
+  // 所属変更モーダル
+  showEditDepartmentModal() {
+    this.newDepartment = this.currentUser?.department || '';
+    this.showEditDepartmentModalFlag = true;
+  }
+
+  hideEditDepartmentModal() {
+    this.showEditDepartmentModalFlag = false;
+    this.newDepartment = '';
+    this.updatingDepartment = false;
+  }
+
+  async updateDepartment() {
+    if (!this.currentUser || !this.newDepartment) return;
+    
+    this.updatingDepartment = true;
+    try {
+      // Firebaseのユーザープロファイルを更新
+      const userRef = doc(this.firestore, 'users', this.currentUser.id);
+      await updateDoc(userRef, {
+        department: this.newDepartment,
+        updatedAt: serverTimestamp()
+      });
+
+      // ローカルのcurrentUserも更新
+      this.currentUser.department = this.newDepartment as any;
+
+      // モーダルを閉じる
+      this.hideEditDepartmentModal();
+      
+      // 成功メッセージ
+      alert('所属を更新しました。');
+    } catch (error) {
+      console.error('所属更新エラー:', error);
+      alert('所属の更新に失敗しました。');
+    } finally {
+      this.updatingDepartment = false;
+    }
   }
 }
