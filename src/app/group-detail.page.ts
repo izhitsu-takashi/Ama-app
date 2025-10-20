@@ -7,6 +7,7 @@ import { TaskService } from './task.service';
 import { AuthService } from './auth.service';
 import { UserService } from './user.service';
 import { JoinRequestService } from './join-request.service';
+import { NotificationService } from './notification.service';
 import { Group, TaskItem, GroupMembership, JoinRequest } from './models';
 import { Observable, Subject, combineLatest, of } from 'rxjs';
 import { takeUntil, map, switchMap, take } from 'rxjs/operators';
@@ -1755,6 +1756,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private userService = inject(UserService);
   private joinRequestService = inject(JoinRequestService);
+  private notificationService = inject(NotificationService);
 
   private destroy$ = new Subject<void>();
 
@@ -1794,6 +1796,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   showTooltip = false;
   tooltipTaskId = '';
   tooltipPosition = { x: 0, y: 0 };
+
 
 
   taskForm = this.fb.group({
@@ -1976,6 +1979,55 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     this.timelineItems = items;
   }
 
+  // 課題作成時に期限間近かどうかをチェックして通知を送信
+  private async checkAndNotifyTaskDueSoon(task: TaskItem): Promise<void> {
+    if (!this.group || !task.dueDate) return;
+
+    const now = new Date();
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+
+    // 期限日を取得
+    const dueDate = task.dueDate.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
+    
+    // 期限が3日以内の場合
+    if (dueDate <= threeDaysFromNow && dueDate >= now) {
+      try {
+        // 担当者に通知
+        if (task.assigneeId) {
+          await this.notificationService.createTaskNotification(
+            task.assigneeId,
+            'task_due_soon' as any,
+            task.id,
+            task.groupId,
+            { 
+              taskTitle: task.title, 
+              dueDate: task.dueDate,
+              groupName: this.group.name
+            }
+          );
+        }
+
+        // グループオーナーに通知（担当者と異なる場合のみ）
+        if (this.group.ownerId && this.group.ownerId !== task.assigneeId) {
+          await this.notificationService.createTaskNotification(
+            this.group.ownerId,
+            'task_due_soon' as any,
+            task.id,
+            task.groupId,
+            { 
+              taskTitle: task.title, 
+              dueDate: task.dueDate,
+              groupName: this.group.name,
+              assigneeName: this.getAssigneeName(task.assigneeId)
+            }
+          );
+        }
+      } catch (error) {
+        console.error('期限間近通知エラー:', error);
+      }
+    }
+  }
 
   getTaskCount(status: string): number {
     return this.filteredTasks.filter(task => task.status === status).length;
@@ -2100,7 +2152,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     const taskData = this.taskForm.getRawValue();
     
     try {
-      await this.taskService.createTask(this.group.id, {
+      const createdTask = await this.taskService.createTask(this.group.id, {
         title: taskData.title!,
         content: taskData.content || '',
         assigneeId: taskData.assigneeId || '',
@@ -2111,6 +2163,11 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         status: 'not_started',
         isRecurring: false
       });
+      
+      // 期限間近の課題かどうかをチェックして通知を送信
+      if (createdTask) {
+        await this.checkAndNotifyTaskDueSoon(createdTask);
+      }
       
       // 課題一覧を再読み込み
       this.tasks$ = this.taskService.getTasksByGroup(this.group.id);
