@@ -40,9 +40,10 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             </button>
           </div>
           <div class="user-info">
-            <div class="user-avatar" (click)="toggleProfileModal()">
-              <span class="avatar-icon">👤</span>
-            </div>
+        <div class="user-avatar" (click)="toggleProfileModal()">
+          <img *ngIf="currentUser?.photoURL" [src]="currentUser.photoURL" alt="ユーザーアイコン" class="header-avatar-image">
+          <span *ngIf="!currentUser?.photoURL" class="avatar-icon">👤</span>
+        </div>
             <button class="logout-btn" (click)="logout()">ログアウト</button>
           </div>
         </div>
@@ -345,7 +346,12 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
           </div>
           <div class="profile-content" *ngIf="currentUser">
             <div class="profile-avatar">
-              <span class="avatar-large">👤</span>
+              <div class="avatar-container">
+                <img *ngIf="currentUser.photoURL" [src]="currentUser.photoURL" alt="プロフィール画像" class="avatar-image">
+                <span *ngIf="!currentUser.photoURL" class="avatar-large">👤</span>
+                <button class="change-avatar-btn" (click)="triggerImageUpload()">📷</button>
+              </div>
+              <input type="file" #fileInput (change)="onImageSelected($event)" accept="image/*" style="display: none;">
             </div>
             <div class="profile-info">
               <h3 class="profile-name">{{ currentUser.displayName || '名前未設定' }}</h3>
@@ -545,6 +551,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       cursor: pointer;
       transition: all 0.2s ease;
       box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+      overflow: hidden;
     }
 
     .user-avatar:hover {
@@ -555,6 +562,13 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .avatar-icon {
       font-size: 20px;
       color: white;
+    }
+
+    .header-avatar-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
     }
 
     .user-name {
@@ -1294,6 +1308,11 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       margin-bottom: 1.5rem;
     }
 
+    .avatar-container {
+      position: relative;
+      display: inline-block;
+    }
+
     .avatar-large {
       font-size: 4rem;
       display: inline-block;
@@ -1306,6 +1325,39 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       justify-content: center;
       margin: 0 auto;
       color: white;
+    }
+
+    .avatar-image {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid #e2e8f0;
+      display: block;
+    }
+
+    .change-avatar-btn {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: all 0.2s;
+    }
+
+    .change-avatar-btn:hover {
+      background: #5a67d8;
+      transform: scale(1.1);
     }
 
     .profile-info {
@@ -1466,6 +1518,7 @@ export class MainPage implements OnInit, OnDestroy {
   showEditDepartmentModalFlag = false;
   newDepartment = '';
   updatingDepartment = false;
+  uploadingImage = false;
   selectedDayEvents: CalendarEvent[] = [];
   showDayEventsModal = false;
   
@@ -1528,7 +1581,7 @@ export class MainPage implements OnInit, OnDestroy {
             id: user.uid,
             email: user.email || '',
             displayName: profile?.displayName || user.displayName || undefined,
-            photoURL: user.photoURL || undefined,
+            photoURL: profile?.photoURL || user.photoURL || undefined,
             role: 'user',
             department: profile?.department,
             createdAt: new Date(),
@@ -2253,6 +2306,71 @@ export class MainPage implements OnInit, OnDestroy {
       alert('所属の更新に失敗しました。');
     } finally {
       this.updatingDepartment = false;
+    }
+  }
+
+  // 画像アップロード機能
+  triggerImageUpload() {
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  }
+
+  async onImageSelected(event: any) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // ファイルサイズチェック（5MB以下）
+    if (file.size > 5 * 1024 * 1024) {
+      alert('画像ファイルは5MB以下にしてください。');
+      return;
+    }
+
+    // ファイル形式チェック
+    if (!file.type.startsWith('image/')) {
+      alert('画像ファイルを選択してください。');
+      return;
+    }
+
+    this.uploadingImage = true;
+    try {
+      // 画像をBase64に変換してプレビュー
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        const imageUrl = e.target.result;
+        
+        // ローカルのcurrentUserを更新（プレビュー用）
+        if (this.currentUser) {
+          this.currentUser.photoURL = imageUrl;
+        }
+      };
+      reader.readAsDataURL(file);
+
+      // Firebaseのユーザープロファイルを更新
+      if (this.currentUser) {
+        const userRef = doc(this.firestore, 'users', this.currentUser.id);
+        const reader = new FileReader();
+        reader.onload = async (e: any) => {
+          try {
+            await updateDoc(userRef, {
+              photoURL: e.target.result,
+              updatedAt: serverTimestamp()
+            });
+            alert('プロフィール画像を更新しました。');
+          } catch (error) {
+            console.error('画像更新エラー:', error);
+            alert('画像の更新に失敗しました。');
+          } finally {
+            this.uploadingImage = false;
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (error) {
+      console.error('画像処理エラー:', error);
+      alert('画像の処理に失敗しました。');
+      this.uploadingImage = false;
     }
   }
 }
