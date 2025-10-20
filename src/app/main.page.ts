@@ -41,7 +41,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
           </div>
           <div class="user-info">
         <div class="user-avatar" (click)="toggleProfileModal()">
-          <img *ngIf="currentUser?.photoURL" [src]="currentUser.photoURL" alt="ユーザーアイコン" class="header-avatar-image">
+          <img *ngIf="currentUser?.photoURL" [src]="currentUser?.photoURL" alt="ユーザーアイコン" class="header-avatar-image">
           <span *ngIf="!currentUser?.photoURL" class="avatar-icon">👤</span>
         </div>
             <button class="logout-btn" (click)="logout()">ログアウト</button>
@@ -2033,7 +2033,6 @@ export class MainPage implements OnInit, OnDestroy {
 
   showNotifications() {
     // TODO: 通知一覧モーダルを表示
-    console.log('通知一覧を表示');
   }
 
 

@@ -20,7 +20,6 @@ export class AppComponent implements OnInit {
     /* 自動送信機能（起動問題のため無効化）
     try {
       this.autoReportScheduler.startScheduler();
-      console.log('自動送信スケジューラーが開始されました');
     } catch (error) {
       console.error('スケジューラー初期化エラー:', error);
     }

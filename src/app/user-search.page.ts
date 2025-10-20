@@ -1198,7 +1198,6 @@ export class UserSearchPage implements OnInit, OnDestroy {
   loadUsers(): void {
     // 認証状態をチェック
     if (!this.authService.currentUser) {
-      console.log('ユーザーがログインしていません');
       this.loading = false;
       return;
     }

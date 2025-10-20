@@ -30,9 +30,3 @@ export const GOOGLE_CALENDAR_CONFIG = {
 // 6. 承認済みのリダイレクトURI: http://localhost:4200/auth/google/callback
 // 7. 作成されたクライアントIDとクライアントシークレットを上記の値に設定
 
-// デバッグ用: 実際の設定値が入力されているか確認
-console.log('Google Calendar Config:', {
-  CLIENT_ID: GOOGLE_CALENDAR_CONFIG.CLIENT_ID,
-  REDIRECT_URI: GOOGLE_CALENDAR_CONFIG.REDIRECT_URI,
-  SCOPES: GOOGLE_CALENDAR_CONFIG.SCOPES
-});
