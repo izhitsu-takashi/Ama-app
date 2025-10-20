@@ -57,11 +57,33 @@ import { map, takeUntil } from 'rxjs/operators';
               <option value="low">低</option>
             </select>
           </div>
+          
+          <div class="filter-group">
+            <label>期限で並べ替え:</label>
+            <select [(ngModel)]="sortByDueDate" (change)="filterTasks()">
+              <option value="">並べ替えなし</option>
+              <option value="asc">期限が近い順</option>
+              <option value="desc">期限が遠い順</option>
+            </select>
+          </div>
+          
+          <div class="filter-group">
+            <label>完了済み課題:</label>
+            <select [(ngModel)]="showCompleted" (change)="filterTasks()">
+              <option value="true">表示する</option>
+              <option value="false">表示しない</option>
+            </select>
+          </div>
         </div>
 
         <!-- 課題一覧 -->
         <div class="tasks-list" *ngIf="filteredTasks.length > 0; else noTasks">
-          <div *ngFor="let task of filteredTasks" class="task-item" (click)="openTask(task)">
+          <div *ngFor="let task of filteredTasks" 
+               class="task-item" 
+               [class.due-warning]="task.status !== 'completed' && isDueWithinDays(task.dueDate, 3) && !isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
+               [class.due-danger]="task.status !== 'completed' && isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
+               [class.overdue]="task.status !== 'completed' && isOverdue(task.dueDate)"
+               (click)="openTask(task)">
             <div class="task-header">
               <h3 class="task-title">{{ task.title }}</h3>
               <div class="task-meta">
@@ -255,6 +277,40 @@ import { map, takeUntil } from 'rxjs/operators';
       color: #16a34a;
     }
 
+    /* 期限に応じた色変更 */
+    .task-item.due-warning {
+      border-color: #fbbf24;
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    }
+
+    .task-item.due-warning:hover {
+      border-color: #f59e0b;
+      background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+    }
+
+    .task-item.due-danger {
+      border-color: #ef4444;
+      background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+    }
+
+    .task-item.due-danger:hover {
+      border-color: #dc2626;
+      background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    }
+
+    .task-item.overdue {
+      border-color: #dc2626;
+      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    }
+
+    .task-item.overdue:hover {
+      border-color: #b91c1c;
+      background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+      box-shadow: 0 4px 12px rgba(185, 28, 28, 0.2);
+    }
+
     .status-badge {
       padding: 0.25rem 0.75rem;
       border-radius: 20px;
@@ -413,6 +469,8 @@ export class TasksPage implements OnInit, OnDestroy {
   selectedGroupId = '';
   selectedStatus = '';
   selectedPriority = '';
+  sortByDueDate = 'asc';
+  showCompleted = 'false';
 
   ngOnInit() {
     this.loadUserData();
@@ -462,9 +520,25 @@ export class TasksPage implements OnInit, OnDestroy {
       const groupMatch = !this.selectedGroupId || task.groupId === this.selectedGroupId;
       const statusMatch = !this.selectedStatus || task.status === this.selectedStatus;
       const priorityMatch = !this.selectedPriority || task.priority === this.selectedPriority;
+      const completedMatch = this.showCompleted === 'true' || task.status !== 'completed';
       
-      return groupMatch && statusMatch && priorityMatch;
+      return groupMatch && statusMatch && priorityMatch && completedMatch;
     });
+
+    // 期限でソート
+    if (this.sortByDueDate) {
+      this.filteredTasks.sort((a, b) => {
+        const aDate = a.dueDate ? (a.dueDate.toDate ? a.dueDate.toDate() : new Date(a.dueDate)) : new Date('9999-12-31');
+        const bDate = b.dueDate ? (b.dueDate.toDate ? b.dueDate.toDate() : new Date(b.dueDate)) : new Date('9999-12-31');
+        
+        if (this.sortByDueDate === 'asc') {
+          return aDate.getTime() - bDate.getTime();
+        } else if (this.sortByDueDate === 'desc') {
+          return bDate.getTime() - aDate.getTime();
+        }
+        return 0;
+      });
+    }
   }
 
   getPriorityLabel(priority: string): string {
@@ -514,6 +588,22 @@ export class TasksPage implements OnInit, OnDestroy {
 
   goBack() {
     this.router.navigate(['/main']);
+  }
+
+  // 期限判定メソッド
+  isDueWithinDays(date: any, days: number): boolean {
+    if (!date) return false;
+    const d = date.toDate ? date.toDate() : new Date(date);
+    const now = new Date();
+    const targetDate = new Date();
+    targetDate.setDate(now.getDate() + days);
+    return d <= targetDate && d >= now;
+  }
+
+  isOverdue(date: any): boolean {
+    if (!date) return false;
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d < new Date();
   }
 
 }

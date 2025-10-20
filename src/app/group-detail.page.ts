@@ -396,7 +396,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
             <div class="form-group">
               <label class="form-label">発生日</label>
               <input 
-                type="date" 
+                type="datetime-local" 
                 formControlName="occurredOn" 
                 class="form-input"
               />
@@ -404,7 +404,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
             <div class="form-group">
               <label class="form-label">期限</label>
               <input 
-                type="date" 
+                type="datetime-local" 
                 formControlName="dueDate" 
                 class="form-input"
               />
@@ -492,7 +492,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
             <div class="form-group">
               <label class="form-label">発生日</label>
               <input 
-                type="date" 
+                type="datetime-local" 
                 formControlName="occurredOn" 
                 class="form-input"
               />
@@ -500,7 +500,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
             <div class="form-group">
               <label class="form-label">期限</label>
               <input 
-                type="date" 
+                type="datetime-local" 
                 formControlName="dueDate" 
                 class="form-input"
               />
@@ -1829,7 +1829,8 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       const occurredDate = new Date(occurredOn);
       const dueDateObj = new Date(dueDate);
       
-      if (dueDateObj < occurredDate) {
+      // 時刻も含めて比較
+      if (dueDateObj <= occurredDate) {
         return { dateInvalid: true };
       }
     }
@@ -2094,7 +2095,26 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   formatDate(date: any): string {
     if (!date) return '未設定';
     const d = date.toDate ? date.toDate() : new Date(date);
-    return d.toLocaleDateString('ja-JP');
+    const now = new Date();
+    
+    // 年をまたぐ場合は yyyy/mm/dd 形式
+    if (d.getFullYear() !== now.getFullYear()) {
+      return d.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).replace(/\//g, '/');
+    }
+    
+    // 同年の場合は mm/dd 形式
+    return d.toLocaleString('ja-JP', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
   isOverdue(date: any): boolean {
@@ -2267,7 +2287,13 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   formatDateForInput(date: any): string {
     if (!date) return '';
     const d = date.toDate ? date.toDate() : new Date(date);
-    return d.toISOString().split('T')[0];
+    // datetime-local形式に変換（YYYY-MM-DDTHH:mm）
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
 
   async markTaskComplete(taskId: string) {

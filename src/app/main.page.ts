@@ -183,7 +183,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             <div class="groups-section">
               <div class="section-header">
                 <h2>👥 参加しているグループ</h2>
-                <button class="create-group-btn" routerLink="/group/create">+ 作成</button>
+                <button class="view-all-btn" routerLink="/groups">すべて表示</button>
               </div>
               <div class="groups-container">
                 <div class="groups-list" *ngIf="userGroups$ | async as groups; else noGroups">
@@ -227,6 +227,9 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
                   <div class="task-item" 
                        *ngFor="let task of tasks" 
                        [class]="'priority-' + task.priority"
+                       [class.due-warning]="task.status !== 'completed' && isDueWithinDays(task.dueDate, 3) && !isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
+                       [class.due-danger]="task.status !== 'completed' && isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
+                       [class.overdue]="task.status !== 'completed' && isOverdue(task.dueDate)"
                        (click)="openTask(task)">
                     <div class="task-header">
                       <h4 class="task-title">{{ task.title }}</h4>
@@ -1065,6 +1068,40 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .priority-high { border-left: 4px solid #ed8936; }
     .priority-urgent { border-left: 4px solid #e53e3e; }
 
+    /* 期限に応じた色変更 */
+    .task-item.due-warning {
+      border-color: #fbbf24;
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    }
+
+    .task-item.due-warning:hover {
+      border-color: #f59e0b;
+      background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+    }
+
+    .task-item.due-danger {
+      border-color: #ef4444;
+      background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+    }
+
+    .task-item.due-danger:hover {
+      border-color: #dc2626;
+      background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    }
+
+    .task-item.overdue {
+      border-color: #dc2626;
+      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    }
+
+    .task-item.overdue:hover {
+      border-color: #b91c1c;
+      background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+      box-shadow: 0 4px 12px rgba(185, 28, 28, 0.2);
+    }
+
     .empty-state {
       text-align: center;
       padding: 2rem;
@@ -1372,7 +1409,16 @@ export class MainPage implements OnInit, OnDestroy {
 
   private loadRecentTasks() {
     if (this.currentUser) {
-      this.recentTasks$ = this.taskService.getRecentTasks(this.currentUser.id, 5);
+      this.recentTasks$ = this.taskService.getRecentTasks(this.currentUser.id, 5).pipe(
+        map(tasks => {
+          // 期限が近い順にソート
+          return tasks.sort((a, b) => {
+            const aDate = a.dueDate ? (a.dueDate.toDate ? a.dueDate.toDate() : new Date(a.dueDate)) : new Date('9999-12-31');
+            const bDate = b.dueDate ? (b.dueDate.toDate ? b.dueDate.toDate() : new Date(b.dueDate)) : new Date('9999-12-31');
+            return aDate.getTime() - bDate.getTime();
+          });
+        })
+      );
     } else {
       this.recentTasks$ = of([]);
     }
@@ -1886,5 +1932,21 @@ export class MainPage implements OnInit, OnDestroy {
     if (!date) return '';
     const d = date.toDate ? date.toDate() : new Date(date);
     return d.toLocaleDateString('ja-JP');
+  }
+
+  // 期限判定メソッド
+  isDueWithinDays(date: any, days: number): boolean {
+    if (!date) return false;
+    const d = date.toDate ? date.toDate() : new Date(date);
+    const now = new Date();
+    const targetDate = new Date();
+    targetDate.setDate(now.getDate() + days);
+    return d <= targetDate && d >= now;
+  }
+
+  isOverdue(date: any): boolean {
+    if (!date) return false;
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d < new Date();
   }
 }
