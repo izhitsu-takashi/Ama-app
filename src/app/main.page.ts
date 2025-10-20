@@ -32,7 +32,8 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
         <div class="header-right">
           <div class="notification-container">
             <button class="notification-btn" routerLink="/notifications">
-              🔔
+              <span class="bell-icon" 
+                    [class.has-notifications]="unreadNotifications > 0">🔔</span>
               <div class="notification-badge" *ngIf="unreadNotifications > 0">
                 {{ unreadNotifications }}
               </div>
@@ -413,6 +414,28 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       justify-content: center;
       border-radius: 9999px; /* 丸 */
       transition: background-color 0.2s, border-color 0.2s;
+    }
+
+    .bell-icon {
+      display: inline-block;
+      transition: transform 0.2s ease;
+    }
+
+    .bell-icon.has-notifications {
+      animation: bellShake 1s ease-in-out infinite;
+      transform-origin: center bottom;
+    }
+
+    @keyframes bellShake {
+      0%, 100% {
+        transform: rotate(0deg);
+      }
+      10%, 30%, 50%, 70%, 90% {
+        transform: rotate(-10deg);
+      }
+      20%, 40%, 60%, 80% {
+        transform: rotate(10deg);
+      }
     }
 
     .notification-btn:hover {
