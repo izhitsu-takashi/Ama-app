@@ -8,7 +8,8 @@ import { AuthService } from './auth.service';
 import { UserService } from './user.service';
 import { JoinRequestService } from './join-request.service';
 import { NotificationService } from './notification.service';
-import { Group, TaskItem, GroupMembership, JoinRequest } from './models';
+import { AnnouncementService } from './announcement.service';
+import { Group, TaskItem, GroupMembership, JoinRequest, Announcement } from './models';
 import { Observable, Subject, combineLatest, of } from 'rxjs';
 import { takeUntil, map, switchMap, take } from 'rxjs/operators';
 
@@ -53,6 +54,12 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
             <span *ngIf="(joinRequests$ | async)?.length" class="request-count">
               {{ (joinRequests$ | async)?.length }}
             </span>
+          </button>
+          <button class="btn btn-announcement" 
+                  [class.btn-announcement-unread]="hasUnreadAnnouncements()"
+                  (click)="showAnnouncementListModal()">
+            <span class="btn-icon">📢</span>
+            アナウンス
           </button>
           <button class="btn btn-primary" (click)="showCreateTaskModal()">
             <span class="btn-icon">+</span>
@@ -177,6 +184,107 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 <div class="empty-icon">👥</div>
                 <h3 class="empty-title">参加リクエストがありません</h3>
                 <p class="empty-description">グループへの参加リクエストが届くとここに表示されます</p>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+
+      <!-- アナウンス作成モーダル -->
+      <div class="modal-overlay" *ngIf="showAnnouncementModalFlag">
+        <div class="modal">
+          <div class="modal-header">
+            <h2 class="modal-title">アナウンス作成</h2>
+            <button class="modal-close" (click)="closeAnnouncementModal()">×</button>
+          </div>
+          <div class="modal-form">
+            <form (ngSubmit)="createAnnouncement()" #announcementForm="ngForm">
+              <div class="form-group">
+                <label for="announcementTitle" class="form-label">タイトル</label>
+                <input 
+                  type="text" 
+                  id="announcementTitle"
+                  [(ngModel)]="announcementData.title" 
+                  name="title"
+                  class="form-input"
+                  placeholder="アナウンスのタイトルを入力"
+                  required
+                >
+              </div>
+              
+              <div class="form-group">
+                <label for="announcementContent" class="form-label">内容</label>
+                <textarea 
+                  id="announcementContent"
+                  [(ngModel)]="announcementData.content" 
+                  name="content"
+                  class="form-textarea"
+                  placeholder="アナウンスの内容を入力"
+                  rows="6"
+                  required
+                ></textarea>
+              </div>
+              
+              
+              <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" (click)="closeAnnouncementModal()">
+                  キャンセル
+                </button>
+                <button 
+                  type="submit" 
+                  class="btn btn-primary" 
+                  [disabled]="!announcementForm.valid || creatingAnnouncement"
+                >
+                  <span *ngIf="!creatingAnnouncement">📢 アナウンス投稿</span>
+                  <span *ngIf="creatingAnnouncement">⏳ 投稿中...</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- アナウンス一覧ポップアップ -->
+      <div class="modal-overlay" *ngIf="showAnnouncementListModalFlag" (click)="closeAnnouncementMenu()">
+        <div class="modal announcement-list-modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h2 class="modal-title">📢 アナウンス一覧</h2>
+            <div class="modal-header-actions">
+              <button class="btn btn-announcement" (click)="showAnnouncementModal()">
+                <span class="btn-icon">📢</span>
+                アナウンス作成
+              </button>
+              <button class="modal-close" (click)="closeAnnouncementListModal()">×</button>
+            </div>
+          </div>
+          <div class="modal-content" [class.scrollable]="announcements.length > 3">
+            <div class="announcements-list" *ngIf="announcements.length > 0; else noAnnouncements">
+              <div class="announcement-item" *ngFor="let announcement of announcements">
+                <div class="announcement-header">
+                  <div class="announcement-title">
+                    {{ announcement.title }}
+                  </div>
+                  <div class="announcement-meta">
+                    <span class="announcement-author">{{ announcement.authorName }}</span>
+                    <span class="announcement-date">{{ formatDate(announcement.createdAt) }}</span>
+                    <div class="announcement-actions" *ngIf="canDeleteAnnouncement(announcement)">
+                      <button class="announcement-menu-btn" (click)="toggleAnnouncementMenu(announcement.id)">
+                        ⋯
+                      </button>
+                      <div class="announcement-menu" *ngIf="showAnnouncementMenu === announcement.id">
+                        <button class="announcement-menu-item delete" (click)="deleteAnnouncement(announcement.id)">
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="announcement-content">{{ announcement.content }}</div>
+              </div>
+            </div>
+            <ng-template #noAnnouncements>
+              <div class="no-announcements">
+                <p>まだアナウンスがありません。</p>
               </div>
             </ng-template>
           </div>
@@ -1655,6 +1763,287 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       margin-left: 8px;
     }
 
+    /* アナウンス関連スタイル */
+    .btn-announcement {
+      background: white;
+      color: #374151;
+      border: 2px solid #e5e7eb;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-announcement:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      border-color: #d1d5db;
+    }
+
+    .btn-announcement-unread {
+      background: #fef3c7;
+      border-color: #f59e0b;
+      color: #92400e;
+    }
+
+    .btn-announcement-unread:hover {
+      background: #fde68a;
+      border-color: #d97706;
+    }
+
+    .announcements-section {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .announcements-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .announcement-item {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid #f59e0b;
+    }
+
+    .announcement-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .announcement-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #1f2937;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .important-badge {
+      background: #ef4444;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .announcement-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .announcement-author {
+      font-size: 0.875rem;
+      color: #6b7280;
+      font-weight: 500;
+    }
+
+    .announcement-date {
+      font-size: 0.75rem;
+      color: #9ca3af;
+    }
+
+    .announcement-content {
+      color: #374151;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .checkbox-input {
+      width: 16px;
+      height: 16px;
+      accent-color: #f59e0b;
+    }
+
+    .checkbox-text {
+      font-size: 0.875rem;
+      color: #374151;
+    }
+
+    .form-textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    .form-textarea:focus {
+      outline: none;
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+    }
+
+    .no-announcements {
+      text-align: center;
+      padding: 40px 20px;
+      color: #6b7280;
+    }
+
+    .no-announcements p {
+      margin-bottom: 20px;
+      font-size: 1.125rem;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .announcement-list-modal {
+      max-width: 800px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .announcement-list-modal .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .announcement-list-modal .modal-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .announcement-list-modal .modal-content {
+      max-height: 50vh;
+      padding: 24px;
+    }
+
+    .announcement-list-modal .modal-content.scrollable {
+      overflow-y: auto;
+      max-height: 40vh;
+    }
+
+    .announcement-list-modal .announcements-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .announcement-list-modal .announcement-item {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 24px;
+      border-left: 4px solid #f59e0b;
+      margin-bottom: 8px;
+    }
+
+    .announcement-list-modal .announcement-header {
+      margin-bottom: 16px;
+    }
+
+    .announcement-list-modal .announcement-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #1f2937;
+      margin-bottom: 8px;
+    }
+
+    .announcement-list-modal .announcement-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+
+    .announcement-list-modal .announcement-content {
+      color: #374151;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .announcement-actions {
+      position: relative;
+      display: inline-block;
+    }
+
+    .announcement-menu-btn {
+      background: none;
+      border: none;
+      color: #6b7280;
+      font-size: 1.25rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .announcement-menu-btn:hover {
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    .announcement-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 10;
+      min-width: 120px;
+    }
+
+    .announcement-menu-item {
+      display: block;
+      width: 100%;
+      padding: 8px 16px;
+      border: none;
+      background: none;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      font-size: 0.875rem;
+    }
+
+    .announcement-menu-item:hover {
+      background: #f3f4f6;
+    }
+
+    .announcement-menu-item.delete {
+      color: #dc2626;
+    }
+
+    .announcement-menu-item.delete:hover {
+      background: #fef2f2;
+    }
+
     .empty-state {
       text-align: center;
       padding: 40px 20px;
@@ -1799,6 +2188,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   private userService = inject(UserService);
   private joinRequestService = inject(JoinRequestService);
   private notificationService = inject(NotificationService);
+  private announcementService = inject(AnnouncementService);
   private cd = inject(ChangeDetectorRef);
 
   private destroy$ = new Subject<void>();
@@ -1828,6 +2218,18 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   joinRequests$: Observable<JoinRequest[]> = of([]);
   showJoinRequests = false;
   isGroupOwner = false;
+
+  // アナウンス関連
+  announcements: Announcement[] = [];
+  showAnnouncementModalFlag = false;
+  showAnnouncementListModalFlag = false;
+  creatingAnnouncement = false;
+  announcementData = {
+    title: '',
+    content: ''
+  };
+  unreadAnnouncements: Set<string> = new Set();
+  showAnnouncementMenu: string | null = null;
 
   // メンバー表示関連
   showMembers = false;
@@ -1894,6 +2296,9 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       if (group) {
         this.members$ = this.groupService.getGroupMembers(group.id);
         this.tasks$ = this.taskService.getTasksByGroup(group.id);
+        
+        // アナウンスを読み込み
+        this.loadAnnouncements(group.id);
         
         // グループオーナーチェック
         this.auth.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
@@ -2676,5 +3081,129 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       };
       this.updateTaskReactionState(task.id);
     });
+  }
+
+  // アナウンス関連メソッド
+  loadAnnouncements(groupId: string): void {
+    this.announcementService.getGroupAnnouncements(groupId).pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(announcements => {
+      this.announcements = announcements;
+      this.checkUnreadAnnouncements();
+    });
+  }
+
+  checkUnreadAnnouncements(): void {
+    const currentUser = this.auth.currentUser;
+    if (!currentUser || !this.group) return;
+
+    // ユーザーが最後にアナウンスを確認した日時を取得
+    const lastChecked = localStorage.getItem(`announcements_checked_${this.group.id}_${currentUser.uid}`);
+    const lastCheckedTime = lastChecked ? new Date(lastChecked) : new Date(0);
+
+    // 未読のアナウンスをチェック
+    this.unreadAnnouncements.clear();
+    this.announcements.forEach(announcement => {
+      const announcementTime = announcement.createdAt?.toDate?.() || new Date(0);
+      if (announcementTime > lastCheckedTime && announcement.authorId !== currentUser.uid) {
+        this.unreadAnnouncements.add(announcement.id);
+      }
+    });
+  }
+
+  markAnnouncementsAsRead(): void {
+    const currentUser = this.auth.currentUser;
+    if (!currentUser || !this.group) return;
+
+    // 現在の日時を保存
+    localStorage.setItem(`announcements_checked_${this.group.id}_${currentUser.uid}`, new Date().toISOString());
+    this.unreadAnnouncements.clear();
+  }
+
+  hasUnreadAnnouncements(): boolean {
+    return this.unreadAnnouncements.size > 0;
+  }
+
+  // アナウンス削除関連メソッド
+  toggleAnnouncementMenu(announcementId: string): void {
+    this.showAnnouncementMenu = this.showAnnouncementMenu === announcementId ? null : announcementId;
+  }
+
+  closeAnnouncementMenu(): void {
+    this.showAnnouncementMenu = null;
+  }
+
+  canDeleteAnnouncement(announcement: Announcement): boolean {
+    const currentUser = this.auth.currentUser;
+    return currentUser ? announcement.authorId === currentUser.uid : false;
+  }
+
+  async deleteAnnouncement(announcementId: string): Promise<void> {
+    if (!confirm('このアナウンスを削除しますか？')) {
+      return;
+    }
+
+    try {
+      await this.announcementService.deleteAnnouncement(announcementId);
+      alert('アナウンスを削除しました。');
+      this.closeAnnouncementMenu();
+      this.loadAnnouncements(this.group?.id || '');
+    } catch (error) {
+      console.error('アナウンス削除エラー:', error);
+      alert('アナウンスの削除に失敗しました。');
+    }
+  }
+
+  showAnnouncementListModal(): void {
+    this.showAnnouncementListModalFlag = true;
+    this.loadAnnouncements(this.group?.id || '');
+    this.markAnnouncementsAsRead();
+    this.closeAnnouncementMenu();
+  }
+
+  closeAnnouncementListModal(): void {
+    this.showAnnouncementListModalFlag = false;
+  }
+
+  showAnnouncementModal(): void {
+    this.showAnnouncementModalFlag = true;
+    this.closeAnnouncementListModal(); // アナウンス一覧ポップアップを閉じる
+    this.announcementData = {
+      title: '',
+      content: ''
+    };
+  }
+
+  closeAnnouncementModal(): void {
+    this.showAnnouncementModalFlag = false;
+    this.announcementData = {
+      title: '',
+      content: ''
+    };
+  }
+
+  async createAnnouncement(): Promise<void> {
+    if (!this.group || !this.announcementData.title.trim() || !this.announcementData.content.trim()) {
+      return;
+    }
+
+    this.creatingAnnouncement = true;
+    try {
+      const announcementId = await this.announcementService.createAnnouncement(
+        this.group.id,
+        this.announcementData.title,
+        this.announcementData.content,
+        false // isImportantは常にfalse
+      );
+      
+      alert('アナウンスを投稿しました！');
+      this.closeAnnouncementModal();
+      this.loadAnnouncements(this.group.id);
+    } catch (error) {
+      console.error('アナウンス作成エラー:', error);
+      alert('アナウンスの投稿に失敗しました。');
+    } finally {
+      this.creatingAnnouncement = false;
+    }
   }
 }

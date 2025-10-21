@@ -202,7 +202,7 @@ export interface ReportAttachment {
 export interface Notification {
   id: Id;
   userId: Id;
-  type: 'task_assigned' | 'task_due' | 'task_comment' | 'task_reaction' | 'group_invite' | 'progress_report' | 'progress_report_comment' | 'reminder' | 'task_due_soon' | 'group_join_request' | 'message_received';
+  type: 'task_assigned' | 'task_due' | 'task_comment' | 'task_reaction' | 'group_invite' | 'progress_report' | 'progress_report_comment' | 'reminder' | 'task_due_soon' | 'group_join_request' | 'message_received' | 'announcement';
   title: string;
   content: string;
   message: string;
@@ -396,6 +396,21 @@ export interface MessageThread {
     createdAt: Timestamp;
   };
   unreadCount: number; // 未読メッセージ数
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// アナウンス関連
+export interface Announcement {
+  id: Id;
+  groupId: Id;
+  groupName: string;
+  authorId: Id;
+  authorName: string;
+  authorEmail: string;
+  title: string;
+  content: string;
+  isImportant: boolean; // 重要なお知らせかどうか
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
