@@ -140,10 +140,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             <div class="section-header">
               <h2>📅 カレンダー</h2>
               <div class="calendar-actions">
-                <button class="calendar-btn" routerLink="/google-calendar-settings" title="Googleカレンダー連携">
-                  🔗
-                </button>
-                <button class="add-event-btn" (click)="showCreateEventModal()">+</button>
+                <button class="add-event-btn" (click)="showCreateEventModal()">予定を作成</button>
               </div>
             </div>
             
@@ -860,15 +857,16 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       background: #667eea;
       color: white;
       border: none;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 1.5rem;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.2s;
+      white-space: nowrap;
     }
 
     .add-event-btn:hover {
@@ -1001,7 +999,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .event-time { color: #ffffff; font-size: 0.9rem; font-weight:600; }
     .event-title { font-weight: 700; color: #ffffff; }
     .event-type { font-size: 0.8rem; color: #f3f4f6; }
-    .event-actions { display:flex; gap:.5rem; justify-content:flex-end; align-items:center; }
+    .event-actions { display:flex; gap:.5rem; justify-content:flex-end; align-items:center; margin-right: -385px; }
     .event-actions .btn {
       border:none !important;
       padding:.45rem .9rem;
@@ -1941,14 +1939,30 @@ export class MainPage implements OnInit, OnDestroy {
   openEditEvent(ev: CalendarEvent) {
     // 課題期限・マイルストーンは編集不可（読み取り専用）
     if (ev.type !== 'personal') return;
-    this.eventForm.patchValue({
-      title: ev.title,
-      description: ev.description || '',
-      start: this.formatDateTimeLocal(ev.startDate),
-      end: this.formatDateTimeLocal(ev.endDate),
-      color: ev.color || '#3b82f6'
-    });
-    (this as any)._editingEventId = ev.id;
+    
+    // 複数日予定の分割表示の場合は、元のイベントIDを取得
+    const originalEventId = ev.id.includes('_') ? ev.id.split('_')[0] : ev.id;
+    (this as any)._editingEventId = originalEventId;
+    
+    // 元のイベントを取得
+    const originalEvent = this.allEvents.find(e => e.id === originalEventId);
+    if (originalEvent) {
+      this.eventForm.patchValue({
+        title: originalEvent.title,
+        description: originalEvent.description || '',
+        start: this.formatDateTimeLocal(originalEvent.startDate),
+        end: this.formatDateTimeLocal(originalEvent.endDate),
+        color: originalEvent.color || '#3b82f6'
+      });
+    } else {
+      this.eventForm.patchValue({
+        title: ev.title,
+        description: ev.description || '',
+        start: this.formatDateTimeLocal(ev.startDate),
+        end: this.formatDateTimeLocal(ev.endDate),
+        color: ev.color || '#3b82f6'
+      });
+    }
     // 予定一覧モーダルを閉じて、編集モーダルを最前面で開く
     this.showDayEventsModal = false;
     this.showEventModal = true;
@@ -1957,11 +1971,15 @@ export class MainPage implements OnInit, OnDestroy {
   async deleteEvent(ev: CalendarEvent) {
     if (ev.type !== 'personal') return;
     if (!confirm('この予定を削除しますか？')) return;
+    
+    // 複数日予定の分割表示の場合は、元のイベントIDを取得
+    const originalEventId = ev.id.includes('_') ? ev.id.split('_')[0] : ev.id;
+    
     try {
-      await deleteDoc(doc(this.firestore, 'calendarEvents', ev.id));
+      await deleteDoc(doc(this.firestore, 'calendarEvents', originalEventId));
       
       // 完了したイベントのリストからも削除
-      this.todoService.updateTodoCompletion(`event-${ev.id}`, false);
+      this.todoService.updateTodoCompletion(`event-${originalEventId}`, false);
       
       // Todoリストを更新
       this.loadTodayTodos();
@@ -2011,12 +2029,92 @@ export class MainPage implements OnInit, OnDestroy {
   }
 
   private getEventsForDate(date: Date): CalendarEvent[] {
-    // 選択日のイベントを返す（selectedDayEventsは最新に更新される）
+    // 選択日のイベントを返す（複数日予定も含む）
     const ymd = date.toDateString();
-    return this.allEvents.filter(ev => {
-      const sd = (ev.startDate as any)?.toDate ? (ev.startDate as any).toDate() : new Date(ev.startDate);
-      return sd.toDateString() === ymd;
+    const result: CalendarEvent[] = [];
+    
+    this.allEvents.forEach(ev => {
+      const startDate = (ev.startDate as any)?.toDate ? (ev.startDate as any).toDate() : new Date(ev.startDate);
+      const endDate = (ev.endDate as any)?.toDate ? (ev.endDate as any).toDate() : new Date(ev.endDate);
+      
+      // 複数日にまたがる予定の場合、分割して表示
+      if (this.isMultiDayEvent(startDate, endDate)) {
+        const splitEvents = this.splitMultiDayEvent(ev, date);
+        result.push(...splitEvents);
+      } else {
+        // 単日予定の場合
+        if (startDate.toDateString() === ymd) {
+          result.push(ev);
+        }
+      }
     });
+    
+    return result;
+  }
+
+  private isMultiDayEvent(startDate: Date, endDate: Date): boolean {
+    const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    return startDay.getTime() !== endDay.getTime();
+  }
+
+  private splitMultiDayEvent(event: CalendarEvent, targetDate: Date): CalendarEvent[] {
+    const startDate = (event.startDate as any)?.toDate ? (event.startDate as any).toDate() : new Date(event.startDate);
+    const endDate = (event.endDate as any)?.toDate ? (event.endDate as any).toDate() : new Date(event.endDate);
+    
+    const targetDateStr = targetDate.toDateString();
+    const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    
+    // 対象日が予定の期間内にあるかチェック
+    if (targetDate < startDay || targetDate > endDay) {
+      return [];
+    }
+    
+    const result: CalendarEvent[] = [];
+    
+    // 開始日の場合
+    if (targetDate.toDateString() === startDay.toDateString()) {
+      const dayEnd = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 23, 59, 59);
+      const eventEnd = endDate < dayEnd ? endDate : dayEnd;
+      
+      result.push({
+        ...event,
+        id: `${event.id}_start`,
+        startDate: startDate,
+        endDate: eventEnd,
+        title: `${event.title} (開始)`
+      });
+    }
+    // 終了日の場合
+    else if (targetDate.toDateString() === endDay.toDateString()) {
+      const dayStart = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 0, 0, 0);
+      const eventStart = startDate > dayStart ? startDate : dayStart;
+      
+      result.push({
+        ...event,
+        id: `${event.id}_end`,
+        startDate: eventStart,
+        endDate: endDate,
+        title: `${event.title} (終了)`
+      });
+    }
+    // 中間日の場合（終日）
+    else {
+      const dayStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0);
+      const dayEnd = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59);
+      
+      result.push({
+        ...event,
+        id: `${event.id}_${targetDate.toISOString().split('T')[0]}`,
+        startDate: dayStart,
+        endDate: dayEnd,
+        title: `${event.title} (継続)`,
+        allDay: true
+      });
+    }
+    
+    return result;
   }
 
   // イベントハンドラー
@@ -2195,8 +2293,10 @@ export class MainPage implements OnInit, OnDestroy {
     const toDate = (d: any) => (d && d.toDate ? d.toDate() : new Date(d));
     const s = toDate(start);
     const e = toDate(end);
+    
     const sStr = s.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
     const eStr = e.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    
     // 同日で終日扱いなら時間省略
     if (sStr === '00:00' && eStr === '00:00') {
       return '終日';
