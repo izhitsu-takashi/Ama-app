@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from './auth.service';
 import { GroupService } from './group.service';
+import { EmailVerificationService } from './email-verification.service';
 
 @Component({
   selector: 'app-login',
@@ -378,6 +379,7 @@ export class LoginComponent {
   private router = inject(Router);
   private auth = inject(AuthService);
   private groups = inject(GroupService);
+  private emailVerification = inject(EmailVerificationService);
 
   loading = false;
   error = '';

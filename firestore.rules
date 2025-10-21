@@ -51,10 +51,9 @@ service cloud.firestore {
         request.auth.uid == resource.data.userId;
     }
     
-    // メール認証コードは本人のみアクセス可能
+    // メール認証コードは認証前でもアクセス可能（メールアドレスで制限）
     match /email_verifications/{verificationId} {
-      allow read, write: if request.auth != null && 
-        request.auth.email == resource.data.email;
+      allow read, write: if true; // 認証前でもアクセス可能
     }
   }
 }

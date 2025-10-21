@@ -4,7 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from './auth.service';
 import { UserService } from './user.service';
-import { sendEmailVerification } from '@angular/fire/auth';
+import { EmailVerificationService } from './email-verification.service';
 
 @Component({
   selector: 'app-signup',
@@ -63,16 +63,35 @@ import { sendEmailVerification } from '@angular/fire/auth';
               type="password" 
               formControlName="password" 
               class="form-input"
-              placeholder="6文字以上のパスワード"
+              placeholder="8文字以上のパスワード"
               [class.error]="form.get('password')?.invalid && form.get('password')?.touched"
             />
             <div *ngIf="form.get('password')?.invalid && form.get('password')?.touched" class="error-message">
               <span *ngIf="form.get('password')?.errors?.['required']">パスワードを入力してください</span>
-              <span *ngIf="form.get('password')?.errors?.['minlength']">パスワードは6文字以上で入力してください</span>
+              <span *ngIf="form.get('password')?.errors?.['minlength']">パスワードは8文字以上で入力してください</span>
             </div>
             <div class="password-hint">
               <span class="hint-icon">💡</span>
-              パスワードは6文字以上で設定してください
+              パスワードは8文字以上で設定してください
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">パスワード（確認）</label>
+            <input 
+              type="password" 
+              formControlName="confirmPassword" 
+              class="form-input"
+              placeholder="パスワードを再入力"
+              [class.error]="form.get('confirmPassword')?.invalid && form.get('confirmPassword')?.touched"
+            />
+            <div *ngIf="form.get('confirmPassword')?.invalid && form.get('confirmPassword')?.touched" class="error-message">
+              <span *ngIf="form.get('confirmPassword')?.errors?.['required']">パスワード（確認）を入力してください</span>
+              <span *ngIf="form.get('confirmPassword')?.errors?.['passwordMismatch']">パスワードが一致しません</span>
+            </div>
+            <div class="password-hint">
+              <span class="hint-icon">🔒</span>
+              パスワードを再入力してください
             </div>
           </div>
 
@@ -441,6 +460,7 @@ export class SignupComponent {
   private router = inject(Router);
   private auth = inject(AuthService);
   private users = inject(UserService);
+  private emailVerification = inject(EmailVerificationService);
 
   loading = false;
   error = '';
@@ -448,25 +468,45 @@ export class SignupComponent {
   form = this.fb.group({
     displayName: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(20)]],
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(6)]],
+    password: ['', [Validators.required, Validators.minLength(8)]],
+    confirmPassword: ['', [Validators.required]],
     department: ['', [Validators.required]],
-  });
+  }, { validators: this.passwordMatchValidator });
+
+  // パスワード一致チェック
+  passwordMatchValidator(form: any) {
+    const password = form.get('password');
+    const confirmPassword = form.get('confirmPassword');
+    
+    if (password && confirmPassword && password.value !== confirmPassword.value) {
+      confirmPassword.setErrors({ passwordMismatch: true });
+      return { passwordMismatch: true };
+    }
+    
+    return null;
+  }
 
   async onSubmit() {
     if (this.form.invalid) return;
     this.loading = true;
     this.error = '';
     const { displayName, email, password, department } = this.form.getRawValue();
+    
     try {
-      const cred = await this.auth.signUpWithEmail(email!, password!);
-      await this.users.ensureUserProfile(cred.user.uid, cred.user.email, displayName || cred.user.displayName, department as any);
-      try {
-        await sendEmailVerification(cred.user);
-        alert('確認メールを送信しました。メール内のリンクをクリックして認証を完了してください。');
-      } catch {}
-      await this.router.navigateByUrl('/main');
+      // メール認証コードを送信
+      await this.emailVerification.sendVerificationCode(email!);
+      
+      // 認証コード入力画面に遷移（パスワード情報も含める）
+      await this.router.navigate(['/email-verification'], { 
+        queryParams: { 
+          email: email,
+          displayName: displayName,
+          department: department,
+          password: password
+        } 
+      });
     } catch (e: any) {
-      this.error = e?.message ?? '登録に失敗しました';
+      this.error = e?.message ?? '認証コードの送信に失敗しました';
     } finally {
       this.loading = false;
     }

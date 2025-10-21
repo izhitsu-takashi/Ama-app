@@ -30,6 +30,7 @@ import { MorningReportPage } from './morning-report.page';
 import { GroupReportPage } from './group-report.page';
 import { DepartmentTasksPage } from './department-tasks.page';
 import { GroupInvitePage } from './group-invite.page';
+import { EmailVerificationPage } from './email-verification.page';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, canActivate: [authGuard] },
@@ -61,5 +62,6 @@ export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'signup', component: SignupComponent },
   { path: 'reset-password', component: ResetPasswordComponent },
+  { path: 'email-verification', component: EmailVerificationPage },
   { path: '**', redirectTo: '' },
 ];

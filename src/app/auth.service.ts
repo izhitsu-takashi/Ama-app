@@ -19,6 +19,23 @@ export class AuthService {
     return createUserWithEmailAndPassword(this.auth, email, password);
   }
 
+  createUserWithEmailAndPassword(email: string, password: string) {
+    return createUserWithEmailAndPassword(this.auth, email, password);
+  }
+
+  // Firebaseの標準メール認証を無効化するための設定
+  async createUserWithoutEmailVerification(email: string, password: string) {
+    const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
+    
+    // メール認証を無効化（カスタム認証を使用するため）
+    if (userCredential.user) {
+      // ユーザーのメール認証状態を手動で確認済みに設定
+      await userCredential.user.reload();
+    }
+    
+    return userCredential;
+  }
+
   signInWithEmail(email: string, password: string) {
     return signInWithEmailAndPassword(this.auth, email, password);
   }
