@@ -8,8 +8,6 @@ export const scheduledProgressReport = functions.pubsub
   .schedule('*/5 * * * *') // 5分間隔で実行
   .timeZone('Asia/Tokyo')
   .onRun(async (context) => {
-    console.log('自動進捗レポート送信を開始します');
-    
     try {
       const db = admin.firestore();
       const now = admin.firestore.Timestamp.now();
@@ -22,11 +20,8 @@ export const scheduledProgressReport = functions.pubsub
       const schedulesSnapshot = await schedulesQuery.get();
       
       if (schedulesSnapshot.empty) {
-        console.log('送信予定のスケジュールはありません');
         return;
       }
-      
-      console.log(`送信予定のスケジュール数: ${schedulesSnapshot.size}`);
       
       for (const scheduleDoc of schedulesSnapshot.docs) {
         const schedule = scheduleDoc.data();
@@ -103,7 +98,6 @@ export const scheduledProgressReport = functions.pubsub
           
           // 進捗レポートを保存
           await db.collection('progress_reports').add(reportData);
-          console.log(`進捗レポートを作成しました: ${schedule.title}`);
           
           // 次の送信日時を計算・更新
           const nextSendAt = calculateNextSendAt(
@@ -117,14 +111,10 @@ export const scheduledProgressReport = functions.pubsub
             nextSendAt: admin.firestore.Timestamp.fromDate(nextSendAt)
           });
           
-          console.log(`スケジュール更新完了: ${schedule.title}`);
-          
         } catch (error) {
           console.error(`スケジュール処理エラー: ${schedule.title}`, error);
         }
       }
-      
-      console.log('自動進捗レポート送信が完了しました');
     } catch (error) {
       console.error('自動進捗レポート送信でエラーが発生しました:', error);
     }

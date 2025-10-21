@@ -1,1 +1,40 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* メッセージボタンの未読時のスタイル（静的な薄い黄色） */
+.action-btn.has-unread-messages {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important; /* 薄い黄色グラデーション */
+  color: #92400e !important;
+  border-color: #f59e0b !important;
+  transition: all 0.3s ease;
+}
+
+/* メッセージルームの未読時のスタイル（静的な薄い黄色） */
+.message-room.has-unread {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); /* 薄い黄色グラデーション */
+  border-color: #f59e0b;
+  transition: all 0.3s ease;
+}
+
+/* メッセージ画面の未読バッジ */
+.total-unread-badge {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border-radius: 50%;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-left: 8px;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.5);
+  }
+}

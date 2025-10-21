@@ -62,11 +62,8 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             🔍 ユーザー検索
           </button>
           
-          <button class="action-btn secondary" routerLink="/messages">
+          <button class="action-btn secondary" routerLink="/messages" [class.has-unread-messages]="unreadMessageCount > 0">
             💬 メッセージ
-            <div class="message-badge" *ngIf="unreadMessageCount > 0">
-              {{ unreadMessageCount }}
-            </div>
           </button>
           
           <button class="action-btn secondary" routerLink="/group/create">
@@ -1739,14 +1736,15 @@ export class MainPage implements OnInit, OnDestroy {
 
   private loadNotifications() {
     if (this.currentUser) {
-      // 通常の通知とメッセージ通知の両方を取得
+      // 通常の通知のみを取得（🔔バッジ用）
       const regularNotifications$ = this.notificationService.getUnreadCount(this.currentUser.id);
-      const messageNotifications$ = this.messageNotificationService.getUnreadMessageNotificationCount();
       const unreadMessages$ = this.messageService.getUnreadCount();
       
-      const sub = combineLatest([regularNotifications$, messageNotifications$, unreadMessages$]).subscribe({
-        next: ([regularCount, messageCount, unreadMessageCount]) => {
-          this.unreadNotifications = regularCount + messageCount;
+      const sub = combineLatest([regularNotifications$, unreadMessages$]).subscribe({
+        next: ([regularCount, unreadMessageCount]) => {
+          // 🔔通知バッジには通常の通知のみ
+          this.unreadNotifications = regularCount;
+          // 未読メッセージ数は点滅表示用
           this.unreadMessageCount = unreadMessageCount;
         },
         error: (error) => {

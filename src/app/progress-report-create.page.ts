@@ -206,7 +206,7 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
           </div>
 
           <div class="form-actions">
-            <button type="button" class="btn secondary" routerLink="/main">キャンセル</button>
+            <button type="button" class="btn secondary" routerLink="/progress-reports">キャンセル</button>
             <button type="button" class="btn tertiary" (click)="saveDraft()" [disabled]="loading">
               {{ loading ? '保存中...' : '下書き保存' }}
             </button>

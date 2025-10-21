@@ -73,6 +73,15 @@ import { UserService } from './user.service';
                 <span *ngIf="isSentByCurrentUser(message) && !message.isTemporary" class="read-status">
                   {{ message.isRead ? '既読' : '未読' }}
                 </span>
+                <!-- 削除ボタン（自分のメッセージのみ） -->
+                <button 
+                  *ngIf="isSentByCurrentUser(message) && !message.isTemporary" 
+                  class="delete-btn"
+                  (click)="deleteMessage(message.id)"
+                  title="メッセージを削除"
+                >
+                  🗑️
+                </button>
               </div>
             </div>
           </div>
@@ -321,6 +330,22 @@ import { UserService } from './user.service';
       font-size: 0.6rem;
     }
 
+    .delete-btn {
+      background: transparent;
+      border: none;
+      padding: 0.25rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      opacity: 0.6;
+      transition: all 0.2s ease;
+      margin-left: auto;
+    }
+
+    .delete-btn:hover {
+      opacity: 1;
+      transform: scale(1.2);
+    }
+
     .input-container {
       background: white;
       padding: 1rem;
@@ -425,6 +450,14 @@ export class ChatRoomPage implements OnInit, OnDestroy {
     this.route.params.subscribe(params => {
       if (params['userId']) {
         this.otherUserId = params['userId'];
+        
+        // 自分とのチャットを防ぐ
+        const currentUser = this.authService.currentUser;
+        if (currentUser && this.otherUserId === currentUser.uid) {
+          this.router.navigate(['/messages']);
+          return;
+        }
+        
         this.loadUserInfo();
         this.loadMessages();
       }
@@ -522,6 +555,21 @@ export class ChatRoomPage implements OnInit, OnDestroy {
       this.newMessage = messageContent;
     } finally {
       this.sending = false;
+    }
+  }
+
+  async deleteMessage(messageId: string): Promise<void> {
+    if (!confirm('このメッセージを削除してもよろしいですか？')) {
+      return;
+    }
+
+    try {
+      await this.messageService.deleteMessage(messageId);
+      // メッセージ一覧から削除されたメッセージを除外
+      this.messages = this.messages.filter(msg => msg.id !== messageId);
+    } catch (error) {
+      console.error('メッセージ削除エラー:', error);
+      alert('メッセージの削除に失敗しました: ' + (error as Error).message);
     }
   }
 

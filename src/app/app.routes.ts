@@ -17,7 +17,6 @@ import { GoogleCalendarSettingsPage } from './google-calendar-settings.page';
 import { GoogleAuthCallbackComponent } from './google-auth-callback.component';
 import { UserSearchPage } from './user-search.page';
 import { MessagesPage } from './messages.page';
-import { MessageComposePage } from './message-compose.page';
 import { MessageViewPage } from './message-view.page';
 import { ChatRoomPage } from './chat-room.page';
 import { TasksPage } from './tasks.page';
@@ -48,7 +47,6 @@ export const routes: Routes = [
   { path: 'auth/google/callback', component: GoogleAuthCallbackComponent },
   { path: 'user-search', component: UserSearchPage, canActivate: [authGuard] },
   { path: 'messages', component: MessagesPage, canActivate: [authGuard] },
-  { path: 'messages/compose', component: MessageComposePage, canActivate: [authGuard] },
   { path: 'messages/view/:id', component: MessageViewPage, canActivate: [authGuard] },
   { path: 'chat/:userId', component: ChatRoomPage, canActivate: [authGuard] },
   { path: 'tasks', component: TasksPage, canActivate: [authGuard] },

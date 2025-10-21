@@ -1325,6 +1325,12 @@ export class UserSearchPage implements OnInit, OnDestroy {
   private filterUsers(): void {
     let users = [...this.allUsers];
 
+    // 自分を除外
+    const currentUser = this.authService.currentUser;
+    if (currentUser) {
+      users = users.filter(user => user.id !== currentUser.uid);
+    }
+
     // 検索条件でフィルタリング
     if (this.searchTerm.trim()) {
       const term = this.searchTerm.toLowerCase();
@@ -1333,7 +1339,6 @@ export class UserSearchPage implements OnInit, OnDestroy {
         user.email.toLowerCase().includes(term)
       );
     }
-
 
     this.filteredUsers = users;
   }
@@ -1419,10 +1424,8 @@ export class UserSearchPage implements OnInit, OnDestroy {
   }
 
   sendMessage(user: User): void {
-    // メッセージ送信ページに遷移
-    this.router.navigate(['/messages/compose'], {
-      queryParams: { to: user.id }
-    });
+    // そのユーザーとのchatページに遷移
+    this.router.navigate(['/chat', user.id]);
   }
 
   // タブ機能

@@ -17,6 +17,30 @@ export class MessageService {
     private messageNotificationService: MessageNotificationService
   ) {}
 
+  // メッセージを削除
+  async deleteMessage(messageId: string): Promise<void> {
+    const currentUser = this.authService.currentUser;
+    if (!currentUser) {
+      throw new Error('ユーザーが認証されていません');
+    }
+
+    // メッセージの存在確認と送信者チェック
+    const messageRef = doc(this.firestore, 'messages', messageId);
+    const messageDoc = await getDoc(messageRef);
+    
+    if (!messageDoc.exists()) {
+      throw new Error('メッセージが見つかりません');
+    }
+
+    const messageData = messageDoc.data();
+    if (messageData['senderId'] !== currentUser.uid) {
+      throw new Error('このメッセージを削除する権限がありません');
+    }
+
+    // メッセージを削除
+    await deleteDoc(messageRef);
+  }
+
   // メッセージを送信
   async sendMessage(recipientId: string, subject: string, content: string): Promise<string> {
     const currentUser = this.authService.currentUser;
@@ -229,11 +253,6 @@ export class MessageService {
     }
   }
 
-  // メッセージを削除
-  async deleteMessage(messageId: string): Promise<void> {
-    const messageRef = doc(this.firestore, 'messages', messageId);
-    await deleteDoc(messageRef);
-  }
 
   // 未読メッセージ数を取得
   getUnreadCount(): Observable<number> {

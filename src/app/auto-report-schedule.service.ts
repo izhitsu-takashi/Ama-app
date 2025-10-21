@@ -87,8 +87,6 @@ export class AutoReportScheduleService {
   // 送信予定のスケジュール取得
   async getSchedulesToSend(): Promise<AutoReportSchedule[]> {
     const now = new Date();
-    console.log('現在時刻:', now.toISOString());
-    console.log('現在時刻のTimestamp:', Timestamp.fromDate(now).toDate().toISOString());
     
     try {
       const schedulesRef = collection(this.firestore, 'auto_report_schedules');
@@ -100,14 +98,6 @@ export class AutoReportScheduleService {
       
       const snapshot = await getDocs(q);
       const schedules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AutoReportSchedule));
-      
-      console.log('送信予定のスケジュール数:', schedules.length);
-      schedules.forEach(schedule => {
-        console.log(`スケジュール: ${schedule.title}`);
-        console.log(`- isActive: ${schedule.isActive}`);
-        console.log(`- nextSendAt: ${schedule.nextSendAt.toDate().toISOString()}`);
-        console.log(`- 現在時刻との比較: ${schedule.nextSendAt.toDate() <= now}`);
-      });
       
       return schedules;
     } catch (error) {
@@ -176,16 +166,12 @@ export class AutoReportScheduleService {
   // スケジュールに基づく進捗報告送信
   async sendScheduledReport(schedule: AutoReportSchedule): Promise<void> {
     try {
-      console.log('自動送信開始:', schedule.title);
-      
       // 添付グループのタスクを取得
       if (!schedule.attachedGroupId) {
         throw new Error('添付グループが指定されていません');
       }
 
-      console.log('添付グループのタスクを取得中:', schedule.attachedGroupId);
       const tasks = await this.groupService.getGroupTasks(schedule.attachedGroupId);
-      console.log('取得したタスク数:', tasks.length);
       
       // 過去1週間のタスクをフィルタリング
       const oneWeekAgo = new Date();
@@ -195,8 +181,6 @@ export class AutoReportScheduleService {
         const taskDate = task.occurredOn?.toDate() || task.createdAt?.toDate();
         return taskDate && taskDate >= oneWeekAgo;
       });
-
-      console.log('フィルタリング後のタスク数:', filteredTasks.length);
 
       // タスクをカテゴリ別に分類
       const categorizedTasks = this.aiReportGenerator.categorizeTasks(filteredTasks);
@@ -216,15 +200,12 @@ export class AutoReportScheduleService {
         upcomingTasks: categorizedTasks.upcoming
       };
 
-      console.log('AIレポート生成中...');
       // AIでレポート生成
       const generatedReport = await firstValueFrom(this.aiReportGenerator.generateProgressReport(reportData));
       
       if (!generatedReport) {
         throw new Error('レポート生成に失敗しました');
       }
-
-      console.log('生成されたレポート:', generatedReport.title);
 
       // 送信者のユーザー情報を取得
       const userDoc = await this.userService.getUserProfile(schedule.userId);
@@ -267,9 +248,7 @@ export class AutoReportScheduleService {
         }
       }
 
-      console.log('進捗報告を作成中...');
       await this.progressReportService.createProgressReport(reportData_toSend);
-      console.log('進捗報告の作成が完了しました');
 
       // 次の送信日時を更新
       const nextSendAt = this.calculateNextSendAt(

@@ -16,7 +16,6 @@ export class AppComponent implements OnInit {
   ngOnInit(): void {
     // 自動送信スケジューラーを有効化
     try {
-      console.log('自動送信スケジューラーを初期化中...');
       this.autoReportScheduler.startScheduler();
     } catch (error) {
       console.error('スケジューラー初期化エラー:', error);
