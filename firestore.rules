@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ユーザー認証が必要
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // ユーザー情報は本人のみアクセス可能
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // グループ情報はメンバーのみアクセス可能
+    match /groups/{groupId} {
+      allow read, write: if request.auth != null && 
+        (resource.data.members[request.auth.uid] != null || 
+         resource.data.ownerId == request.auth.uid);
+    }
+    
+    // グループメンバーシップは本人のみアクセス可能
+    match /group_memberships/{membershipId} {
+      allow read, write: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+    }
+    
+    // タスクはグループメンバーのみアクセス可能
+    match /tasks/{taskId} {
+      allow read, write: if request.auth != null && 
+        exists(/databases/$(database)/documents/groups/$(resource.data.groupId)) &&
+        (get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.members[request.auth.uid] != null);
+    }
+    
+    // 進捗レポートはグループメンバーのみアクセス可能
+    match /progress_reports/{reportId} {
+      allow read, write: if request.auth != null && 
+        exists(/databases/$(database)/documents/groups/$(resource.data.groupId)) &&
+        (get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.members[request.auth.uid] != null);
+    }
+    
+    // メッセージはグループメンバーのみアクセス可能
+    match /messages/{messageId} {
+      allow read, write: if request.auth != null && 
+        exists(/databases/$(database)/documents/groups/$(resource.data.groupId)) &&
+        (get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.members[request.auth.uid] != null);
+    }
+    
+    // 自動レポートスケジュールは本人のみアクセス可能
+    match /auto_report_schedules/{scheduleId} {
+      allow read, write: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+    }
+    
+    // メール認証コードは本人のみアクセス可能
+    match /email_verifications/{verificationId} {
+      allow read, write: if request.auth != null && 
+        request.auth.email == resource.data.email;
+    }
+  }
+}

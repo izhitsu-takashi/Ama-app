@@ -275,14 +275,21 @@ export class TodoService {
       }
     }
     
-    localStorage.setItem('completedEvents', JSON.stringify(completedEvents));
+    // ブラウザ環境でのみlocalStorageを使用
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('completedEvents', JSON.stringify(completedEvents));
+    }
   }
 
   // 完了したイベントのリストを取得
   private getCompletedEvents(): string[] {
     try {
-      const stored = localStorage.getItem('completedEvents');
-      return stored ? JSON.parse(stored) : [];
+      // ブラウザ環境でのみlocalStorageを使用
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem('completedEvents');
+        return stored ? JSON.parse(stored) : [];
+      }
+      return [];
     } catch (error) {
       console.error('完了イベント取得エラー:', error);
       return [];

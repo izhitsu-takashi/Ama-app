@@ -1,0 +1,41 @@
+{"users": [
+{
+  "localId": "57O5b9MqTSQUOJndiGbSWlhgvoo2",
+  "email": "takashi.izhitsu@pathoslogos.co.jp",
+  "emailVerified": false,
+  "passwordHash": "VRwyOMSWvyCl7LRKiDQ9caG9UR0BoaElSPhPv1KZe1PibvfE2rVyG77QTqJ7mo5kOCmIXjzq5K2cOXxZbUDlBA==",
+  "salt": "5ryrYydSTuSmkA==",
+  "lastSignedInAt": "1761007663841",
+  "createdAt": "1760953950402",
+  "providerUserInfo": []
+},
+{
+  "localId": "JrcG7MQtVcREPR5WHmlN6HdPVtE2",
+  "email": "admin@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "uLj4ehDWsTCPn4d2QZuxjmUjdljTo2lDvCRHSIT+E0Gj9InFFJN+IfVJO0P2ryisuYAz0p65xBa2KlZuvL58GQ==",
+  "salt": "cGYiJH6/ULN5AQ==",
+  "lastSignedInAt": "1760853419799",
+  "createdAt": "1760851842595",
+  "providerUserInfo": []
+},
+{
+  "localId": "lQODqNJGU2XdlhUQ3dSyELM2uzA3",
+  "email": "kaihatsu@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "p1AeMxCRXDZKgWAqqqB/RRxoBVLTAZNKyyFQLB6UoB4hRi117I4eQ0m1YKG6F1gPtrxfYR3WxbQcWKymqF4gzg==",
+  "salt": "91Ylo/ur4XC6og==",
+  "lastSignedInAt": "1760938688442",
+  "createdAt": "1760930498773",
+  "providerUserInfo": []
+},
+{
+  "localId": "vsiIgs16G9MITqG8kaVe3x7p8bn1",
+  "email": "test@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "eLbWdBedgZALdHN5YnRhHZbe7ho8MzQYm0eqgUDkJ6e2uHppOSb7D1Utr8QlH0zZ8jmWy2ROgTZZmXGX96VSEA==",
+  "salt": "VKQa+R6QF8fh0w==",
+  "lastSignedInAt": "1760955790470",
+  "createdAt": "1760656587696",
+  "providerUserInfo": []
+}]}

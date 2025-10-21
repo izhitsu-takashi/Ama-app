@@ -67,7 +67,23 @@ import { takeUntil, take } from 'rxjs/operators';
               </div>
               
               <div class="report-content">
-                <p class="report-text">{{ report.content }}</p>
+                <p class="report-text" [class.preview-text]="!showFullContent[report.id]">
+                  {{ showFullContent[report.id] ? report.content : getPreviewText(report.content) }}
+                </p>
+                <button 
+                  *ngIf="!showFullContent[report.id] && report.content.length > 200" 
+                  class="btn small secondary show-more-btn"
+                  (click)="toggleContent(report.id)"
+                >
+                  すべて表示
+                </button>
+                <button 
+                  *ngIf="showFullContent[report.id] && report.content.length > 200" 
+                  class="btn small secondary show-more-btn"
+                  (click)="toggleContent(report.id)"
+                >
+                  折りたたむ
+                </button>
               </div>
               
               <div class="report-meta">
@@ -95,7 +111,23 @@ import { takeUntil, take } from 'rxjs/operators';
               </div>
               
               <div class="report-content">
-                <p class="report-text">{{ report.content }}</p>
+                <p class="report-text" [class.preview-text]="!showFullContent[report.id]">
+                  {{ showFullContent[report.id] ? report.content : getPreviewText(report.content) }}
+                </p>
+                <button 
+                  *ngIf="!showFullContent[report.id] && report.content.length > 200" 
+                  class="btn small secondary show-more-btn"
+                  (click)="toggleContent(report.id)"
+                >
+                  すべて表示
+                </button>
+                <button 
+                  *ngIf="showFullContent[report.id] && report.content.length > 200" 
+                  class="btn small secondary show-more-btn"
+                  (click)="toggleContent(report.id)"
+                >
+                  折りたたむ
+                </button>
               </div>
               
               <div class="report-meta">
@@ -126,7 +158,23 @@ import { takeUntil, take } from 'rxjs/operators';
               </div>
               
               <div class="report-content">
-                <p class="report-text">{{ report.content }}</p>
+                <p class="report-text" [class.preview-text]="!showFullContent[report.id]">
+                  {{ showFullContent[report.id] ? report.content : getPreviewText(report.content) }}
+                </p>
+                <button 
+                  *ngIf="!showFullContent[report.id] && report.content.length > 200" 
+                  class="btn small secondary show-more-btn"
+                  (click)="toggleContent(report.id)"
+                >
+                  すべて表示
+                </button>
+                <button 
+                  *ngIf="showFullContent[report.id] && report.content.length > 200" 
+                  class="btn small secondary show-more-btn"
+                  (click)="toggleContent(report.id)"
+                >
+                  折りたたむ
+                </button>
               </div>
               
               <div class="report-meta">
@@ -327,6 +375,28 @@ import { takeUntil, take } from 'rxjs/operators';
       white-space: pre-wrap;
     }
 
+    .preview-text {
+      max-height: 4.5rem;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .preview-text::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1.5rem;
+      background: linear-gradient(transparent, white);
+    }
+
+    .show-more-btn {
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+    }
+
     .report-meta {
       display: flex;
       gap: 1rem;
@@ -474,6 +544,9 @@ export class ProgressReportsPage implements OnInit, OnDestroy {
   draftReports$: Observable<ProgressReport[]> = of([]);
   sentReports$: Observable<ProgressReport[]> = of([]);
   receivedReports$: Observable<ProgressReport[]> = of([]);
+  
+  // プレビュー表示の制御
+  showFullContent: { [key: string]: boolean } = {};
 
   ngOnInit() {
     this.loadReports();
@@ -570,5 +643,18 @@ export class ProgressReportsPage implements OnInit, OnDestroy {
         alert('下書きの送信に失敗しました。');
       }
     }
+  }
+
+  // プレビューテキストを取得（200文字で切り詰め）
+  getPreviewText(content: string): string {
+    if (content.length <= 200) {
+      return content;
+    }
+    return content.substring(0, 200) + '...';
+  }
+
+  // コンテンツの表示/非表示を切り替え
+  toggleContent(reportId: string) {
+    this.showFullContent[reportId] = !this.showFullContent[reportId];
   }
 }

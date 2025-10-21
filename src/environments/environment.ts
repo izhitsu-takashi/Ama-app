@@ -1,12 +1,12 @@
 export const environment = {
   production: false,
   firebase: {
-    apiKey: "AIzaSyD87oW1gofEUEVLiKe3G5a5LUQHOQpK3Iw",
-    authDomain: "ama-app-d1194.firebaseapp.com",
-    projectId: "ama-app-d1194",
-    storageBucket: "ama-app-d1194.firebasestorage.app",
-    messagingSenderId: "493427822791",
-    appId: "1:493427822791:web:04adc1c4851cc31787eee2"
+    apiKey: "AIzaSyBcG5WGTToP8-Gx1DyI45z_85mZpeCoepU",
+    authDomain: "kensyu10117.firebaseapp.com",
+    projectId: "kensyu10117",
+    storageBucket: "kensyu10117.firebasestorage.app",
+    messagingSenderId: "373502057817",
+    appId: "1:373502057817:web:dbd1683be108b89b1e8048"
   },
 };
 

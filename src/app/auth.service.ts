@@ -62,14 +62,20 @@ export class AuthService {
       return false;
     }
     
-    // ローカルストレージから管理者フラグを取得
-    const isAdmin = localStorage.getItem('isAdmin') === 'true';
-    return isAdmin;
+    // ブラウザ環境でのみlocalStorageを使用
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const isAdmin = localStorage.getItem('isAdmin') === 'true';
+      return isAdmin;
+    }
+    return false;
   }
 
   // 管理者権限を設定（ログイン時に呼び出し）
   setAdminStatus(isAdmin: boolean): void {
-    localStorage.setItem('isAdmin', isAdmin.toString());
+    // ブラウザ環境でのみlocalStorageを使用
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('isAdmin', isAdmin.toString());
+    }
   }
 }
 

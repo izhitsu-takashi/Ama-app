@@ -31,11 +31,6 @@ export class AutoReportSchedulerService {
 
   // 送信予定のレポートをチェックして送信
   private async checkAndSendScheduledReports(): Promise<void> {
-    // 自動送信機能は無効化されています
-    // console.log('自動送信機能は無効化されています');
-    return;
-    
-    /* 自動送信機能（起動問題のため無効化）
     try {
       const now = new Date();
       console.log('スケジュールチェック開始:', now.toISOString());
@@ -55,6 +50,5 @@ export class AutoReportSchedulerService {
     } catch (error) {
       console.error('スケジュールチェックエラー:', error);
     }
-    */
   }
 }
