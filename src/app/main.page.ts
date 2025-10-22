@@ -577,13 +577,14 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .action-btn.primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      background: white;
+      color: #4a5568;
+      border: 2px solid #e2e8f0;
     }
 
     .action-btn.primary:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
 
     .action-btn.secondary {

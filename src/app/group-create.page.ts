@@ -99,35 +99,35 @@ import { TaskService } from './task.service';
           <!-- AI基盤作成タブ -->
           <div *ngIf="activeTab === 'ai'" class="tab-content">
             <div class="ai-intro">
-              <h3 class="ai-intro-title">🤖 AI プロジェクト基盤作成</h3>
+              <h3 class="ai-intro-title">🤖 AI グループ基盤作成</h3>
               <p class="ai-intro-description">
-                プロジェクトの概要を入力すると、AIが自動的に課題・優先度・タイムラインを生成し、
-                グループにタスクとして追加します。
+                グループの概要を入力すると、AIが自動的に課題・優先度・タイムラインを生成し、
+                グループにタスクとして追加します。個人の課題から大規模プロジェクトまで対応します。
               </p>
             </div>
 
             <div class="form-group">
-              <label class="form-label">プロジェクト名</label>
+              <label class="form-label">グループ名</label>
               <input 
                 type="text" 
                 formControlName="name" 
                 class="form-input"
-                placeholder="プロジェクト名を入力"
+                placeholder="グループ名を入力"
                 [class.error]="form.get('name')?.invalid && form.get('name')?.touched"
               />
               <div *ngIf="form.get('name')?.invalid && form.get('name')?.touched" class="error-message">
-                <span *ngIf="form.get('name')?.errors?.['required']">プロジェクト名を入力してください</span>
-                <span *ngIf="form.get('name')?.errors?.['minlength']">プロジェクト名は2文字以上で入力してください</span>
-                <span *ngIf="form.get('name')?.errors?.['maxlength']">プロジェクト名は50文字以内で入力してください</span>
+                <span *ngIf="form.get('name')?.errors?.['required']">グループ名を入力してください</span>
+                <span *ngIf="form.get('name')?.errors?.['minlength']">グループ名は2文字以上で入力してください</span>
+                <span *ngIf="form.get('name')?.errors?.['maxlength']">グループ名は50文字以内で入力してください</span>
               </div>
             </div>
 
             <div class="form-group">
-              <label class="form-label">プロジェクト概要</label>
+              <label class="form-label">グループ概要</label>
               <textarea 
                 formControlName="description" 
                 class="form-textarea"
-                placeholder="プロジェクトの概要や目的を入力してください"
+                placeholder="グループの概要や目的を入力してください"
                 rows="4"
               ></textarea>
               <div class="field-hint">
@@ -139,14 +139,18 @@ import { TaskService } from './task.service';
             <div class="ai-form">
               <div class="form-row">
                 <div class="form-group">
-                  <label class="form-label">アプリタイプ</label>
+                  <label class="form-label">プロジェクトタイプ</label>
                   <select [(ngModel)]="projectInput.appType" [ngModelOptions]="{standalone: true}" class="form-select">
                     <option value="">選択してください</option>
+                    <option value="個人の課題・学習">個人の課題・学習</option>
                     <option value="Webアプリケーション">Webアプリケーション</option>
                     <option value="モバイルアプリ">モバイルアプリ</option>
                     <option value="デスクトップアプリ">デスクトップアプリ</option>
                     <option value="API/バックエンド">API/バックエンド</option>
                     <option value="データ分析ツール">データ分析ツール</option>
+                    <option value="研究・調査">研究・調査</option>
+                    <option value="イベント企画">イベント企画</option>
+                    <option value="マーケティング">マーケティング</option>
                     <option value="その他">その他</option>
                   </select>
                 </div>
@@ -171,7 +175,7 @@ import { TaskService } from './task.service';
                   [(ngModel)]="projectInput.goals" 
                   [ngModelOptions]="{standalone: true}"
                   class="form-textarea"
-                  placeholder="プロジェクトで実現したい具体的な目標や機能を入力してください"
+                  placeholder="グループで実現したい具体的な目標や成果を入力してください"
                   rows="3"
                 ></textarea>
               </div>
@@ -180,6 +184,7 @@ import { TaskService } from './task.service';
                 <label class="form-label">規模感</label>
                 <select [(ngModel)]="projectInput.scale" [ngModelOptions]="{standalone: true}" class="form-select">
                   <option value="">選択してください</option>
+                  <option value="個人課題（数日）">個人課題（数日）</option>
                   <option value="小規模（1-2週間）">小規模（1-2週間）</option>
                   <option value="中規模（1-2ヶ月）">中規模（1-2ヶ月）</option>
                   <option value="大規模（3-6ヶ月）">大規模（3-6ヶ月）</option>
@@ -929,7 +934,7 @@ export class GroupCreatePage {
   projectAnalysis: ProjectAnalysis | null = null;
 
   projectInput: ProjectInput = {
-    projectName: '',
+    projectName: '', // グループ名として使用
     description: '',
     appType: '',
     goals: '',
@@ -991,7 +996,7 @@ export class GroupCreatePage {
     this.error = '';
     
     try {
-      // プロジェクト名をフォームのグループ名から取得
+      // グループ名をフォームから取得
       this.projectInput.projectName = this.form.get('name')?.value || '';
       this.projectInput.description = this.form.get('description')?.value || '';
       
@@ -1004,6 +1009,7 @@ export class GroupCreatePage {
   }
 
   isProjectInputValid(): boolean {
+    // グループ基盤作成に必要な項目が入力されているかチェック
     return !!(
       this.projectInput.appType &&
       this.projectInput.goals &&
