@@ -22,9 +22,8 @@ import { takeUntil } from 'rxjs/operators';
           <h1>👥 グループ資料作成</h1>
         </div>
         <div class="header-right">
-          <button class="generate-btn" (click)="generateSlide()" [disabled]="loading || !selectedGroup">
-            <span *ngIf="!loading">📄 スライド生成</span>
-            <span *ngIf="loading">生成中...</span>
+          <button class="action-btn download-btn" (click)="downloadReport()" [disabled]="!selectedGroup">
+            📥 ダウンロード
           </button>
         </div>
       </header>
@@ -61,7 +60,7 @@ import { takeUntil } from 'rxjs/operators';
                   <h3 class="section-title">📊 グループ概要</h3>
                   <div class="overview-grid">
                     <div class="overview-item">
-                      <div class="overview-value">{{ selectedGroup.memberIds.length }}</div>
+                      <div class="overview-value">{{ actualMemberCount }}</div>
                       <div class="overview-label">メンバー数</div>
                     </div>
                     <div class="overview-item">
@@ -105,15 +104,15 @@ import { takeUntil } from 'rxjs/operators';
                     <h3 class="section-title">⏰ 期限管理</h3>
                     <div class="deadline-stats">
                       <div class="deadline-item urgent">
-                        <span class="deadline-label">緊急（今日まで）:</span>
+                        <span class="deadline-label">本日:</span>
                         <span class="deadline-value">{{ getUrgentTasks().length }}</span>
                       </div>
                       <div class="deadline-item warning">
-                        <span class="deadline-label">注意（3日以内）:</span>
+                        <span class="deadline-label">3日以内:</span>
                         <span class="deadline-value">{{ getWarningTasks().length }}</span>
                       </div>
                       <div class="deadline-item normal">
-                        <span class="deadline-label">正常:</span>
+                        <span class="deadline-label">3日以降:</span>
                         <span class="deadline-value">{{ getNormalTasks().length }}</span>
                       </div>
                     </div>
@@ -131,15 +130,6 @@ import { takeUntil } from 'rxjs/operators';
           </div>
         </div>
 
-        <!-- 生成されたスライド -->
-        <div class="generated-slide" *ngIf="generatedSlideHtml">
-          <h2>生成されたスライド</h2>
-          <div class="slide-actions">
-            <button class="action-btn print-btn" (click)="printSlide()">🖨️ 印刷</button>
-            <button class="action-btn download-btn" (click)="downloadSlide()">💾 ダウンロード</button>
-          </div>
-          <div class="slide-output" [innerHTML]="generatedSlideHtml"></div>
-        </div>
       </main>
     </div>
   `,
@@ -189,11 +179,9 @@ import { takeUntil } from 'rxjs/operators';
       margin: 0;
     }
 
-    .generate-btn {
-      background: linear-gradient(135deg, #10b981, #059669);
-      color: white;
-      border: none;
+    .action-btn {
       padding: 0.75rem 1.5rem;
+      border: none;
       border-radius: 8px;
       cursor: pointer;
       font-size: 1rem;
@@ -201,14 +189,23 @@ import { takeUntil } from 'rxjs/operators';
       transition: all 0.2s ease;
     }
 
-    .generate-btn:hover:not(:disabled) {
+    .action-btn:hover:not(:disabled) {
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
     }
 
-    .generate-btn:disabled {
+    .action-btn:disabled {
       opacity: 0.6;
       cursor: not-allowed;
+    }
+
+    .download-btn {
+      background: #10b981;
+      color: white;
+    }
+
+    .download-btn:hover {
+      background: #059669;
     }
 
     .main-content {
@@ -425,60 +422,6 @@ import { takeUntil } from 'rxjs/operators';
       100% { transform: rotate(360deg); }
     }
 
-    .generated-slide {
-      background: rgba(255, 255, 255, 0.95);
-      padding: 2rem;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    .generated-slide h2 {
-      margin: 0 0 1.5rem 0;
-      color: #374151;
-      font-size: 1.5rem;
-      font-weight: 700;
-    }
-
-    .slide-actions {
-      display: flex;
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-
-    .action-btn {
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 1rem;
-      font-weight: 600;
-      transition: all 0.2s ease;
-    }
-
-    .print-btn {
-      background: #3b82f6;
-      color: white;
-    }
-
-    .print-btn:hover {
-      background: #2563eb;
-    }
-
-    .download-btn {
-      background: #10b981;
-      color: white;
-    }
-
-    .download-btn:hover {
-      background: #059669;
-    }
-
-    .slide-output {
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 2rem;
-      background: white;
-    }
 
     /* レスポンシブデザイン */
     @media (max-width: 768px) {
@@ -537,7 +480,7 @@ export class GroupReportPage implements OnInit, OnDestroy {
   completedTasks: TaskItem[] = [];
   allUsers: User[] = [];
   loading = false;
-  generatedSlideHtml = '';
+  actualMemberCount = 0;
 
   ngOnInit() {
     this.loadUserGroups();
@@ -574,11 +517,19 @@ export class GroupReportPage implements OnInit, OnDestroy {
   private loadGroupTasks() {
     if (!this.selectedGroup) return;
 
+    // タスクを読み込み
     this.taskService.getGroupTasks(this.selectedGroup.id).pipe(
       takeUntil(this.destroy$)
     ).subscribe(tasks => {
       this.groupTasks = tasks;
       this.completedTasks = tasks.filter(task => task.status === 'completed');
+    });
+
+    // 正確なメンバー数を取得
+    this.groupService.getGroupMemberCount(this.selectedGroup.id).pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(count => {
+      this.actualMemberCount = count;
     });
   }
 
@@ -647,128 +598,218 @@ export class GroupReportPage implements OnInit, OnDestroy {
 
 
 
-  generateSlide() {
+  downloadReport() {
     if (!this.selectedGroup) return;
     
-    this.loading = true;
-    
-    // スライド生成のシミュレーション
-    setTimeout(() => {
-      this.generatedSlideHtml = this.createSlideHtml();
-      this.loading = false;
-    }, 2000);
-  }
-
-  private createSlideHtml(): string {
-    if (!this.selectedGroup) return '';
-
-    return `
-      <div style="width: 800px; height: 600px; background: white; padding: 2rem; font-family: 'Segoe UI', sans-serif;">
-        <div style="text-align: center; margin-bottom: 2rem; border-bottom: 3px solid #10b981; padding-bottom: 1rem;">
-          <h1 style="font-size: 2.5rem; color: #374151; margin: 0 0 0.5rem 0;">👥 グループ進捗資料</h1>
-          <p style="font-size: 1.5rem; color: #10b981; margin: 0 0 0.5rem 0; font-weight: 600;">${this.selectedGroup.name}</p>
-          <p style="font-size: 1.25rem; color: #6b7280; margin: 0;">${this.getCurrentDate()}</p>
-        </div>
-        
-        <div style="display: flex; flex-direction: column; gap: 1rem; height: calc(100% - 120px);">
-          <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #10b981;">
-            <h3 style="font-size: 1.1rem; color: #374151; margin: 0 0 0.75rem 0;">📊 グループ概要</h3>
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
-              <div style="text-align: center; padding: 1rem; background: white; border-radius: 8px;">
-                <div style="font-size: 1.75rem; font-weight: 700; color: #10b981; margin-bottom: 0.5rem;">${this.selectedGroup.memberIds.length}</div>
-                <div style="font-size: 0.875rem; color: #6b7280;">メンバー数</div>
-              </div>
-              <div style="text-align: center; padding: 1rem; background: white; border-radius: 8px;">
-                <div style="font-size: 1.75rem; font-weight: 700; color: #10b981; margin-bottom: 0.5rem;">${this.groupTasks.length}</div>
-                <div style="font-size: 0.875rem; color: #6b7280;">総タスク数</div>
-              </div>
-              <div style="text-align: center; padding: 1rem; background: white; border-radius: 8px;">
-                <div style="font-size: 1.75rem; font-weight: 700; color: #10b981; margin-bottom: 0.5rem;">${this.completedTasks.length}</div>
-                <div style="font-size: 0.875rem; color: #6b7280;">完了済み</div>
-              </div>
-              <div style="text-align: center; padding: 1rem; background: white; border-radius: 8px;">
-                <div style="font-size: 1.75rem; font-weight: 700; color: #10b981; margin-bottom: 0.5rem;">${this.getProgressPercentage()}%</div>
-                <div style="font-size: 0.875rem; color: #6b7280;">進捗率</div>
-              </div>
-            </div>
-          </div>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-            <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #10b981;">
-              <h3 style="font-size: 1.1rem; color: #374151; margin: 0 0 0.75rem 0;">📋 タスク状況</h3>
-              <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: white; border-radius: 6px;">
-                  <span style="color: #6b7280; font-weight: 500;">未着手:</span>
-                  <span style="font-weight: 600; font-size: 1rem; color: #6b7280;">${this.getTaskCountByStatus('not_started')}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: white; border-radius: 6px;">
-                  <span style="color: #6b7280; font-weight: 500;">進行中:</span>
-                  <span style="font-weight: 600; font-size: 1rem; color: #3b82f6;">${this.getTaskCountByStatus('in_progress')}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: white; border-radius: 6px;">
-                  <span style="color: #6b7280; font-weight: 500;">完了:</span>
-                  <span style="font-weight: 600; font-size: 1rem; color: #10b981;">${this.getTaskCountByStatus('completed')}</span>
-                </div>
-              </div>
-            </div>
-            
-            <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #10b981;">
-              <h3 style="font-size: 1.1rem; color: #374151; margin: 0 0 0.75rem 0;">⏰ 期限管理</h3>
-              <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: white; border-radius: 6px;">
-                  <span style="color: #6b7280; font-weight: 500;">緊急（今日まで）:</span>
-                  <span style="font-weight: 600; font-size: 1rem; color: #dc2626;">${this.getUrgentTasks().length}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: white; border-radius: 6px;">
-                  <span style="color: #6b7280; font-weight: 500;">注意（3日以内）:</span>
-                  <span style="font-weight: 600; font-size: 1rem; color: #f59e0b;">${this.getWarningTasks().length}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: white; border-radius: 6px;">
-                  <span style="color: #6b7280; font-weight: 500;">正常:</span>
-                  <span style="font-weight: 600; font-size: 1rem; color: #10b981;">${this.getNormalTasks().length}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  printSlide() {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>グループ進捗資料</title>
-            <style>
-              body { margin: 0; padding: 0; }
-              @media print {
-                body { margin: 0; }
-              }
-            </style>
-          </head>
-          <body>
-            ${this.generatedSlideHtml}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-    }
-  }
-
-  downloadSlide() {
-    const blob = new Blob([this.generatedSlideHtml], { type: 'text/html' });
+    const reportContent = this.createReportHtml();
+    const blob = new Blob([reportContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `グループ進捗資料_${this.selectedGroup?.name}_${new Date().toISOString().split('T')[0]}.html`;
+    a.download = `グループ進捗資料_${this.selectedGroup.name}_${new Date().toISOString().split('T')[0]}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  private createReportHtml(): string {
+    if (!this.selectedGroup) return '';
+
+    return `
+      <!DOCTYPE html>
+      <html lang="ja">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>グループ進捗資料 - ${this.selectedGroup.name}</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background: #f9fafb;
+            color: #374151;
+          }
+          .report-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            padding: 2rem;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            border-bottom: 3px solid #10b981;
+            padding-bottom: 1rem;
+          }
+          .title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #374151;
+            margin: 0 0 0.5rem 0;
+          }
+          .subtitle {
+            font-size: 1.5rem;
+            color: #10b981;
+            margin: 0 0 0.5rem 0;
+            font-weight: 600;
+          }
+          .date {
+            font-size: 1.25rem;
+            color: #6b7280;
+            margin: 0;
+          }
+          .overview-section {
+            background: #f9fafb;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+            margin-bottom: 1.5rem;
+          }
+          .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #374151;
+            margin: 0 0 0.75rem 0;
+          }
+          .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+          }
+          .overview-item {
+            text-align: center;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+          }
+          .overview-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #10b981;
+            margin-bottom: 0.5rem;
+          }
+          .overview-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            font-weight: 500;
+          }
+          .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+          }
+          .content-section {
+            background: #f9fafb;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+          }
+          .stats-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+          }
+          .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+          }
+          .stat-label {
+            color: #6b7280;
+            font-weight: 500;
+          }
+          .stat-value {
+            font-weight: 600;
+            font-size: 1rem;
+          }
+          .not-started { color: #6b7280; }
+          .in-progress { color: #3b82f6; }
+          .completed { color: #10b981; }
+          .urgent { color: #dc2626; }
+          .warning { color: #f59e0b; }
+          .normal { color: #10b981; }
+        </style>
+      </head>
+      <body>
+        <div class="report-container">
+          <div class="header">
+            <h1 class="title">👥 グループ進捗資料</h1>
+            <p class="subtitle">${this.selectedGroup.name}</p>
+            <p class="date">${this.getCurrentDate()}</p>
+          </div>
+          
+          <div class="overview-section">
+            <h3 class="section-title">📊 グループ概要</h3>
+            <div class="overview-grid">
+              <div class="overview-item">
+                <div class="overview-value">${this.actualMemberCount}</div>
+                <div class="overview-label">メンバー数</div>
+              </div>
+              <div class="overview-item">
+                <div class="overview-value">${this.groupTasks.length}</div>
+                <div class="overview-label">総タスク数</div>
+              </div>
+              <div class="overview-item">
+                <div class="overview-value">${this.completedTasks.length}</div>
+                <div class="overview-label">完了済み</div>
+              </div>
+              <div class="overview-item">
+                <div class="overview-value">${this.getProgressPercentage()}%</div>
+                <div class="overview-label">進捗率</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="content-grid">
+            <div class="content-section">
+              <h3 class="section-title">📋 タスク状況</h3>
+              <div class="stats-list">
+                <div class="stat-item">
+                  <span class="stat-label">未着手:</span>
+                  <span class="stat-value not-started">${this.getTaskCountByStatus('not_started')}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">進行中:</span>
+                  <span class="stat-value in-progress">${this.getTaskCountByStatus('in_progress')}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">完了:</span>
+                  <span class="stat-value completed">${this.getTaskCountByStatus('completed')}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="content-section">
+              <h3 class="section-title">⏰ 期限管理</h3>
+              <div class="stats-list">
+                <div class="stat-item">
+                  <span class="stat-label">本日:</span>
+                  <span class="stat-value urgent">${this.getUrgentTasks().length}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">3日以内:</span>
+                  <span class="stat-value warning">${this.getWarningTasks().length}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">3日以降:</span>
+                  <span class="stat-value normal">${this.getNormalTasks().length}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
   }
 
   goBack() {

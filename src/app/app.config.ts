@@ -1,4 +1,4 @@
-import { ApplicationConfig } from '@angular/core';
+import { ApplicationConfig, importProvidersFrom } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { provideClientHydration } from '@angular/platform-browser';
@@ -9,6 +9,7 @@ import { getFirestore, provideFirestore } from '@angular/fire/firestore';
 import { getStorage, provideStorage } from '@angular/fire/storage';
 import { getFunctions, provideFunctions } from '@angular/fire/functions';
 import { environment } from '../environments/environment';
+import { Compiler } from '@angular/core';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -20,5 +21,6 @@ export const appConfig: ApplicationConfig = {
     provideFirestore(() => getFirestore()),
     provideStorage(() => getStorage()),
     provideFunctions(() => getFunctions()),
+    Compiler,
   ]
 };
