@@ -19,9 +19,6 @@ import { takeUntil } from 'rxjs/operators';
           <button class="back-btn" (click)="goBack()">← 戻る</button>
           <h1>📄 資料作成</h1>
         </div>
-        <div class="header-right">
-          <span class="user-info">{{ getUserDisplayName() }}</span>
-        </div>
       </header>
 
       <!-- メインコンテンツ -->
@@ -112,10 +109,6 @@ import { takeUntil } from 'rxjs/operators';
       margin: 0;
     }
 
-    .user-info {
-      font-weight: 600;
-      color: #4b5563;
-    }
 
     .main-content {
       max-width: 1200px;
@@ -306,11 +299,6 @@ export class DocumentsPage implements OnInit, OnDestroy {
     }
   }
 
-  getUserDisplayName(): string {
-    const currentUser = this.authService.currentUser;
-    if (!currentUser) return '';
-    return currentUser.displayName || currentUser.email || 'ユーザー';
-  }
 
   createMorningReport() {
     this.router.navigate(['/documents/morning-report']);

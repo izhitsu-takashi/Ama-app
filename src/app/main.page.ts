@@ -1902,8 +1902,9 @@ export class MainPage implements OnInit, OnDestroy {
         query(collection(this.firestore, 'tasks'), where('groupId', 'in', targetIds)),
         { idField: 'id' }
       ).subscribe((tasks: any[]) => {
+        const currentUserId = this.currentUser?.id;
         const dueEvents: CalendarEvent[] = (tasks || [])
-          .filter(t => t.dueDate)
+          .filter(t => t.dueDate && t.assigneeId === currentUserId && t.status !== 'completed') // 自分が担当者で未完了の課題のみ
           .map(t => ({
             id: 'task_' + t.id,
             userId: this.currentUser!.id,
