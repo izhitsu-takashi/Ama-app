@@ -12,6 +12,8 @@ import { AnnouncementService } from './announcement.service';
 import { Group, TaskItem, GroupMembership, JoinRequest, Announcement } from './models';
 import { Observable, Subject, combineLatest, of } from 'rxjs';
 import { takeUntil, map, switchMap, take } from 'rxjs/operators';
+import { collection, getDocs, query, where, deleteDoc } from 'firebase/firestore';
+import { Firestore } from '@angular/fire/firestore';
 
 @Component({
   selector: 'app-group-detail',
@@ -117,8 +119,8 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
               <button 
                 *ngIf="isGroupOwner" 
                 class="btn btn-invite-header" 
-                (click)="copyInviteLink()"
-                title="招待リンクをコピー"
+                (click)="openInviteModal()"
+                title="ユーザーを招待"
               >
                 招待
               </button>
@@ -134,7 +136,7 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                   </div>
                   <div class="member-details">
                     <h4 class="member-name">{{ getMemberDisplayName(member.userId, member.userName, member.userEmail) }}</h4>
-                    <p class="member-email">{{ member.userEmail }}</p>
+                    <p class="member-email">{{ getMemberEmail(member.userId, member.userEmail) }}</p>
                     <span class="member-role" [class]="member.role">
                       {{ getRoleLabel(member.role) }}
                     </span>
@@ -142,6 +144,14 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
                 </div>
                 <div class="member-meta">
                   <span class="join-date">参加日: {{ formatDate(member.joinedAt) }}</span>
+                  <button 
+                    *ngIf="member.userId === getCurrentUserId() && !isGroupOwner" 
+                    class="btn btn-danger btn-sm" 
+                    (click)="leaveGroup()"
+                    style="margin-left: 0.5rem; background: #ef4444; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;"
+                  >
+                    退会
+                  </button>
                 </div>
               </div>
             </div>
@@ -662,6 +672,48 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
             </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- 招待モーダル -->
+    <div class="modal-overlay" *ngIf="showInviteModal">
+      <div class="modal invite-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2 class="modal-title">ユーザーを招待</h2>
+          <button class="modal-close" (click)="closeInviteModal()">×</button>
+        </div>
+        <div class="modal-form">
+          <div class="search-section">
+            <div class="search-input-group">
+              <input
+                type="text"
+                [(ngModel)]="inviteSearchTerm"
+                (input)="searchUsersForInvite()"
+                placeholder="ユーザー名またはメールで検索..."
+                class="search-input"
+              >
+              <button class="search-btn" (click)="searchUsersForInvite()">🔍</button>
+            </div>
+          </div>
+
+          <div *ngIf="inviteLoading" class="empty-state">検索中...</div>
+          <div *ngIf="!inviteLoading && inviteSearchResults.length === 0 && inviteSearchTerm">対象のユーザーが見つかりません</div>
+
+          <div class="members-list" *ngIf="inviteSearchResults.length > 0">
+            <div class="member-item" *ngFor="let u of inviteSearchResults">
+              <div class="member-info">
+                <div class="member-avatar"><span class="avatar-text">{{ (u.displayName || u.email).slice(0,1) }}</span></div>
+                <div class="member-details">
+                  <h4 class="member-name">{{ u.displayName || u.email }}</h4>
+                  <p class="member-email">{{ u.email }}</p>
+                </div>
+              </div>
+              <div class="member-meta">
+                <button class="btn" (click)="sendInviteToUser(u.id, u.displayName, u.email)">招待を送信</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   `,
@@ -2176,6 +2228,47 @@ import { takeUntil, map, switchMap, take } from 'rxjs/operators';
       border-radius: 10px;
       margin-left: 8px;
     }
+
+    .invite-modal .search-section {
+      background: rgba(255,255,255,0.95);
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      margin-bottom: 0.75rem;
+    }
+    .invite-modal .search-input-group {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .invite-modal .search-input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      transition: all .2s ease;
+    }
+    .invite-modal .search-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    .invite-modal .search-btn {
+      background: linear-gradient(135deg, #667eea 0%, #5a67d8 100%);
+      color: #fff;
+      border: none;
+      padding: 0.65rem 1rem;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s ease;
+      min-width: 48px;
+    }
+    .invite-modal .search-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
   `]
 })
 export class GroupDetailPage implements OnInit, OnDestroy {
@@ -2190,6 +2283,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   private notificationService = inject(NotificationService);
   private announcementService = inject(AnnouncementService);
   private cd = inject(ChangeDetectorRef);
+  private firestore = inject(Firestore);
 
   private destroy$ = new Subject<void>();
 
@@ -2197,6 +2291,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   members$: Observable<GroupMembership[]> = of([]);
   members: GroupMembership[] = []; // メンバー情報をキャッシュ
   memberNameById: { [userId: string]: string } = {}; // ユーザー名キャッシュ
+  memberEmailById: { [userId: string]: string } = {}; // メールアドレスキャッシュ
   tasks$: Observable<TaskItem[]> = of([]);
   filteredTasks: TaskItem[] = [];
   showTimeline = false;
@@ -2243,7 +2338,10 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   tooltipTaskId = '';
   tooltipPosition = { x: 0, y: 0 };
 
-
+  showInviteModal = false;
+  inviteSearchTerm = '';
+  inviteSearchResults: { id: string, displayName: string, email: string }[] = [];
+  inviteLoading = false;
 
   taskForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(2)]],
@@ -2325,6 +2423,12 @@ export class GroupDetailPage implements OnInit, OnDestroy {
               if (profile?.displayName) {
                 this.memberNameById[uid] = profile.displayName;
                 hasUpdates = true;
+              }
+              
+              // メールアドレスも取得
+              if (profile?.email) {
+                this.memberEmailById[uid] = profile.email;
+                hasUpdates = true;
               } else {
                 // displayNameが取得できない場合は、メンバーシップの情報から推測
                 const member = members.find(m => m.userId === uid);
@@ -2332,6 +2436,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
                   // メールアドレスから名前を抽出してdisplayNameとして保存
                   const emailName = member.userEmail.split('@')[0];
                   this.memberNameById[uid] = emailName;
+                  this.memberEmailById[uid] = member.userEmail;
                   // Firestoreのプロファイルも更新
                   await this.userService.updateUserProfile(uid, { displayName: emailName });
                   hasUpdates = true;
@@ -3204,6 +3309,130 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       alert('アナウンスの投稿に失敗しました。');
     } finally {
       this.creatingAnnouncement = false;
+    }
+  }
+
+  openInviteModal() {
+    this.showInviteModal = true;
+    this.inviteSearchTerm = '';
+    this.inviteSearchResults = [];
+  }
+
+  closeInviteModal() {
+    this.showInviteModal = false;
+  }
+
+  async searchUsersForInvite() {
+    const term = (this.inviteSearchTerm || '').trim().toLowerCase();
+    if (!term) {
+      this.inviteSearchResults = [];
+      return;
+    }
+    this.inviteLoading = true;
+    try {
+      // 簡易検索: users コレクション全体を取得してクライアント側フィルタ（小規模想定）
+      // 大規模化する場合は Cloud Functions 経由の検索APIへ変更
+      const usersSnap = await getDocs(collection(this.firestore, 'users'));
+      const results: { id: string, displayName: string, email: string }[] = [];
+      usersSnap.forEach(docSnap => {
+        const data: any = docSnap.data();
+        const name = (data.displayName || '').toLowerCase();
+        const email = (data.email || '').toLowerCase();
+        if (name.includes(term) || email.includes(term)) {
+          results.push({ id: docSnap.id, displayName: data.displayName || email, email: data.email || '' });
+        }
+      });
+      // 既に参加済みのユーザーは除外（members$の最新値があれば使用）
+      let memberIds: string[] = [];
+      try {
+        const membersSnap = await getDocs(collection(this.firestore, 'groupMemberships'));
+        memberIds = membersSnap.docs
+          .map(d => d.data() as any)
+          .filter(m => m.groupId === this.group?.id)
+          .map(m => m.userId);
+      } catch {}
+      this.inviteSearchResults = results.filter(u => !memberIds.includes(u.id)).slice(0, 20);
+    } catch (e) {
+      console.error('invite search error', e);
+      this.inviteSearchResults = [];
+    } finally {
+      this.inviteLoading = false;
+    }
+  }
+
+  async sendInviteToUser(userId: string, displayName: string, email: string) {
+    if (!this.group || !this.isGroupOwner) return;
+    try {
+      // 通知レコードを作成（pushはFunctions側が拾って送信）
+      await this.notificationService.createGroupNotification(
+        'group_invite' as any,
+        this.group.id,
+        this.group.name,
+        userId,
+        { inviterName: (this.auth.currentUser && ((this as any).memberNameById?.[this.auth.currentUser.uid] || this.auth.currentUser.displayName || this.auth.currentUser.email?.split('@')[0])) || 'ユーザー' }
+      );
+      alert(`${displayName || email} さんに招待を送信しました`);
+    } catch (e) {
+      console.error('send invite error', e);
+      alert('招待の送信に失敗しました');
+    }
+  }
+
+  getCurrentUserId(): string {
+    return this.auth.currentUser?.uid || '';
+  }
+
+  getMemberEmail(userId: string, userEmail?: string): string {
+    // キャッシュされたメールアドレスを確認
+    if (this.memberEmailById && this.memberEmailById[userId]) {
+      return this.memberEmailById[userId];
+    }
+    
+    // 既存のuserEmailがある場合はそれを使用
+    if (userEmail && userEmail !== 'owner@example.com') {
+      return userEmail;
+    }
+    
+    // 非同期でメールアドレスを取得
+    this.loadUserEmail(userId);
+    return 'メールアドレス未設定';
+  }
+
+  async loadUserEmail(userId: string): Promise<void> {
+    try {
+      const profile = await this.userService.getUserProfile(userId);
+      if (profile?.email) {
+        this.memberEmailById[userId] = profile.email;
+        this.cd.detectChanges();
+      }
+    } catch (error) {
+      console.error('メールアドレス取得エラー:', userId, error);
+    }
+  }
+
+  async leaveGroup() {
+    if (!this.group || !this.auth.currentUser) return;
+    
+    const confirmed = confirm('本当にこのグループから退会しますか？');
+    if (!confirmed) return;
+    
+    try {
+      // groupMembershipsから自分のレコードを削除
+      const membershipQuery = query(
+        collection(this.firestore, 'groupMemberships'),
+        where('groupId', '==', this.group.id),
+        where('userId', '==', this.auth.currentUser.uid)
+      );
+      
+      const membershipSnapshot = await getDocs(membershipQuery);
+      const deletePromises = membershipSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+      
+      alert('グループから退会しました');
+      this.router.navigate(['/main']);
+    } catch (e) {
+      console.error('leave group error', e);
+      alert('退会に失敗しました');
     }
   }
 }

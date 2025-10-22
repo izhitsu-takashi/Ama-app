@@ -12,7 +12,7 @@ import { TodoService } from './todo.service';
 import { User, Group, TaskItem, Notification, CalendarEvent, TodoItem } from './models';
 import { Observable, Subscription, combineLatest, of, Subject } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
-import { Firestore, collection, addDoc, serverTimestamp, query, where, collectionData, updateDoc, doc, deleteDoc } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, serverTimestamp, query, where, collectionData, updateDoc, doc, deleteDoc, getDocs } from '@angular/fire/firestore';
 import { map, switchMap, take, takeUntil, startWith } from 'rxjs/operators';
 import { DesktopNotificationService } from './desktop-notification.service';
 import { FcmService } from './fcm.service';
@@ -191,6 +191,18 @@ import { FcmService } from './fcm.service';
                 <h2>👥 グループ</h2>
               </div>
               <div class="groups-container">
+                <!-- 招待一覧 -->
+                <div *ngIf="pendingInvites.length > 0" class="invite-list" style="margin-bottom: 0.75rem; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff7ed;">
+                  <div *ngFor="let inv of pendingInvites" class="invite-item" style="display:flex; justify-content:space-between; align-items:center; padding: 0.5rem 0; gap: 0.5rem;">
+                    <div>
+                      <strong>{{ inv.groupName }}</strong> への招待
+                    </div>
+                    <div style="display:flex; gap:0.5rem;">
+                      <button class="btn" (click)="acceptInvite(inv.id, inv.groupId)" style="background:#10b981; color:#fff; border:none; padding:0.35rem 0.75rem; border-radius:8px;">参加</button>
+                      <button class="btn" (click)="declineInvite(inv.id)" style="background:#ef4444; color:#fff; border:none; padding:0.35rem 0.75rem; border-radius:8px;">拒否</button>
+                    </div>
+                  </div>
+                </div>
                 <div class="groups-list" *ngIf="userGroups$ | async as groups; else noGroups">
                   <a class="group-item" 
                      *ngFor="let group of groups" 
@@ -1631,6 +1643,7 @@ export class MainPage implements OnInit, OnDestroy {
     end: ['', [Validators.required]],
     color: ['#3b82f6']
   });
+  pendingInvites: { id: string; groupId: string; groupName: string }[] = [];
 
   ngOnInit() {
     this.loadUserData();
@@ -1831,21 +1844,72 @@ export class MainPage implements OnInit, OnDestroy {
       // 通常の通知のみを取得（🔔バッジ用）
       const regularNotifications$ = this.notificationService.getUnreadCount(this.currentUser.id);
       const unreadMessages$ = this.messageService.getUnreadCount();
-      
-      const sub = combineLatest([regularNotifications$, unreadMessages$]).subscribe({
-        next: ([regularCount, unreadMessageCount]) => {
-          // 🔔通知バッジには通常の通知のみ
+      const invites$ = this.notificationService.getUserNotifications(this.currentUser.id, 100);
+      const sub = combineLatest([regularNotifications$, unreadMessages$, invites$]).subscribe({
+        next: ([regularCount, unreadMessageCount, notifications]) => {
           this.unreadNotifications = regularCount;
-          // 未読メッセージ数は点滅表示用
           this.unreadMessageCount = unreadMessageCount;
+          this.pendingInvites = (notifications || [])
+            .filter(n => n.type === 'group_invite' && !n.isRead)
+            .map(n => ({ id: n.id!, groupId: (n.data as any)?.groupId, groupName: (n.data as any)?.groupName || 'グループ' }));
         },
         error: (error) => {
           console.error('Error loading notifications:', error);
           this.unreadNotifications = 0;
           this.unreadMessageCount = 0;
+          this.pendingInvites = [];
         }
       });
-      this.subscriptions.push(sub);
+      this.subscriptions.push(sub as any);
+    } else {
+      this.unreadNotifications = 0;
+      this.pendingInvites = [];
+    }
+  }
+
+  async acceptInvite(inviteId: string, groupId: string) {
+    if (!this.currentUser) return;
+    try {
+      // 既に参加済みかチェック
+      const existingMembership = await getDocs(query(
+        collection(this.firestore, 'groupMemberships'),
+        where('groupId', '==', groupId),
+        where('userId', '==', this.currentUser.id)
+      ));
+      
+      if (existingMembership.empty) {
+        // 参加
+        await addDoc(collection(this.firestore, 'groupMemberships'), {
+          groupId,
+          userId: this.currentUser.id,
+          joinedAt: new Date()
+        } as any);
+      }
+      
+      // 通知を既読/削除
+      await this.notificationService.markAsRead(inviteId);
+      
+      // UIから即座に削除
+      this.pendingInvites = this.pendingInvites.filter(i => i.id !== inviteId);
+      
+      // 通知リストを再読み込み
+      this.loadNotifications();
+    } catch (e) {
+      console.error('accept invite error', e);
+    }
+  }
+
+  async declineInvite(inviteId: string) {
+    try {
+      await this.notificationService.markAsRead(inviteId);
+      
+      // UIから即座に削除
+      this.pendingInvites = this.pendingInvites.filter(i => i.id !== inviteId);
+      
+      // 通知リストを再読み込み
+      this.loadNotifications();
+    } catch (e) {
+      console.error('decline invite error', e);
     }
   }
 

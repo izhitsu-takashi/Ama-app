@@ -141,6 +141,7 @@ export class NotificationService {
       message: content,
       data: {
         groupId,
+        groupName,
         ...additionalData
       }
     });
@@ -311,7 +312,7 @@ export class NotificationService {
   private getGroupNotificationTitle(type: string, groupName: string): string {
     switch (type) {
       case 'group_invite':
-        return 'グループへの招待';
+        return `「${groupName}」への招待`;
       default:
         return 'グループに関する通知';
     }
