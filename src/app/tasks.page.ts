@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from './auth.service';
 import { GroupService } from './group.service';
 import { TaskService } from './task.service';
+import { UserService } from './user.service';
 import { Group, TaskItem } from './models';
 import { Observable, Subscription, combineLatest, of, Subject } from 'rxjs';
 import { map, takeUntil } from 'rxjs/operators';
@@ -457,6 +458,7 @@ export class TasksPage implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private groupService = inject(GroupService);
   private taskService = inject(TaskService);
+  private userService = inject(UserService);
   private router = inject(Router);
   private destroy$ = new Subject<void>();
 
@@ -464,6 +466,7 @@ export class TasksPage implements OnInit, OnDestroy {
   userGroups: Group[] = [];
   allTasks: TaskItem[] = [];
   filteredTasks: TaskItem[] = [];
+  userCache: { [userId: string]: string } = {};
   
   // フィルター
   selectedGroupId = '';
@@ -511,7 +514,29 @@ export class TasksPage implements OnInit, OnDestroy {
       takeUntil(this.destroy$)
     ).subscribe(taskArrays => {
       this.allTasks = taskArrays.flat();
+      this.loadUserNames();
       this.filterTasks();
+    });
+  }
+
+  private loadUserNames() {
+    // 全てのタスクからユニークなassigneeIdを取得
+    const assigneeIds = [...new Set(this.allTasks
+      .map(task => task.assigneeId)
+      .filter(id => id && typeof id === 'string'))];
+
+    // 各ユーザーの情報を非同期で取得
+    assigneeIds.forEach(assigneeId => {
+      if (assigneeId) {
+        this.userService.getUserProfile(assigneeId).then(user => {
+          if (user) {
+            this.userCache[assigneeId] = user.displayName || 'Unknown User';
+          }
+        }).catch(error => {
+          console.error('ユーザー情報取得エラー:', error);
+          this.userCache[assigneeId] = 'Unknown User';
+        });
+      }
     });
   }
 
@@ -565,9 +590,25 @@ export class TasksPage implements OnInit, OnDestroy {
     return group?.name || '不明なグループ';
   }
 
-  getAssigneeName(assigneeId: string): string {
-    // 簡易実装 - 実際にはUserServiceから取得
-    return 'ユーザー';
+  getAssigneeName(assigneeId: string | undefined): string {
+    if (!assigneeId) return '未割り当て';
+    
+    // キャッシュから取得
+    if (this.userCache[assigneeId]) {
+      return this.userCache[assigneeId];
+    }
+    
+    // キャッシュにない場合は非同期で取得
+    this.userService.getUserProfile(assigneeId).then(user => {
+      if (user) {
+        this.userCache[assigneeId] = user.displayName || 'Unknown User';
+      }
+    }).catch(error => {
+      console.error('ユーザー情報取得エラー:', error);
+      this.userCache[assigneeId] = 'Unknown User';
+    });
+    
+    return '読み込み中...';
   }
 
   formatDate(date: any): string {
