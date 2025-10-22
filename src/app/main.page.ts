@@ -648,13 +648,13 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       height: 100%;
       display: flex;
       flex-direction: column;
-      max-height: 450px; /* 13.3インチ用に調整 */
+      max-height: 425px; /* 枠の高さを425pxに変更 */
     }
 
     .todo-list {
       flex: 1;
       overflow-y: auto;
-      max-height: 375px; /* 13.3インチ用に調整 */
+      max-height: 355px; /* 425pxの枠に合わせて調整 */
     }
 
     .todo-list::-webkit-scrollbar {
@@ -784,7 +784,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      max-height: 500px; /* カレンダーが見切れないように調整 */
+      max-height: 425px; /* 枠の高さを425pxに変更 */
     }
 
     .today-info {
@@ -985,7 +985,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .day-number {
-      font-size: 0.5rem; /* カレンダーが見切れないようにさらに調整 */
+      font-size: 0.75rem; /* 日付の数字を大きく調整 */
       font-weight: 500;
       color: #2d3748;
     }
@@ -998,8 +998,8 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .event-dot {
-      width: 0.1875rem; /* カレンダーが見切れないようにさらに調整 */
-      height: 0.1875rem; /* カレンダーが見切れないようにさらに調整 */
+      width: 0.25rem; /* 予定マークを大きく調整 */
+      height: 0.25rem; /* 予定マークを大きく調整 */
       border-radius: 50%;
     }
 
@@ -1254,7 +1254,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       flex: 1;
       overflow-y: auto;
       padding-right: 0.5rem;
-      max-height: 500px; /* ヘッダー分を除いた高さ制限 */
+      max-height: 355px; /* 425pxの枠に合わせて調整 */
     }
 
     .groups-container::-webkit-scrollbar,
@@ -1291,13 +1291,13 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       .todo-section,
       .calendar-section,
       .right-section {
-        max-height: 500px; /* 中画面での高さ調整 */
+        max-height: 425px; /* 中画面での高さ調整 */
       }
       
       .todo-list,
       .groups-container,
       .tasks-container {
-        max-height: 400px; /* 中画面でのスクロール領域調整 */
+        max-height: 355px; /* 中画面でのスクロール領域調整 */
       }
     }
 
@@ -1332,19 +1332,19 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       }
 
       .day-number {
-        font-size: 0.75rem;
+        font-size: 0.875rem; /* モバイルでも日付を大きく調整 */
       }
       
       .todo-section,
       .calendar-section,
       .right-section {
-        max-height: 400px; /* モバイルでの高さ調整 */
+        max-height: 425px; /* モバイルでの高さ調整 */
       }
       
       .todo-list,
       .groups-container,
       .tasks-container {
-        max-height: 300px; /* モバイルでのスクロール領域調整 */
+        max-height: 355px; /* モバイルでのスクロール領域調整 */
       }
     }
 
