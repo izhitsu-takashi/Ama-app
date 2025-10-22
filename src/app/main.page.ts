@@ -139,9 +139,6 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
           <div class="calendar-section">
             <div class="section-header">
               <h2>📅 カレンダー</h2>
-              <div class="calendar-actions">
-                <button class="add-event-btn" (click)="showCreateEventModal()">予定を作成</button>
-              </div>
             </div>
             
             <!-- 今日の情報 -->
@@ -189,8 +186,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             <!-- 参加しているグループ -->
             <div class="groups-section">
               <div class="section-header">
-                <h2>👥 参加しているグループ</h2>
-                <button class="view-all-btn" routerLink="/groups">すべて表示</button>
+                <h2>👥 グループ</h2>
               </div>
               <div class="groups-container">
                 <div class="groups-list" *ngIf="userGroups$ | async as groups; else noGroups">
@@ -204,11 +200,6 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
                       <div class="group-stats">
                         <span class="member-count">👥 {{ getGroupMemberCount(group.id) }}人</span>
                       </div>
-                    </div>
-                    <div class="group-actions">
-                      <button class="action-btn small" (click)="openGroup(group); $event.stopPropagation()">
-                        開く
-                      </button>
                     </div>
                   </a>
                 </div>
@@ -364,6 +355,10 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     </div>
   `,
   styles: [`
+    :host {
+      font-size: 0.75rem; /* 13.3インチ用にスケーリング（27インチ基準の75%） */
+    }
+
     .main-container {
       min-height: 100vh;
       background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -373,7 +368,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .header {
       background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(10px);
-      padding: 1rem 2rem;
+      padding: 0.75rem 1.5rem; /* 13.3インチ用に調整 */
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -383,7 +378,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
 
     .app-title {
       margin: 0;
-      font-size: 1.5rem;
+      font-size: 1.125rem; /* 13.3インチ用に調整 */
       font-weight: 700;
       display: flex;
       flex-direction: column;
@@ -391,7 +386,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .title-main {
-      font-size: 2.2rem;
+      font-size: 1.65rem; /* 13.3インチ用に調整 */
       font-weight: 900;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%);
       background-size: 300% 300%;
@@ -404,7 +399,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .title-sub {
-      font-size: 0.9rem;
+      font-size: 0.675rem; /* 13.3インチ用に調整 */
       font-weight: 500;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       -webkit-background-clip: text;
@@ -503,8 +498,8 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .user-avatar {
-      width: 40px;
-      height: 40px;
+      width: 30px; /* 13.3インチ用に調整 */
+      height: 30px; /* 13.3インチ用に調整 */
       border-radius: 50%;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       display: flex;
@@ -522,7 +517,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .avatar-icon {
-      font-size: 20px;
+      font-size: 15px; /* 13.3インチ用に調整 */
       color: white;
     }
 
@@ -542,10 +537,10 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       background: #e53e3e;
       color: white;
       border: none;
-      padding: 0.5rem 1rem;
+      padding: 0.375rem 0.75rem; /* 13.3インチ用に調整 */
       border-radius: 0.375rem;
       cursor: pointer;
-      font-size: 0.875rem;
+      font-size: 0.656rem; /* 13.3インチ用に調整 */
       transition: background-color 0.2s;
     }
 
@@ -554,26 +549,26 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .main-content {
-      padding: 2rem;
-      max-width: 1400px;
+      padding: 1.5rem; /* 13.3インチ用に調整 */
+      max-width: 1050px; /* 13.3インチ用に調整 */
       margin: 0 auto;
     }
 
     .action-buttons {
       display: flex;
-      gap: 1rem;
-      margin-bottom: 2rem;
+      gap: 0.75rem; /* 13.3インチ用に調整 */
+      margin-bottom: 1.5rem; /* 13.3インチ用に調整 */
       flex-wrap: wrap;
     }
 
     .action-btn {
-      padding: 0.75rem 1.5rem;
+      padding: 0.5625rem 1.125rem; /* 13.3インチ用に調整 */
       border: none;
       border-radius: 0.5rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
-      font-size: 1rem;
+      font-size: 0.75rem; /* 13.3インチ用に調整 */
     }
 
     .action-btn.primary {
@@ -640,26 +635,26 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .content-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-      max-height: calc(100vh - 200px);
+      gap: 1.125rem; /* 13.3インチ用に調整 */
+      margin-bottom: 1.5rem; /* 13.3インチ用に調整 */
+      max-height: calc(100vh - 150px); /* 13.3インチ用に調整 */
     }
 
     .todo-section {
       background: white;
       border-radius: 1rem;
-      padding: 1.5rem;
+      padding: 1.125rem; /* 13.3インチ用に調整 */
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       height: 100%;
       display: flex;
       flex-direction: column;
-      max-height: 600px; /* カレンダーの高さに合わせて制限 */
+      max-height: 450px; /* 13.3インチ用に調整 */
     }
 
     .todo-list {
       flex: 1;
       overflow-y: auto;
-      max-height: 500px; /* ヘッダー分を除いた高さ */
+      max-height: 375px; /* 13.3インチ用に調整 */
     }
 
     .todo-list::-webkit-scrollbar {
@@ -783,21 +778,21 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .calendar-section, .right-section {
       background: white;
       border-radius: 1rem;
-      padding: 1.5rem;
+      padding: 1.125rem; /* 13.3インチ用に調整 */
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       height: 100%;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      max-height: 600px; /* カレンダーの高さに合わせて制限 */
+      max-height: 500px; /* カレンダーが見切れないように調整 */
     }
 
     .today-info {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 1rem;
+      padding: 0.75rem; /* 13.3インチ用に調整 */
       border-radius: 8px;
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem; /* 13.3インチ用に調整 */
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -810,18 +805,18 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .today-date {
-      font-size: 1.2rem;
+      font-size: 0.9rem; /* 13.3インチ用に調整 */
       font-weight: 600;
       margin-bottom: 0.25rem;
     }
 
     .today-time {
-      font-size: 1.5rem;
+      font-size: 1.125rem; /* 13.3インチ用に調整 */
       font-weight: 700;
     }
 
     .today-day {
-      font-size: 1rem;
+      font-size: 0.75rem; /* 13.3インチ用に調整 */
       font-weight: 500;
       text-align: right;
     }
@@ -838,14 +833,14 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1.5rem;
-      padding-bottom: 0.75rem;
+      margin-bottom: 1.125rem; /* 13.3インチ用に調整 */
+      padding-bottom: 0.5625rem; /* 13.3インチ用に調整 */
     }
 
     .section-header h2 {
       margin: 0;
       color: #2d3748;
-      font-size: 1.25rem;
+      font-size: 0.9375rem; /* 13.3インチ用に調整 */
       font-weight: 600;
     }
 
@@ -860,9 +855,9 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       color: white;
       border: none;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 1.2rem;
+      width: 30px; /* 13.3インチ用に調整 */
+      height: 30px; /* 13.3インチ用に調整 */
+      font-size: 0.9rem; /* 13.3インチ用に調整 */
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -910,8 +905,8 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .calendar-container {
       background: #f7fafc;
       border-radius: 0.75rem;
-      padding: 1rem;
-      max-height: 500px; /* カレンダーの高さ制限 */
+      padding: 0.5rem; /* カレンダーが見切れないように調整 */
+      max-height: 400px; /* カレンダーが見切れないように調整 */
       overflow: hidden;
     }
 
@@ -919,28 +914,28 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem; /* 13.3インチ用に調整 */
     }
 
     .calendar-header h3 {
       margin: 0;
       color: #2d3748;
-      font-size: 1.125rem;
+      font-size: 0.84375rem; /* 13.3インチ用に調整 */
     }
 
     .nav-btn {
       background: none;
       border: none;
-      font-size: 1.5rem;
+      font-size: 1.125rem; /* 13.3インチ用に調整 */
       cursor: pointer;
       color: #4a5568;
-      padding: 0.25rem;
+      padding: 0.1875rem; /* 13.3インチ用に調整 */
     }
 
     .calendar-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      gap: 0.25rem;
+      gap: 0.0625rem; /* カレンダーが見切れないようにさらに調整 */
       flex: 1;
       overflow: hidden;
     }
@@ -951,8 +946,8 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding: 0.25rem;
-      border-radius: 0.375rem;
+      padding: 0.0625rem; /* カレンダーが見切れないようにさらに調整 */
+      border-radius: 0.25rem; /* 角丸を小さく */
       cursor: pointer;
       transition: background-color 0.2s;
       position: relative;
@@ -990,7 +985,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .day-number {
-      font-size: 0.875rem;
+      font-size: 0.5rem; /* カレンダーが見切れないようにさらに調整 */
       font-weight: 500;
       color: #2d3748;
     }
@@ -1003,8 +998,8 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .event-dot {
-      width: 0.375rem;
-      height: 0.375rem;
+      width: 0.1875rem; /* カレンダーが見切れないようにさらに調整 */
+      height: 0.1875rem; /* カレンダーが見切れないようにさらに調整 */
       border-radius: 50%;
     }
 
@@ -1084,6 +1079,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       display: flex;
       align-items: center;
       justify-content: space-between;
+      text-decoration: none; /* 下線を削除 */
     }
 
     .group-item:hover, .task-item:hover {
@@ -1126,7 +1122,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .group-name, .task-title {
       margin: 0 0 0.5rem 0;
       color: #2d3748;
-      font-size: 1rem;
+      font-size: 0.875rem; /* 文字サイズを少し大きく */
       font-weight: 600;
     }
 
@@ -1139,7 +1135,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     .group-stats {
       display: flex;
       gap: 1rem;
-      font-size: 0.75rem;
+      font-size: 0.6875rem; /* 文字サイズを少し大きく */
       color: #718096;
     }
 
