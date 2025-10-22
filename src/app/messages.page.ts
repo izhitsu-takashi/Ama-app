@@ -924,7 +924,20 @@ export class MessagesPage implements OnInit, OnDestroy {
   getThreadTitle(thread: MessageThread): string {
     const currentUserId = this.getCurrentUserId();
     const otherParticipantIndex = thread.participants.findIndex(id => id !== currentUserId);
-    return thread.participantNames[otherParticipantIndex] || 'Unknown User';
+    
+    // participantNamesが存在し、正しいインデックスが取得できた場合
+    if (thread.participantNames && thread.participantNames.length > otherParticipantIndex && otherParticipantIndex >= 0) {
+      return thread.participantNames[otherParticipantIndex];
+    }
+    
+    // フォールバック: ユーザー情報をキャッシュから取得
+    if (otherParticipantIndex >= 0) {
+      const otherUserId = thread.participants[otherParticipantIndex];
+      const user = this.allUsers.find(u => u.id === otherUserId);
+      return user?.displayName || 'Unknown User';
+    }
+    
+    return 'Unknown User';
   }
 
   getThreadInitials(thread: MessageThread): string {

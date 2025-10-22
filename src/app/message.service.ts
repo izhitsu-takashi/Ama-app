@@ -174,12 +174,35 @@ export class MessageService {
     );
     
     return from(getDocs(q)).pipe(
-      map(snapshot => {
+      switchMap(snapshot => {
         const threads = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         } as MessageThread));
         
+        // 各スレッドのparticipantNamesを構築
+        const threadPromises = threads.map(async (thread) => {
+          const participantNames: string[] = [];
+          
+          for (const participantId of thread.participants) {
+            try {
+              const user = await this.userService.getUserProfile(participantId);
+              participantNames.push(user?.displayName || 'Unknown User');
+            } catch (error) {
+              console.error('ユーザー情報取得エラー:', error);
+              participantNames.push('Unknown User');
+            }
+          }
+          
+          return {
+            ...thread,
+            participantNames
+          };
+        });
+        
+        return from(Promise.all(threadPromises));
+      }),
+      map(threads => {
         // クライアント側でソート
         return threads.sort((a, b) => {
           const aTime = a.updatedAt?.toDate?.() || new Date(0);
