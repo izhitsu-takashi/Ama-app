@@ -653,11 +653,31 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       height: 100%;
       display: flex;
       flex-direction: column;
+      max-height: 600px; /* カレンダーの高さに合わせて制限 */
     }
 
     .todo-list {
       flex: 1;
       overflow-y: auto;
+      max-height: 500px; /* ヘッダー分を除いた高さ */
+    }
+
+    .todo-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .todo-list::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    .todo-list::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+    }
+
+    .todo-list::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
     }
 
     .empty-todos {
@@ -769,6 +789,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      max-height: 600px; /* カレンダーの高さに合わせて制限 */
     }
 
     .today-info {
@@ -890,6 +911,8 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       background: #f7fafc;
       border-radius: 0.75rem;
       padding: 1rem;
+      max-height: 500px; /* カレンダーの高さ制限 */
+      overflow: hidden;
     }
 
     .calendar-header {
@@ -1235,6 +1258,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       flex: 1;
       overflow-y: auto;
       padding-right: 0.5rem;
+      max-height: 500px; /* ヘッダー分を除いた高さ制限 */
     }
 
     .groups-container::-webkit-scrollbar,
@@ -1266,6 +1290,18 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
       .content-grid {
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
+      }
+      
+      .todo-section,
+      .calendar-section,
+      .right-section {
+        max-height: 500px; /* 中画面での高さ調整 */
+      }
+      
+      .todo-list,
+      .groups-container,
+      .tasks-container {
+        max-height: 400px; /* 中画面でのスクロール領域調整 */
       }
     }
 
@@ -1301,6 +1337,18 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
 
       .day-number {
         font-size: 0.75rem;
+      }
+      
+      .todo-section,
+      .calendar-section,
+      .right-section {
+        max-height: 400px; /* モバイルでの高さ調整 */
+      }
+      
+      .todo-list,
+      .groups-container,
+      .tasks-container {
+        max-height: 300px; /* モバイルでのスクロール領域調整 */
       }
     }
 
