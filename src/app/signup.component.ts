@@ -50,10 +50,20 @@ import { EmailVerificationService } from './email-verification.service';
               class="form-input"
               placeholder="your@email.com"
               [class.error]="form.get('email')?.invalid && form.get('email')?.touched"
+              (blur)="onEmailChange()"
+              (input)="onEmailChange()"
             />
             <div *ngIf="form.get('email')?.invalid && form.get('email')?.touched" class="error-message">
               <span *ngIf="form.get('email')?.errors?.['required']">メールアドレスを入力してください</span>
               <span *ngIf="form.get('email')?.errors?.['email']">正しいメールアドレスを入力してください</span>
+            </div>
+            <div *ngIf="emailChecking" class="checking-message">
+              <span class="checking-icon">⏳</span>
+              メールアドレスを確認中...
+            </div>
+            <div *ngIf="emailExists && !emailChecking" class="error-message">
+              <span class="error-icon">⚠️</span>
+              このメールアドレスは既に使用されています
             </div>
           </div>
 
@@ -284,6 +294,24 @@ import { EmailVerificationService } from './email-verification.service';
       font-size: 14px;
     }
 
+    .checking-message {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    .checking-icon {
+      font-size: 14px;
+      animation: spin 1s linear infinite;
+    }
+
+    .error-icon {
+      font-size: 14px;
+    }
+
 
     .auth-button {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -473,6 +501,9 @@ export class SignupComponent {
     department: ['', [Validators.required]],
   }, { validators: this.passwordMatchValidator });
 
+  emailChecking = false;
+  emailExists = false;
+
   // パスワード一致チェック
   passwordMatchValidator(form: any) {
     const password = form.get('password');
@@ -486,8 +517,26 @@ export class SignupComponent {
     return null;
   }
 
+  // メールアドレスの重複チェック（リアルタイム）
+  async onEmailChange() {
+    const email = this.form.get('email')?.value;
+    if (!email || !this.form.get('email')?.valid) {
+      this.emailExists = false;
+      return;
+    }
+
+    this.emailChecking = true;
+    try {
+      this.emailExists = await this.emailVerification.checkEmailExists(email);
+    } catch (error) {
+      console.error('メールアドレス重複チェックエラー:', error);
+    } finally {
+      this.emailChecking = false;
+    }
+  }
+
   async onSubmit() {
-    if (this.form.invalid) return;
+    if (this.form.invalid || this.emailExists) return;
     this.loading = true;
     this.error = '';
     const { displayName, email, password, department } = this.form.getRawValue();
@@ -506,9 +555,45 @@ export class SignupComponent {
         } 
       });
     } catch (e: any) {
-      this.error = e?.message ?? '認証コードの送信に失敗しました';
+      this.error = this.getErrorMessage(e);
     } finally {
       this.loading = false;
+    }
+  }
+
+  private getErrorMessage(error: any): string {
+    const errorCode = error?.code || error?.message || '';
+    const errorMessage = error?.message || '';
+    
+    // カスタムエラーメッセージのチェック
+    if (errorMessage.includes('このメールアドレスは既に使用されています')) {
+      return 'このメールアドレスは既に使用されています';
+    }
+    
+    switch (errorCode) {
+      case 'auth/email-already-in-use':
+        return 'このメールアドレスは既に使用されています';
+      case 'auth/invalid-email':
+        return 'メールアドレスの形式が正しくありません';
+      case 'auth/weak-password':
+        return 'パスワードが弱すぎます。8文字以上の強力なパスワードを設定してください';
+      case 'auth/operation-not-allowed':
+        return 'この操作は許可されていません';
+      case 'auth/network-request-failed':
+        return 'ネットワークエラーが発生しました。インターネット接続を確認してください';
+      case 'auth/too-many-requests':
+        return 'リクエストが多すぎます。しばらく待ってから再試行してください';
+      case 'auth/user-disabled':
+        return 'このアカウントは無効になっています';
+      case 'auth/invalid-credential':
+        return '認証情報が無効です';
+      case 'auth/requires-recent-login':
+        return 'セキュリティのため、再度ログインしてください';
+      default:
+        if (error?.message) {
+          return error.message;
+        }
+        return 'アカウント作成に失敗しました。入力内容を確認してください';
     }
   }
 }

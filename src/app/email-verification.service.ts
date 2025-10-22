@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Firestore, collection, addDoc, query, where, getDocs, deleteDoc, doc, serverTimestamp, Timestamp } from '@angular/fire/firestore';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from './auth.service';
+import { getAuth, fetchSignInMethodsForEmail, createUserWithEmailAndPassword, deleteUser, updateProfile } from 'firebase/auth';
 
 @Injectable({
   providedIn: 'root'
@@ -16,8 +17,51 @@ export class EmailVerificationService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
+  // メールアドレスの重複チェック（より確実な方法）
+  async checkEmailExists(email: string): Promise<boolean> {
+    try {
+      const auth = getAuth();
+      
+      // まずfetchSignInMethodsForEmailでチェック
+      try {
+        const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+        if (signInMethods.length > 0) {
+          return true;
+        }
+      } catch (error) {
+        // fetchSignInMethodsForEmailが失敗した場合は、実際にユーザー作成を試行
+        console.log('fetchSignInMethodsForEmail failed, trying createUserWithEmailAndPassword');
+      }
+      
+      // 一時的なパスワードでユーザー作成を試行
+      const tempPassword = 'temp_' + Math.random().toString(36).substring(7);
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, tempPassword);
+        // ユーザー作成に成功した場合は、そのユーザーを削除
+        await deleteUser(userCredential.user);
+        return false; // ユーザーが存在しなかった
+      } catch (error: any) {
+        if (error.code === 'auth/email-already-in-use') {
+          return true; // メールアドレスが既に使用されている
+        }
+        // その他のエラーは無視してfalseを返す
+        console.error('ユーザー作成試行エラー:', error);
+        return false;
+      }
+    } catch (error) {
+      console.error('メールアドレス重複チェックエラー:', error);
+      return false;
+    }
+  }
+
   // 認証コードを送信
   async sendVerificationCode(email: string): Promise<string> {
+    // メールアドレスの重複チェック
+    const emailExists = await this.checkEmailExists(email);
+    if (emailExists) {
+      throw new Error('このメールアドレスは既に使用されています');
+    }
+
     const code = this.generateVerificationCode();
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 10); // 10分後に期限切れ
@@ -141,6 +185,35 @@ export class EmailVerificationService {
       console.log('送信先:', email);
       console.log('認証コード:', code);
       console.log('==================');
+    }
+  }
+
+  // ユーザー作成（重複チェック付き）
+  async createUser(email: string, password: string, displayName: string, department: string) {
+    try {
+      // 最終的な重複チェック
+      const emailExists = await this.checkEmailExists(email);
+      if (emailExists) {
+        throw new Error('このメールアドレスは既に使用されています');
+      }
+
+      // ユーザー作成
+      const auth = getAuth();
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // ユーザープロファイルを更新
+      if (userCredential.user) {
+        await updateProfile(userCredential.user, {
+          displayName: displayName
+        });
+      }
+
+      return userCredential;
+    } catch (error: any) {
+      if (error.code === 'auth/email-already-in-use') {
+        throw new Error('このメールアドレスは既に使用されています');
+      }
+      throw error;
     }
   }
 }

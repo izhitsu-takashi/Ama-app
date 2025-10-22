@@ -418,9 +418,42 @@ export class LoginComponent {
       
       await this.router.navigateByUrl('/main');
     } catch (e: any) {
-      this.error = e?.message ?? 'ログインに失敗しました';
+      this.error = this.getErrorMessage(e);
     } finally {
       this.loading = false;
+    }
+  }
+
+  private getErrorMessage(error: any): string {
+    const errorCode = error?.code || error?.message || '';
+    
+    switch (errorCode) {
+      case 'auth/user-not-found':
+        return 'メールアドレスが正しくありません';
+      case 'auth/invalid-email':
+        return 'メールアドレスの形式が正しくありません';
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential':
+        return 'パスワードが間違っています';
+      case 'auth/user-disabled':
+        return 'このアカウントは無効になっています';
+      case 'auth/too-many-requests':
+        return 'ログイン試行回数が多すぎます。しばらく待ってから再試行してください';
+      case 'auth/network-request-failed':
+        return 'ネットワークエラーが発生しました。インターネット接続を確認してください';
+      case 'auth/weak-password':
+        return 'パスワードが弱すぎます。より強いパスワードを設定してください';
+      case 'auth/email-already-in-use':
+        return 'このメールアドレスは既に使用されています';
+      case 'auth/operation-not-allowed':
+        return 'この操作は許可されていません';
+      case 'auth/requires-recent-login':
+        return 'セキュリティのため、再度ログインしてください';
+      default:
+        if (error?.message) {
+          return error.message;
+        }
+        return 'ログインに失敗しました。入力内容を確認してください';
     }
   }
 }

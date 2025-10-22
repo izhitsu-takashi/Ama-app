@@ -19,8 +19,16 @@ export class AuthService {
     return createUserWithEmailAndPassword(this.auth, email, password);
   }
 
-  createUserWithEmailAndPassword(email: string, password: string) {
-    return createUserWithEmailAndPassword(this.auth, email, password);
+  async createUserWithEmailAndPassword(email: string, password: string) {
+    try {
+      return await createUserWithEmailAndPassword(this.auth, email, password);
+    } catch (error: any) {
+      // メールアドレス重複エラーの場合は、より分かりやすいエラーメッセージを投げる
+      if (error.code === 'auth/email-already-in-use') {
+        throw new Error('このメールアドレスは既に使用されています');
+      }
+      throw error;
+    }
   }
 
   // Firebaseの標準メール認証を無効化するための設定

@@ -312,9 +312,14 @@ export class EmailVerificationPage {
       if (isValid) {
         this.successMessage = '認証が完了しました！アカウントを作成しています...';
         
-        // 認証成功後、直接アカウント作成（Firebaseの標準メール認証を無効化）
+        // 認証成功後、重複チェック付きでアカウント作成
         try {
-          const cred = await this.authService.createUserWithoutEmailVerification(this.email, this.password);
+          const cred = await this.emailVerificationService.createUser(
+            this.email, 
+            this.password, 
+            this.displayName, 
+            this.department as any
+          );
           
           // ユーザープロファイルを作成
           await this.userService.ensureUserProfile(

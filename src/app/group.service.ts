@@ -60,6 +60,19 @@ export class GroupService {
     return docData(doc(this.firestore, 'groups', groupId), { idField: 'id' }) as Observable<Group | null>;
   }
 
+  // グループのメンバー数を取得
+  getGroupMemberCount(groupId: string): Observable<number> {
+    return collectionData(
+      query(
+        collection(this.firestore, 'groupMemberships'),
+        where('groupId', '==', groupId)
+      ),
+      { idField: 'id' }
+    ).pipe(
+      map((memberships: any[]) => memberships.length)
+    );
+  }
+
   async getGroup(groupId: string): Promise<Group | null> {
     const docRef = doc(this.firestore, 'groups', groupId);
     const docSnap = await getDoc(docRef);
@@ -309,16 +322,6 @@ export class GroupService {
     } as TaskItem));
   }
 
-  // グループのメンバー数を取得
-  async getGroupMemberCount(groupId: string): Promise<number> {
-    const membersQuery = query(
-      collection(this.firestore, 'groupMemberships'),
-      where('groupId', '==', groupId)
-    );
-    
-    const membersSnapshot = await getDocs(membersQuery);
-    return membersSnapshot.size;
-  }
 
   // グループ削除（管理者用）
   async deleteGroup(groupId: string): Promise<void> {

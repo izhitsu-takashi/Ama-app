@@ -99,7 +99,7 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
             <div class="group-stats" *ngIf="isUserInGroup(group.id)">
               <div class="stat-item">
                 <span class="stat-icon">👥</span>
-                <span class="stat-value">{{ group.memberIds.length }}人</span>
+                <span class="stat-value">{{ getGroupMemberCount(group.id) }}人</span>
               </div>
               <div class="stat-item">
                 <span class="stat-icon">📋</span>
@@ -593,6 +593,7 @@ export class GroupsPage implements OnInit, OnDestroy {
   filteredGroups: Group[] = [];
   searchTerm = '';
   groupTaskCounts: { [groupId: string]: number } = {};
+  groupMemberCounts: { [groupId: string]: number } = {};
   groupDeadlineStatus: { [groupId: string]: 'normal' | 'yellow' | 'red' } = {};
   showAllGroups = false;
   isJoiningGroup = false;
@@ -611,6 +612,7 @@ export class GroupsPage implements OnInit, OnDestroy {
           ).subscribe(groups => {
             this.allGroups = groups;
             this.loadGroupTaskCounts(groups);
+            this.loadGroupMemberCounts(groups);
             this.loadGroupDeadlineStatus(groups);
             this.applySearch();
           });
@@ -723,6 +725,7 @@ export class GroupsPage implements OnInit, OnDestroy {
       })
     ).subscribe(groups => {
       this.allGroups = groups;
+      this.loadGroupMemberCounts(groups);
       this.applySearch();
     });
   }
@@ -797,6 +800,17 @@ export class GroupsPage implements OnInit, OnDestroy {
     });
   }
 
+  loadGroupMemberCounts(groups: Group[]) {
+    groups.forEach(group => {
+      this.groupService.getGroupMemberCount(group.id).pipe(
+        take(1),
+        takeUntil(this.destroy$)
+      ).subscribe(count => {
+        this.groupMemberCounts[group.id] = count;
+      });
+    });
+  }
+
   loadGroupDeadlineStatus(groups: Group[]) {
     groups.forEach(group => {
       this.taskService.getGroupTasks(group.id).pipe(
@@ -847,6 +861,10 @@ export class GroupsPage implements OnInit, OnDestroy {
 
   getGroupTaskCount(groupId: string): number {
     return this.groupTaskCounts[groupId] || 0;
+  }
+
+  getGroupMemberCount(groupId: string): number {
+    return this.groupMemberCounts[groupId] || 0;
   }
 
   getGroupDeadlineStatus(groupId: string): 'normal' | 'yellow' | 'red' {
