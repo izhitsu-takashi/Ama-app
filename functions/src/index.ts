@@ -3,6 +3,83 @@ import * as admin from 'firebase-admin';
 
 admin.initializeApp();
 
+// ================================
+// FCM: Firestore通知 -> デバイストークンへ配信
+// ================================
+export const sendPushOnNotificationCreate = functions.firestore
+  .document('notifications/{notificationId}')
+  .onCreate(async (snap, context) => {
+    try {
+      const notification = snap.data();
+      const userId = notification?.userId;
+      if (!userId) return;
+
+      const db = admin.firestore();
+      // 対象ユーザーのデバイストークンを取得
+      const devicesSnap = await db.collection('users').doc(userId).collection('devices').get();
+      const tokens: string[] = devicesSnap.docs.map(d => d.id).filter(Boolean);
+      if (tokens.length === 0) return;
+
+      // 通知内容
+      const title = notification.title || '新しい通知';
+      const body = notification.content || notification.message || '';
+
+      // クリック時の遷移URL（typeに応じてbest-effort）
+      const url = (() => {
+        const data = notification.data || {};
+        switch (notification.type) {
+          case 'message_received':
+            return '/messages';
+          case 'announcement':
+            return data.groupId ? `/group/${data.groupId}` : '/';
+          case 'progress_report':
+          case 'progress_report_comment':
+            return '/progress-reports';
+          case 'group_join_request':
+          case 'group_invite':
+            return data.groupId ? `/group/${data.groupId}` : '/groups';
+          case 'task_due':
+          case 'task_due_soon':
+          case 'task_assigned':
+          case 'task_comment':
+          case 'task_reaction':
+            return '/tasks';
+          default:
+            return '/';
+        }
+      })();
+
+      const message: admin.messaging.MulticastMessage = {
+        tokens,
+        notification: {
+          title,
+          body,
+        },
+        data: {
+          url,
+          type: String(notification.type || ''),
+        }
+      };
+
+      const res = await admin.messaging().sendMulticast(message);
+
+      // 不達トークンをクリーンアップ
+      const deletions: Promise<FirebaseFirestore.WriteResult>[] = [];
+      res.responses.forEach((r, idx) => {
+        if (!r.success) {
+          const code = (r.error && (r.error as any).errorInfo && (r.error as any).errorInfo.code) || '';
+          if (code.includes('registration-token-not-registered') || code.includes('invalid-argument')) {
+            const token = tokens[idx];
+            deletions.push(db.collection('users').doc(userId).collection('devices').doc(token).delete());
+          }
+        }
+      });
+      if (deletions.length) await Promise.all(deletions);
+    } catch (e) {
+      console.error('sendPushOnNotificationCreate error', e);
+    }
+  });
+
 // 自動進捗レポート送信のスケジュール関数（5分間隔で実行）
 export const scheduledProgressReport = functions.pubsub
   .schedule('*/5 * * * *') // 5分間隔で実行

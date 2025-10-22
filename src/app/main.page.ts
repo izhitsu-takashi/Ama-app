@@ -13,7 +13,9 @@ import { User, Group, TaskItem, Notification, CalendarEvent, TodoItem } from './
 import { Observable, Subscription, combineLatest, of, Subject } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { Firestore, collection, addDoc, serverTimestamp, query, where, collectionData, updateDoc, doc, deleteDoc } from '@angular/fire/firestore';
-import { map, switchMap, take, takeUntil } from 'rxjs/operators';
+import { map, switchMap, take, takeUntil, startWith } from 'rxjs/operators';
+import { DesktopNotificationService } from './desktop-notification.service';
+import { FcmService } from './fcm.service';
 
 @Component({
   selector: 'app-main',
@@ -1583,6 +1585,8 @@ export class MainPage implements OnInit, OnDestroy {
   private messageService = inject(MessageService);
   private todoService = inject(TodoService);
   private firestore = inject(Firestore);
+  private desktopNotifications = inject(DesktopNotificationService);
+  private fcm = inject(FcmService);
 
   currentUser: User | null = null;
   userGroups$: Observable<Group[]> = of([]);
@@ -1643,6 +1647,23 @@ export class MainPage implements OnInit, OnDestroy {
         this.loadNotifications();
       }
     });
+    
+    // Initialize desktop notifications after user is ready
+    setTimeout(async () => {
+      try {
+        this.desktopNotifications.init();
+        // Initialize FCM (will no-op if unsupported)
+        const VAPID_KEY = 'BHiPS0bFe5WmP0KbdL_FSPXsx7UZfo0Eo1HI0irRTI8pRS5FepX6Ni892j1Zbb0xFMqI-BLlpPxGq_vM5KdHAdI';
+        await this.fcm.init(VAPID_KEY);
+        if (VAPID_KEY) {
+          await this.fcm.requestPermissionAndRegisterToken(VAPID_KEY);
+          // Retry once after a short delay in case auth was not ready yet
+          setTimeout(() => {
+            this.fcm.requestPermissionAndRegisterToken(VAPID_KEY).catch(() => {});
+          }, 2000);
+        }
+      } catch {}
+    }, 0);
   }
 
   ngOnDestroy() {
