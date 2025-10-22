@@ -275,7 +275,7 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
             <div *ngIf="selectedDayEvents.length === 0" class="empty-state">
               <p>予定はありません</p>
             </div>
-            <div class="events-list" *ngIf="selectedDayEvents.length > 0">
+            <div class="events-list" *ngIf="selectedDayEvents.length > 0" [class.scrollable]="selectedDayEvents.length > 4">
               <div class="event-row" *ngFor="let ev of selectedDayEvents" [class]="'event-' + ev.type" [style.background]="ev.color || '#111827'" [style.color]="'#ffffff'">
                 <div class="event-time">{{ formatTimeRange(ev.startDate, ev.endDate) }}</div>
                 <div class="event-title">{{ ev.title }}</div>
@@ -1013,7 +1013,35 @@ import { map, switchMap, take, takeUntil } from 'rxjs/operators';
     }
 
     .day-events-panel { margin-top: 1rem; background: #fff; border-radius: 0.75rem; padding: 1rem; }
-    .events-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .events-list { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 0.5rem; 
+    }
+    
+    .events-list.scrollable {
+      max-height: 300px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+    
+    .events-list.scrollable::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .events-list.scrollable::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 3px;
+    }
+    
+    .events-list.scrollable::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 3px;
+    }
+    
+    .events-list.scrollable::-webkit-scrollbar-thumb:hover {
+      background: #a0aec0;
+    }
     .event-row { display: grid; grid-template-columns: 110px 1fr auto; gap: 0.75rem; padding: 0.75rem; border-radius: 0.5rem; }
     .event-time { color: #ffffff; font-size: 0.9rem; font-weight:600; }
     .event-title { font-weight: 700; color: #ffffff; }
@@ -2347,6 +2375,12 @@ export class MainPage implements OnInit, OnDestroy {
     if (sStr === '00:00' && eStr === '00:00') {
       return '終日';
     }
+    
+    // 開始時間と終了時間が同じ場合は開始時間のみ表示
+    if (sStr === eStr) {
+      return sStr;
+    }
+    
     return `${sStr} - ${eStr}`;
   }
 
