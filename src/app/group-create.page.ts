@@ -4,8 +4,9 @@ import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angu
 import { Router, RouterModule } from '@angular/router';
 import { GroupService } from './group.service';
 import { AuthService } from './auth.service';
-import { AiProjectAnalyzerService, ProjectInput, ProjectAnalysis } from './ai-project-analyzer.service';
+import { AiProjectAnalyzerService, ProjectInput, ProjectAnalysis, LearningData } from './ai-project-analyzer.service';
 import { TaskService } from './task.service';
+import { TestDataService } from './test-data.service';
 
 @Component({
   selector: 'app-group-create',
@@ -212,6 +213,16 @@ import { TaskService } from './task.service';
                   <span *ngIf="!analyzing">🔍 AI分析を実行</span>
                   <span *ngIf="analyzing" class="loading-spinner">⏳</span>
                 </button>
+                
+                <!-- テスト用ボタン -->
+                <button 
+                  type="button" 
+                  class="btn btn-test"
+                  (click)="createTestData()"
+                  [disabled]="loading"
+                >
+                  🧪 テストデータ作成
+                </button>
               </div>
 
               <!-- AI分析結果 -->
@@ -256,6 +267,72 @@ import { TaskService } from './task.service';
                   <ul class="recommendations">
                     <li *ngFor="let rec of projectAnalysis.recommendations">{{ rec }}</li>
                   </ul>
+                </div>
+
+                <!-- 学習データセクション -->
+                <div *ngIf="learningData" class="learning-data-section">
+                  <div class="learning-header">
+                    <h5 class="section-title">🧠 学習データ</h5>
+                    <button 
+                      type="button" 
+                      class="toggle-btn"
+                      (click)="showLearningData = !showLearningData"
+                    >
+                      {{ showLearningData ? '隠す' : '表示' }}
+                    </button>
+                  </div>
+                  
+                  <div *ngIf="showLearningData" class="learning-content">
+                    <!-- 類似グループ -->
+                    <div *ngIf="learningData.similarGroups.length > 0" class="learning-subsection">
+                      <h6 class="subsection-title">📊 類似プロジェクト</h6>
+                      <div class="similar-groups">
+                        <div *ngFor="let group of learningData.similarGroups" class="similar-group">
+                          <div class="group-header">
+                            <span class="group-name">{{ group.name }}</span>
+                            <span class="completion-rate">{{ Math.round(group.completionRate * 100) }}%</span>
+                          </div>
+                          <p class="group-description">{{ group.description }}</p>
+                          <div class="group-stats">
+                            <span class="stat">👥 {{ group.memberCount }}人</span>
+                            <span class="stat">📋 {{ group.taskCount }}タスク</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 共通タスク -->
+                    <div *ngIf="learningData.commonTasks.length > 0" class="learning-subsection">
+                      <h6 class="subsection-title">🔄 共通タスクパターン</h6>
+                      <div class="common-tasks">
+                        <div *ngFor="let task of learningData.commonTasks" class="common-task">
+                          <div class="task-header">
+                            <span class="task-title">{{ task.title }}</span>
+                            <span class="task-frequency">{{ Math.round(task.frequency * 100) }}%</span>
+                          </div>
+                          <p class="task-description">{{ task.description }}</p>
+                          <div class="task-meta">
+                            <span class="task-category">{{ task.category }}</span>
+                            <span class="task-days">平均{{ task.averageDays }}日</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 成功パターン -->
+                    <div *ngIf="learningData.successPatterns.length > 0" class="learning-subsection">
+                      <h6 class="subsection-title">🎯 成功パターン</h6>
+                      <div class="success-patterns">
+                        <div *ngFor="let pattern of learningData.successPatterns" class="success-pattern">
+                          <div class="pattern-header">
+                            <span class="pattern-name">{{ pattern.pattern }}</span>
+                            <span class="success-rate">{{ Math.round(pattern.successRate * 100) }}%</span>
+                          </div>
+                          <p class="pattern-description">{{ pattern.description }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -729,6 +806,29 @@ import { TaskService } from './task.service';
       box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
     }
 
+    .btn-test {
+      background: #f59e0b;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 10px;
+    }
+
+    .btn-test:hover:not(:disabled) {
+      background: #d97706;
+      transform: translateY(-2px);
+    }
+
+    .btn-test:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+
     .ai-results {
       margin-top: 30px;
       background: white;
@@ -917,6 +1017,122 @@ import { TaskService } from './task.service';
         width: 100%;
       }
     }
+
+    /* 学習データセクション */
+    .learning-data-section {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .learning-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .toggle-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .toggle-btn:hover {
+      background: #5a67d8;
+      transform: translateY(-1px);
+    }
+
+    .learning-content {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .learning-subsection {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .subsection-title {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .similar-groups, .common-tasks, .success-patterns {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .similar-group, .common-task, .success-pattern {
+      padding: 12px;
+      background: #f7fafc;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .group-header, .task-header, .pattern-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .group-name, .task-title, .pattern-name {
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .completion-rate, .task-frequency, .success-rate {
+      background: #10b981;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .group-description, .task-description, .pattern-description {
+      margin: 8px 0;
+      color: #4a5568;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .group-stats, .task-meta {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .stat {
+      font-size: 12px;
+      color: #6b7280;
+      background: #f3f4f6;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .task-category, .task-days {
+      font-size: 12px;
+      color: #6b7280;
+      background: #f3f4f6;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
   `]
 })
 export class GroupCreatePage {
@@ -926,12 +1142,16 @@ export class GroupCreatePage {
   private auth = inject(AuthService);
   private aiAnalyzer = inject(AiProjectAnalyzerService);
   private taskService = inject(TaskService);
+  private testDataService = inject(TestDataService);
 
   loading = false;
   error = '';
   activeTab: 'manual' | 'ai' = 'manual';
   analyzing = false;
   projectAnalysis: ProjectAnalysis | null = null;
+  learningData: LearningData | null = null;
+  showLearningData = false;
+  Math = Math; // テンプレートでMath.round()を使用するため
 
   projectInput: ProjectInput = {
     projectName: '', // グループ名として使用
@@ -1000,6 +1220,10 @@ export class GroupCreatePage {
       this.projectInput.projectName = this.form.get('name')?.value || '';
       this.projectInput.description = this.form.get('description')?.value || '';
       
+      // 学習データを取得
+      this.learningData = await this.aiAnalyzer.getLearningData(this.projectInput);
+      
+      // AI分析を実行
       this.projectAnalysis = await this.aiAnalyzer.analyzeProject(this.projectInput).toPromise() || null;
     } catch (e: any) {
       this.error = 'AI分析に失敗しました: ' + (e?.message || '不明なエラー');
@@ -1026,6 +1250,17 @@ export class GroupCreatePage {
       'low': '低'
     };
     return priorityMap[priority] || priority;
+  }
+
+  async createTestData(): Promise<void> {
+    this.loading = true;
+    try {
+      await this.testDataService.createTestData();
+    } catch (error) {
+      this.error = 'テストデータの作成に失敗しました: ' + (error as Error).message;
+    } finally {
+      this.loading = false;
+    }
   }
 
   private async createTasksFromAnalysis(groupId: string, userId: string) {

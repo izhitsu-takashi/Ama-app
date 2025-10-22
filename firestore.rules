@@ -11,9 +11,10 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // グループ情報はメンバーのみアクセス可能
+    // グループ情報はメンバーのみアクセス可能（学習機能のため読み取りは全ユーザー）
     match /groups/{groupId} {
-      allow read, write: if request.auth != null && 
+      allow read: if request.auth != null; // 学習機能のため全ユーザーが読み取り可能
+      allow write: if request.auth != null && 
         (resource.data.members[request.auth.uid] != null || 
          resource.data.ownerId == request.auth.uid);
     }
@@ -24,9 +25,10 @@ service cloud.firestore {
         request.auth.uid == resource.data.userId;
     }
     
-    // タスクはグループメンバーのみアクセス可能
+    // タスクはグループメンバーのみアクセス可能（学習機能のため読み取りは全ユーザー）
     match /tasks/{taskId} {
-      allow read, write: if request.auth != null && 
+      allow read: if request.auth != null; // 学習機能のため全ユーザーが読み取り可能
+      allow write: if request.auth != null && 
         exists(/databases/$(database)/documents/groups/$(resource.data.groupId)) &&
         (get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.members[request.auth.uid] != null);
     }

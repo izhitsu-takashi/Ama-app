@@ -1,7 +1,10 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, take } from 'rxjs/operators';
+import { Firestore, collection, query, getDocs, where, orderBy, limit } from '@angular/fire/firestore';
+import { GroupService } from './group.service';
+import { TaskService } from './task.service';
 
 export interface ProjectAnalysis {
   tasks: GeneratedTask[];
@@ -35,12 +38,49 @@ export interface ProjectInput {
   deadline?: string;
 }
 
+export interface LearningData {
+  similarGroups: SimilarGroup[];
+  commonTasks: CommonTask[];
+  successPatterns: SuccessPattern[];
+  recommendations: string[];
+}
+
+export interface SimilarGroup {
+  id: string;
+  name: string;
+  description: string;
+  memberCount: number;
+  taskCount: number;
+  completionRate: number;
+  commonKeywords: string[];
+}
+
+export interface CommonTask {
+  title: string;
+  description: string;
+  category: string;
+  averageDays: number;
+  frequency: number; // 出現頻度（0-1）
+  priority: string;
+}
+
+export interface SuccessPattern {
+  pattern: string;
+  description: string;
+  successRate: number;
+  applicableTypes: string[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class AiProjectAnalyzerService {
   private readonly OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
   private readonly API_KEY = 'YOUR_OPENAI_API_KEY'; // 実際のAPIキーに置き換える
+
+  private firestore = inject(Firestore);
+  private groupService = inject(GroupService);
+  private taskService = inject(TaskService);
 
   constructor(private http: HttpClient) {}
 
@@ -50,8 +90,38 @@ export class AiProjectAnalyzerService {
     // 実際のOpenAI APIを使用する場合
     // return this.callOpenAI(prompt);
     
-    // 開発用のモックデータを返す
-    return this.generateMockAnalysis(projectInput);
+    // 学習データを取得してから分析を生成
+    return this.generateAnalysisWithLearning(projectInput);
+  }
+
+  /**
+   * 既存のグループと課題データから学習データを取得
+   */
+  async getLearningData(projectInput: ProjectInput): Promise<LearningData> {
+    try {
+      console.log('🔍 学習データ取得開始:', projectInput);
+      
+      const [similarGroups, commonTasks, successPatterns] = await Promise.all([
+        this.findSimilarGroups(projectInput),
+        this.analyzeCommonTasks(projectInput),
+        this.identifySuccessPatterns(projectInput)
+      ]);
+
+      console.log('📊 学習データ取得完了:');
+      console.log('- 類似グループ:', similarGroups.length, '件');
+      console.log('- 共通タスク:', commonTasks.length, '件');
+      console.log('- 成功パターン:', successPatterns.length, '件');
+
+      return {
+        similarGroups,
+        commonTasks,
+        successPatterns,
+        recommendations: this.generateLearningRecommendations(similarGroups, commonTasks, successPatterns)
+      };
+    } catch (error) {
+      console.error('学習データの取得に失敗:', error);
+      return this.getDefaultLearningData();
+    }
   }
 
   private createAnalysisPrompt(input: ProjectInput): string {
@@ -158,6 +228,36 @@ export class AiProjectAnalyzerService {
         });
       })
     );
+  }
+
+  private generateAnalysisWithLearning(input: ProjectInput): Observable<ProjectAnalysis> {
+    return new Observable(observer => {
+      this.getLearningData(input).then(learningData => {
+        const tasks = this.generateTasksWithLearning(input, learningData);
+        const timeline = this.generateTimelineWithLearning(input, learningData);
+        const recommendations = this.generateRecommendationsWithLearning(input, learningData);
+
+        observer.next({
+          tasks,
+          timeline,
+          recommendations
+        });
+        observer.complete();
+      }).catch(error => {
+        console.error('学習データの処理に失敗:', error);
+        // フォールバックとして従来の方法を使用
+        const tasks = this.generateTasksForProject(input);
+        const timeline = this.generateTimelineForProject(input);
+        const recommendations = this.generateRecommendations(input);
+
+        observer.next({
+          tasks,
+          timeline,
+          recommendations
+        });
+        observer.complete();
+      });
+    });
   }
 
   private generateMockAnalysis(input: ProjectInput): Observable<ProjectAnalysis> {
@@ -961,5 +1061,451 @@ export class AiProjectAnalyzerService {
     }
 
     return recommendations;
+  }
+
+  // ===== 学習データを活用したメソッド =====
+
+  /**
+   * 類似グループを検索
+   */
+  private async findSimilarGroups(input: ProjectInput): Promise<SimilarGroup[]> {
+    try {
+      const groupsRef = collection(this.firestore, 'groups');
+      const groupsSnapshot = await getDocs(groupsRef);
+      
+      const groups = groupsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+
+      // プロジェクトタイプや説明に基づいて類似度を計算
+      const similarGroups = groups
+        .filter(group => this.calculateSimilarity(input, group) > 0.3)
+        .map(group => ({
+          id: group.id,
+          name: group.name,
+          description: group.description,
+          memberCount: group.memberIds?.length || 0,
+          taskCount: 0, // 後で計算
+          completionRate: 0, // 後で計算
+          commonKeywords: this.extractKeywords(group.description)
+        }))
+        .slice(0, 5); // 上位5件
+
+      // 各グループのタスク情報を取得
+      for (const group of similarGroups) {
+        const tasks = await this.taskService.getGroupTasks(group.id).pipe(take(1)).toPromise();
+        group.taskCount = tasks?.length || 0;
+        group.completionRate = tasks ? (tasks.filter(t => t.status === 'completed').length / tasks.length) : 0;
+      }
+
+      return similarGroups;
+    } catch (error) {
+      console.error('類似グループの検索に失敗:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 共通タスクを分析
+   */
+  private async analyzeCommonTasks(input: ProjectInput): Promise<CommonTask[]> {
+    try {
+      const tasksRef = collection(this.firestore, 'tasks');
+      const tasksSnapshot = await getDocs(tasksRef);
+      
+      const allTasks = tasksSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+
+      // プロジェクトタイプに関連するタスクをフィルタリング
+      const relevantTasks = allTasks.filter(task => 
+        this.isTaskRelevant(task, input)
+      );
+
+      // タスクをカテゴリ別にグループ化
+      const taskCategories = this.categorizeTasks(relevantTasks);
+      
+      // 各カテゴリの共通タスクを生成
+      const commonTasks: CommonTask[] = [];
+      
+      for (const [category, tasks] of Object.entries(taskCategories)) {
+        if (tasks.length > 0) {
+          const avgDays = tasks.reduce((sum, task) => sum + (task.estimatedDays || 3), 0) / tasks.length;
+          const frequency = Math.min(tasks.length / 10, 1); // 出現頻度（正規化）
+          
+          commonTasks.push({
+            title: this.generateTaskTitle(category, tasks),
+            description: this.generateTaskDescription(category, tasks),
+            category,
+            averageDays: Math.round(avgDays),
+            frequency,
+            priority: this.determinePriority(frequency, avgDays)
+          });
+        }
+      }
+
+      return commonTasks.sort((a, b) => b.frequency - a.frequency).slice(0, 10);
+    } catch (error) {
+      console.error('共通タスクの分析に失敗:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 成功パターンを特定
+   */
+  private async identifySuccessPatterns(input: ProjectInput): Promise<SuccessPattern[]> {
+    try {
+      const groupsRef = collection(this.firestore, 'groups');
+      const groupsSnapshot = await getDocs(groupsRef);
+      
+      const groups = groupsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+
+      const patterns: SuccessPattern[] = [];
+
+      // 高完了率グループの特徴を分析
+      for (const group of groups) {
+        const tasks = await this.taskService.getGroupTasks(group.id).pipe(take(1)).toPromise();
+        if (tasks && tasks.length > 0) {
+          const completionRate = tasks.filter(t => t.status === 'completed').length / tasks.length;
+          
+          if (completionRate > 0.8) { // 高完了率グループ
+            patterns.push({
+              pattern: '段階的タスク分割',
+              description: '大きなタスクを小さな単位に分割することで、進捗が見えやすくなり完了率が向上',
+              successRate: completionRate,
+              applicableTypes: ['Webアプリケーション', 'モバイルアプリ', '研究・調査']
+            });
+          }
+        }
+      }
+
+      // デフォルトの成功パターンも追加
+      patterns.push(
+        {
+          pattern: '定期的な進捗確認',
+          description: '週次または日次での進捗確認により、問題の早期発見と解決が可能',
+          successRate: 0.85,
+          applicableTypes: ['すべて']
+        },
+        {
+          pattern: '明確な期限設定',
+          description: '各タスクに明確な期限を設定することで、優先順位が明確になり効率が向上',
+          successRate: 0.78,
+          applicableTypes: ['すべて']
+        }
+      );
+
+      return patterns.slice(0, 5);
+    } catch (error) {
+      console.error('成功パターンの特定に失敗:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 学習データを活用したタスク生成
+   */
+  private generateTasksWithLearning(input: ProjectInput, learningData: LearningData): GeneratedTask[] {
+    const baseTasks = this.generateTasksForProject(input);
+    const learnedTasks: GeneratedTask[] = [];
+
+    // 共通タスクから学習したタスクを追加
+    for (const commonTask of learningData.commonTasks) {
+      if (commonTask.frequency > 0.5) { // 高頻度タスクのみ採用
+        learnedTasks.push({
+          title: commonTask.title,
+          description: commonTask.description,
+          priority: commonTask.priority as 'high' | 'medium' | 'low',
+          estimatedDays: commonTask.averageDays,
+          category: commonTask.category
+        });
+      }
+    }
+
+    // ベースタスクと学習タスクをマージ（重複を避ける）
+    const allTasks = [...baseTasks];
+    for (const learnedTask of learnedTasks) {
+      if (!allTasks.some(task => task.title === learnedTask.title)) {
+        allTasks.push(learnedTask);
+      }
+    }
+
+    return allTasks.slice(0, 15); // 最大15タスク
+  }
+
+  /**
+   * 学習データを活用したタイムライン生成
+   */
+  private generateTimelineWithLearning(input: ProjectInput, learningData: LearningData): TimelinePhase[] {
+    const baseTimeline = this.generateTimelineForProject(input);
+    
+    // 成功パターンに基づいてタイムラインを調整
+    const adjustedTimeline = baseTimeline.map(phase => {
+      const relevantPatterns = learningData.successPatterns.filter(pattern => 
+        pattern.applicableTypes.includes(input.appType) || pattern.applicableTypes.includes('すべて')
+      );
+
+      if (relevantPatterns.length > 0) {
+        const avgSuccessRate = relevantPatterns.reduce((sum, p) => sum + p.successRate, 0) / relevantPatterns.length;
+        // 成功率に基づいて期間を調整
+        const adjustedDuration = Math.round(phase.duration * (1 + (1 - avgSuccessRate) * 0.2));
+        return {
+          ...phase,
+          duration: adjustedDuration
+        };
+      }
+      return phase;
+    });
+
+    return adjustedTimeline;
+  }
+
+  /**
+   * 学習データを活用した推奨事項生成
+   */
+  private generateRecommendationsWithLearning(input: ProjectInput, learningData: LearningData): string[] {
+    const baseRecommendations = this.generateRecommendations(input);
+    const learnedRecommendations: string[] = [];
+
+    // 類似グループからの学習
+    if (learningData.similarGroups.length > 0) {
+      const avgCompletionRate = learningData.similarGroups.reduce((sum, group) => sum + group.completionRate, 0) / learningData.similarGroups.length;
+      
+      if (avgCompletionRate > 0.8) {
+        learnedRecommendations.push(`類似プロジェクト「${learningData.similarGroups[0].name}」では高い完了率（${Math.round(avgCompletionRate * 100)}%）を達成しています。同じアプローチを参考にしてください。`);
+      }
+    }
+
+    // 成功パターンからの学習
+    for (const pattern of learningData.successPatterns) {
+      if (pattern.applicableTypes.includes(input.appType) || pattern.applicableTypes.includes('すべて')) {
+        learnedRecommendations.push(`成功パターン「${pattern.pattern}」を採用することを推奨します（成功率: ${Math.round(pattern.successRate * 100)}%）。${pattern.description}`);
+      }
+    }
+
+    return [...baseRecommendations, ...learnedRecommendations].slice(0, 8);
+  }
+
+  // ===== ヘルパーメソッド =====
+
+  private calculateSimilarity(input: ProjectInput, group: any): number {
+    let similarity = 0;
+    
+    // プロジェクトタイプの類似度
+    if (group.description && input.appType) {
+      const inputKeywords = this.extractKeywords(input.appType + ' ' + input.description);
+      const groupKeywords = this.extractKeywords(group.description);
+      const commonKeywords = inputKeywords.filter(keyword => groupKeywords.includes(keyword));
+      similarity += (commonKeywords.length / Math.max(inputKeywords.length, groupKeywords.length)) * 0.6;
+    }
+
+    // チームサイズの類似度
+    const groupSize = group.memberIds?.length || 0;
+    const sizeDiff = Math.abs(groupSize - input.teamSize);
+    similarity += (1 - sizeDiff / Math.max(groupSize, input.teamSize, 1)) * 0.4;
+
+    return similarity;
+  }
+
+  private extractKeywords(text: string): string[] {
+    const keywords = text.toLowerCase()
+      .replace(/[^\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 1);
+    
+    return [...new Set(keywords)]; // 重複を除去
+  }
+
+  private isTaskRelevant(task: any, input: ProjectInput): boolean {
+    const taskText = (task.title + ' ' + task.description).toLowerCase();
+    const inputText = (input.appType + ' ' + input.description + ' ' + input.goals).toLowerCase();
+    
+    const inputKeywords = this.extractKeywords(inputText);
+    const taskKeywords = this.extractKeywords(taskText);
+    
+    const commonKeywords = inputKeywords.filter(keyword => taskKeywords.includes(keyword));
+    return commonKeywords.length > 0;
+  }
+
+  private categorizeTasks(tasks: any[]): { [category: string]: any[] } {
+    const categories: { [category: string]: any[] } = {};
+    
+    for (const task of tasks) {
+      const category = this.determineTaskCategory(task);
+      if (!categories[category]) {
+        categories[category] = [];
+      }
+      categories[category].push(task);
+    }
+    
+    return categories;
+  }
+
+  private determineTaskCategory(task: any): string {
+    const title = task.title?.toLowerCase() || '';
+    const description = task.description?.toLowerCase() || '';
+    const text = title + ' ' + description;
+
+    if (text.includes('設計') || text.includes('設計書') || text.includes('architecture')) {
+      return '設計・設計書';
+    } else if (text.includes('開発') || text.includes('実装') || text.includes('coding')) {
+      return '開発・実装';
+    } else if (text.includes('テスト') || text.includes('検証') || text.includes('testing')) {
+      return 'テスト・検証';
+    } else if (text.includes('調査') || text.includes('研究') || text.includes('analysis')) {
+      return '調査・研究';
+    } else if (text.includes('企画') || text.includes('計画') || text.includes('planning')) {
+      return '企画・計画';
+    } else if (text.includes('デザイン') || text.includes('ui') || text.includes('ux')) {
+      return 'デザイン・UI/UX';
+    } else if (text.includes('ドキュメント') || text.includes('文書') || text.includes('documentation')) {
+      return 'ドキュメント・文書';
+    } else if (text.includes('デプロイ') || text.includes('リリース') || text.includes('deployment')) {
+      return 'デプロイ・リリース';
+    } else {
+      return 'その他';
+    }
+  }
+
+  private generateTaskTitle(category: string, tasks: any[]): string {
+    const commonWords = this.findCommonWords(tasks.map(t => t.title));
+    
+    switch (category) {
+      case '設計・設計書':
+        return commonWords.length > 0 ? `${commonWords[0]}の設計書作成` : 'システム設計書の作成';
+      case '開発・実装':
+        return commonWords.length > 0 ? `${commonWords[0]}の実装` : '機能の実装';
+      case 'テスト・検証':
+        return commonWords.length > 0 ? `${commonWords[0]}のテスト` : '機能テストの実施';
+      case '調査・研究':
+        return commonWords.length > 0 ? `${commonWords[0]}の調査` : '技術調査の実施';
+      case '企画・計画':
+        return commonWords.length > 0 ? `${commonWords[0]}の企画` : 'プロジェクト企画の策定';
+      case 'デザイン・UI/UX':
+        return commonWords.length > 0 ? `${commonWords[0]}のデザイン` : 'UI/UXデザインの作成';
+      case 'ドキュメント・文書':
+        return commonWords.length > 0 ? `${commonWords[0]}のドキュメント作成` : '技術文書の作成';
+      case 'デプロイ・リリース':
+        return commonWords.length > 0 ? `${commonWords[0]}のデプロイ` : 'システムのデプロイ';
+      default:
+        return commonWords.length > 0 ? `${commonWords[0]}の作業` : 'タスクの実行';
+    }
+  }
+
+  private generateTaskDescription(category: string, tasks: any[]): string {
+    const descriptions = tasks.map(t => t.description).filter(d => d && d.length > 0);
+    const commonPhrases = this.findCommonPhrases(descriptions);
+    
+    if (commonPhrases.length > 0) {
+      return commonPhrases[0];
+    }
+    
+    switch (category) {
+      case '設計・設計書':
+        return 'システムの設計書を作成し、要件を明確に定義する';
+      case '開発・実装':
+        return '要件に基づいて機能を実装し、動作確認を行う';
+      case 'テスト・検証':
+        return '実装した機能のテストを実施し、品質を確保する';
+      case '調査・研究':
+        return '必要な技術や手法について調査し、最適解を見つける';
+      case '企画・計画':
+        return 'プロジェクトの企画を策定し、実行計画を立てる';
+      case 'デザイン・UI/UX':
+        return 'ユーザビリティを考慮したデザインを作成する';
+      case 'ドキュメント・文書':
+        return 'プロジェクトに関する技術文書を作成する';
+      case 'デプロイ・リリース':
+        return 'システムを本番環境にデプロイし、リリースする';
+      default:
+        return 'プロジェクトの目標達成に向けて作業を進める';
+    }
+  }
+
+  private findCommonWords(titles: string[]): string[] {
+    const wordCount: { [word: string]: number } = {};
+    
+    for (const title of titles) {
+      const words = this.extractKeywords(title);
+      for (const word of words) {
+        wordCount[word] = (wordCount[word] || 0) + 1;
+      }
+    }
+    
+    return Object.entries(wordCount)
+      .filter(([_, count]) => count > 1)
+      .sort((a, b) => b[1] - a[1])
+      .map(([word, _]) => word)
+      .slice(0, 3);
+  }
+
+  private findCommonPhrases(descriptions: string[]): string[] {
+    const phraseCount: { [phrase: string]: number } = {};
+    
+    for (const description of descriptions) {
+      const sentences = description.split(/[。！？]/).filter(s => s.trim().length > 0);
+      for (const sentence of sentences) {
+        const trimmed = sentence.trim();
+        if (trimmed.length > 10 && trimmed.length < 100) {
+          phraseCount[trimmed] = (phraseCount[trimmed] || 0) + 1;
+        }
+      }
+    }
+    
+    return Object.entries(phraseCount)
+      .filter(([_, count]) => count > 1)
+      .sort((a, b) => b[1] - a[1])
+      .map(([phrase, _]) => phrase)
+      .slice(0, 3);
+  }
+
+  private determinePriority(frequency: number, averageDays: number): string {
+    if (frequency > 0.7 && averageDays <= 3) {
+      return 'high';
+    } else if (frequency > 0.4 || averageDays <= 7) {
+      return 'medium';
+    } else {
+      return 'low';
+    }
+  }
+
+  private generateLearningRecommendations(similarGroups: SimilarGroup[], commonTasks: CommonTask[], successPatterns: SuccessPattern[]): string[] {
+    const recommendations: string[] = [];
+    
+    if (similarGroups.length > 0) {
+      recommendations.push(`類似プロジェクトから${similarGroups.length}件の成功事例を学習しました`);
+    }
+    
+    if (commonTasks.length > 0) {
+      recommendations.push(`過去のプロジェクトから${commonTasks.length}件の共通タスクパターンを抽出しました`);
+    }
+    
+    if (successPatterns.length > 0) {
+      recommendations.push(`${successPatterns.length}件の成功パターンを特定し、適用可能なものを推奨事項に含めました`);
+    }
+    
+    return recommendations;
+  }
+
+  private getDefaultLearningData(): LearningData {
+    return {
+      similarGroups: [],
+      commonTasks: [],
+      successPatterns: [
+        {
+          pattern: '段階的タスク分割',
+          description: '大きなタスクを小さな単位に分割することで、進捗が見えやすくなり完了率が向上',
+          successRate: 0.85,
+          applicableTypes: ['すべて']
+        }
+      ],
+      recommendations: ['学習データの取得に失敗したため、デフォルトの推奨事項を適用しています']
+    };
   }
 }
