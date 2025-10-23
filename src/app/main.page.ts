@@ -370,8 +370,96 @@ import { ProgressReportService } from './progress-report.service';
     </div>
   `,
   styles: [`
+    /* ベースレスポンシブ設定 */
     :host {
-      font-size: 0.75rem; /* 13.3インチ用にスケーリング（27インチ基準の75%） */
+      font-size: clamp(0.5rem, 2.5vw, 1.5rem); /* 可変フォントサイズ */
+    }
+
+    /* レスポンシブデザイン - 可変単位を使用 */
+    @media (min-width: 2560px) {
+      :host {
+        font-size: 1.5rem; /* 超大画面用 */
+      }
+    }
+
+    @media (min-width: 1920px) and (max-width: 2559px) {
+      :host {
+        font-size: 1.25rem; /* 大画面用 */
+      }
+    }
+
+    @media (min-width: 1440px) and (max-width: 1919px) {
+      :host {
+        font-size: 1rem; /* 中〜大画面用 */
+      }
+    }
+
+    @media (min-width: 1200px) and (max-width: 1439px) {
+      :host {
+        font-size: 0.875rem; /* 中画面用 */
+      }
+    }
+
+    @media (min-width: 1024px) and (max-width: 1199px) {
+      :host {
+        font-size: 0.75rem; /* 中〜小画面用 */
+      }
+    }
+
+    @media (min-width: 768px) and (max-width: 1023px) {
+      :host {
+        font-size: 0.625rem; /* 小画面用 */
+      }
+    }
+
+    @media (max-width: 767px) {
+      :host {
+        font-size: 0.75rem; /* モバイル用 */
+      }
+      
+      .main-content {
+        padding: clamp(0.5rem, 2vw, 1rem); /* モバイル用パディング */
+        max-width: 100%; /* モバイルでは画面幅を完全活用 */
+        width: 100%;
+      }
+      
+      .content-grid {
+        grid-template-columns: 1fr; /* モバイルでは縦並び */
+        gap: clamp(0.5rem, 2vw, 1rem);
+        margin-bottom: clamp(0.5rem, 2vw, 1rem);
+        max-height: none;
+      }
+      
+      .todo-section, .calendar-section, .right-section {
+        max-height: none; /* モバイルでは高さ制限なし */
+        padding: clamp(0.75rem, 2vw, 1.25rem);
+      }
+      
+      .header {
+        padding: clamp(0.5rem, 2vw, 1rem) clamp(0.75rem, 3vw, 1.5rem);
+        flex-direction: column;
+        gap: clamp(0.5rem, 2vw, 1rem);
+      }
+      
+      .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .action-buttons {
+        gap: clamp(0.25rem, 1vw, 0.5rem);
+        margin-bottom: clamp(0.75rem, 2vw, 1.25rem);
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      
+      .action-btn {
+        padding: clamp(0.25rem, 1vw, 0.5rem) clamp(0.5rem, 2vw, 1rem);
+        font-size: clamp(0.5rem, 1.5vw, 0.75rem);
+        min-width: auto;
+        flex: 1;
+        min-width: 0;
+      }
     }
 
     .main-container {
@@ -383,7 +471,7 @@ import { ProgressReportService } from './progress-report.service';
     .header {
       background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(10px);
-      padding: 0.75rem 1.5rem; /* 13.3インチ用に調整 */
+      padding: clamp(0.375rem, 1.5vw, 0.75rem) clamp(0.75rem, 3vw, 1.5rem); /* より小さなパディング */
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -393,7 +481,7 @@ import { ProgressReportService } from './progress-report.service';
 
     .app-title {
       margin: 0;
-      font-size: 1.125rem; /* 13.3インチ用に調整 */
+      font-size: clamp(0.75rem, 2.5vw, 1.25rem); /* より小さなフォントサイズ */
       font-weight: 700;
       display: flex;
       flex-direction: column;
@@ -401,7 +489,7 @@ import { ProgressReportService } from './progress-report.service';
     }
 
     .title-main {
-      font-size: 1.65rem; /* 13.3インチ用に調整 */
+      font-size: clamp(1rem, 3.5vw, 2rem); /* より小さなフォントサイズ */
       font-weight: 900;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%);
       background-size: 300% 300%;
@@ -414,14 +502,14 @@ import { ProgressReportService } from './progress-report.service';
     }
 
     .title-sub {
-      font-size: 0.675rem; /* 13.3インチ用に調整 */
+      font-size: clamp(0.4rem, 1.5vw, 0.8rem); /* より小さなフォントサイズ */
       font-weight: 500;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       opacity: 0.8;
-      margin-top: 0.2rem;
+      margin-top: clamp(0.1rem, 0.5vw, 0.3rem); /* 可変マージン */
     }
 
     @keyframes gradientShift {
@@ -564,26 +652,35 @@ import { ProgressReportService } from './progress-report.service';
     }
 
     .main-content {
-      padding: 1.5rem; /* 13.3インチ用に調整 */
-      max-width: 1050px; /* 13.3インチ用に調整 */
+      padding: clamp(1rem, 3vw, 2rem); /* 可変パディング */
+      max-width: min(1200px, 90vw); /* 中画面用に横幅制限を狭く */
+      width: 100%;
       margin: 0 auto;
     }
 
     .action-buttons {
       display: flex;
-      gap: 0.75rem; /* 13.3インチ用に調整 */
-      margin-bottom: 1.5rem; /* 13.3インチ用に調整 */
-      flex-wrap: wrap;
+      gap: clamp(0.5rem, 2vw, 1rem); /* 可変ギャップ */
+      margin-bottom: clamp(1rem, 3vw, 2rem); /* 可変マージン */
+      flex-wrap: wrap; /* 必要に応じて改行を許可 */
+      justify-content: center; /* 中央揃え */
+      max-width: 100%; /* 幅制限 */
+      overflow-x: auto; /* 横スクロールを許可 */
     }
 
     .action-btn {
-      padding: 0.5625rem 1.125rem; /* 13.3インチ用に調整 */
+      padding: clamp(0.25rem, 1vw, 0.5rem) clamp(0.5rem, 2vw, 1rem); /* より小さなパディング */
       border: none;
-      border-radius: 0.5rem;
+      border-radius: clamp(0.25rem, 0.8vw, 0.5rem); /* より小さなボーダーラディウス */
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
-      font-size: 0.75rem; /* 13.3インチ用に調整 */
+      font-size: clamp(0.5rem, 1.5vw, 0.8rem); /* より小さなフォントサイズ */
+      white-space: nowrap; /* テキストの改行を防ぐ */
+      flex-shrink: 1; /* ボタンの縮小を許可 */
+      min-width: 0; /* 最小幅を0に設定 */
+      max-width: none; /* 最大幅制限を削除 */
+      flex: 1; /* 横の最大幅にフィット */
     }
 
     .action-btn.primary {
@@ -655,27 +752,29 @@ import { ProgressReportService } from './progress-report.service';
 
     .content-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 1.125rem; /* 13.3インチ用に調整 */
-      margin-bottom: 1.5rem; /* 13.3インチ用に調整 */
-      max-height: calc(100vh - 150px); /* 13.3インチ用に調整 */
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* 適切な最小幅 */
+      gap: clamp(0.75rem, 2vw, 1.5rem); /* 可変ギャップ */
+      margin-bottom: clamp(1rem, 2vw, 1.5rem); /* 可変マージン */
+      max-height: calc(100vh - clamp(120px, 15vh, 150px)); /* 適切な高さ制限 */
     }
 
     .todo-section {
       background: white;
-      border-radius: 1rem;
-      padding: 1.125rem; /* 13.3インチ用に調整 */
+      border-radius: clamp(0.75rem, 2vw, 1rem); /* 可変ボーダーラディウス */
+      padding: clamp(0.75rem, 2vw, 1.5rem); /* 可変パディング */
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       height: 100%;
       display: flex;
       flex-direction: column;
-      max-height: 425px; /* 枠の高さを425pxに変更 */
+      max-width: 100%; /* 幅制限 */
+      max-height: calc(100vh - clamp(120px, 15vh, 150px)); /* さらに広い高さ制限 */
+      overflow: hidden; /* はみ出しを防ぐ */
     }
 
     .todo-list {
       flex: 1;
       overflow-y: auto;
-      max-height: 355px; /* 425pxの枠に合わせて調整 */
+      max-height: calc(100vh - clamp(200px, 25vh, 250px)); /* さらに広い高さ制限 */
     }
 
     .todo-list::-webkit-scrollbar {
@@ -707,13 +806,15 @@ import { ProgressReportService } from './progress-report.service';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
-      padding: 1rem;
+      gap: clamp(0.5rem, 2vw, 1rem); /* 可変ギャップ */
+      padding: clamp(0.75rem, 2vw, 1.5rem); /* 可変パディング */
       border: 1px solid #e5e7eb;
-      border-radius: 1rem;
-      margin-bottom: 0.75rem;
+      border-radius: clamp(0.75rem, 2vw, 1rem); /* 可変ボーダーラディウス */
+      margin-bottom: clamp(0.5rem, 1.5vw, 1rem); /* 可変マージン */
       background: #f9fafb;
       transition: all 0.2s ease;
+      max-width: 100%; /* 幅制限 */
+      overflow: hidden; /* はみ出しを防ぐ */
     }
 
     .todo-item:hover {
@@ -804,14 +905,15 @@ import { ProgressReportService } from './progress-report.service';
 
     .calendar-section, .right-section {
       background: white;
-      border-radius: 1rem;
-      padding: 1.125rem; /* 13.3インチ用に調整 */
+      border-radius: clamp(0.75rem, 2vw, 1rem); /* 可変ボーダーラディウス */
+      padding: clamp(0.75rem, 2vw, 1.5rem); /* 可変パディング */
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       height: 100%;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      max-height: 425px; /* 枠の高さを425pxに変更 */
+      max-width: 100%; /* 幅制限 */
+      max-height: calc(100vh - clamp(120px, 15vh, 150px)); /* さらに広い高さ制限 */
     }
 
     .today-info {
@@ -933,7 +1035,7 @@ import { ProgressReportService } from './progress-report.service';
       background: #f7fafc;
       border-radius: 0.75rem;
       padding: 0.5rem; /* カレンダーが見切れないように調整 */
-      max-height: 400px; /* カレンダーが見切れないように調整 */
+      max-height: calc(100vh - clamp(300px, 35vh, 380px)); /* カレンダー下側見切れ修正 */
       overflow: hidden;
     }
 
@@ -1047,7 +1149,7 @@ import { ProgressReportService } from './progress-report.service';
     }
     
     .events-list.scrollable {
-      max-height: 300px;
+      max-height: calc(100vh - clamp(400px, 45vh, 500px)); /* 適切な高さ制限 */
       overflow-y: auto;
       padding-right: 0.5rem;
     }
@@ -1126,8 +1228,8 @@ import { ProgressReportService } from './progress-report.service';
 
     .group-item, .task-item {
       background: #f7fafc;
-      border-radius: 0.75rem;
-      padding: 1rem;
+      border-radius: clamp(0.5rem, 1.5vw, 0.75rem); /* 可変ボーダーラディウス */
+      padding: clamp(0.75rem, 2vw, 1.5rem); /* 可変パディング */
       cursor: pointer;
       transition: all 0.2s;
       border: 2px solid transparent;
@@ -1135,6 +1237,8 @@ import { ProgressReportService } from './progress-report.service';
       align-items: center;
       justify-content: space-between;
       text-decoration: none; /* 下線を削除 */
+      max-width: 100%; /* 幅制限 */
+      overflow: hidden; /* はみ出しを防ぐ */
     }
 
     .group-item:hover, .task-item:hover {
@@ -1309,7 +1413,7 @@ import { ProgressReportService } from './progress-report.service';
       flex: 1;
       overflow-y: auto;
       padding-right: 0.5rem;
-      max-height: 355px; /* 425pxの枠に合わせて調整 */
+      max-height: calc(100vh - clamp(200px, 25vh, 250px)); /* さらに広い高さ制限 */
     }
 
     .groups-container::-webkit-scrollbar,
@@ -1346,13 +1450,13 @@ import { ProgressReportService } from './progress-report.service';
       .todo-section,
       .calendar-section,
       .right-section {
-        max-height: 425px; /* 中画面での高さ調整 */
+        max-height: calc(100vh - clamp(180px, 22vh, 220px)); /* 中画面での適切な高さ制限 */
       }
       
       .todo-list,
       .groups-container,
       .tasks-container {
-        max-height: 355px; /* 中画面でのスクロール領域調整 */
+        max-height: calc(100vh - clamp(280px, 32vh, 350px)); /* 中画面での適切な高さ制限 */
       }
     }
 
@@ -1393,13 +1497,13 @@ import { ProgressReportService } from './progress-report.service';
       .todo-section,
       .calendar-section,
       .right-section {
-        max-height: 425px; /* モバイルでの高さ調整 */
+        max-height: calc(100vh - clamp(160px, 20vh, 200px)); /* モバイルでの適切な高さ制限 */
       }
       
       .todo-list,
       .groups-container,
       .tasks-container {
-        max-height: 355px; /* モバイルでのスクロール領域調整 */
+        max-height: calc(100vh - clamp(260px, 30vh, 320px)); /* モバイルでの適切な高さ制限 */
       }
     }
 
