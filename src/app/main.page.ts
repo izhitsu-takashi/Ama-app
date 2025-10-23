@@ -2066,7 +2066,7 @@ export class MainPage implements OnInit, OnDestroy {
           .map(t => ({
             id: 'task_' + t.id,
             userId: this.currentUser!.id,
-            title: `[期限] ${t.title}`,
+            title: `[期限] ${t.title} (${this.getGroupName(t.groupId)})`,
             startDate: t.dueDate,
             endDate: t.dueDate,
             type: 'task_due',
