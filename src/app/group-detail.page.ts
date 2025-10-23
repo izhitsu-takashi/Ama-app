@@ -28,45 +28,98 @@ import { Firestore } from '@angular/fire/firestore';
           戻る
         </button>
         <div class="header-content">
-          <h1 class="group-title">{{ group?.name }}</h1>
+          <h1 class="group-title" (click)="toggleGroupInfoModal()">{{ group?.name }}</h1>
           <p class="group-description" *ngIf="group?.description">{{ group?.description }}</p>
         </div>
         <div class="header-actions">
-          <button 
-            class="btn btn-secondary" 
-            (click)="toggleMembers()"
-          >
-            <span class="btn-icon">👥</span>
-            メンバー
+          <button class="btn btn-primary" (click)="toggleActionsModal()">
+            <span class="btn-icon">⚙️</span>
+            メニュー
           </button>
-          <button 
-            class="btn btn-secondary" 
-            (click)="toggleTimeline()"
-          >
-            <span class="btn-icon">📈</span>
-            タイムライン
-          </button>
-          <button 
-            *ngIf="isGroupOwner" 
-            class="btn btn-secondary" 
-            (click)="toggleJoinRequests()"
-          >
-            <span class="btn-icon">📝</span>
-            参加リクエスト
-            <span *ngIf="(joinRequests$ | async)?.length" class="request-count">
-              {{ (joinRequests$ | async)?.length }}
-            </span>
-          </button>
-          <button class="btn btn-announcement" 
-                  [class.btn-announcement-unread]="hasUnreadAnnouncements()"
-                  (click)="showAnnouncementListModal()">
-            <span class="btn-icon">📢</span>
-            アナウンス
-          </button>
-          <button class="btn btn-primary" (click)="showCreateTaskModal()">
-            <span class="btn-icon">+</span>
-            課題を作成
-          </button>
+        </div>
+      </div>
+
+      <!-- グループ情報モーダル -->
+      <div class="modal-overlay" *ngIf="showGroupInfoModal" (click)="closeGroupInfoModal()">
+        <div class="modal group-info-modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h2 class="modal-title">グループ情報</h2>
+            <button class="modal-close" (click)="closeGroupInfoModal()">×</button>
+          </div>
+          <div class="modal-form">
+            <div class="group-info-content">
+              <h3 class="info-title">{{ group?.name }}</h3>
+              <p class="info-description" *ngIf="group?.description">{{ group?.description }}</p>
+              <div class="info-stats">
+                <div class="stat-item">
+                  <span class="stat-label">メンバー数:</span>
+                  <span class="stat-value">{{ (members$ | async)?.length || 0 }}人</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">課題数:</span>
+                  <span class="stat-value">{{ (tasks$ | async)?.length || 0 }}件</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">完了率:</span>
+                  <span class="stat-value">{{ getCompletionRate() }}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- アクションメニューモーダル -->
+      <div class="modal-overlay" *ngIf="showActionsModal" (click)="closeActionsModal()">
+        <div class="modal actions-modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h2 class="modal-title">メニュー</h2>
+            <button class="modal-close" (click)="closeActionsModal()">×</button>
+          </div>
+          <div class="modal-form">
+            <div class="actions-grid">
+              <button class="action-card" (click)="toggleMembers(); closeActionsModal()">
+                <div class="action-icon">👥</div>
+                <div class="action-title">メンバー</div>
+                <div class="action-description">グループメンバーを管理</div>
+              </button>
+              
+              <button class="action-card" (click)="toggleTimeline(); closeActionsModal()">
+                <div class="action-icon">📈</div>
+                <div class="action-title">タイムライン</div>
+                <div class="action-description">課題の進捗を可視化</div>
+              </button>
+              
+              <button 
+                *ngIf="isGroupOwner" 
+                class="action-card" 
+                (click)="toggleJoinRequests(); closeActionsModal()"
+              >
+                <div class="action-icon">📝</div>
+                <div class="action-title">参加リクエスト</div>
+                <div class="action-description">参加申請を管理</div>
+                <span *ngIf="(joinRequests$ | async)?.length" class="action-badge">
+                  {{ (joinRequests$ | async)?.length }}
+                </span>
+              </button>
+              
+              <button 
+                class="action-card" 
+                [class.action-card-unread]="hasUnreadAnnouncements()"
+                (click)="showAnnouncementListModal(); closeActionsModal()"
+              >
+                <div class="action-icon">📢</div>
+                <div class="action-title">アナウンス</div>
+                <div class="action-description">グループのお知らせ</div>
+              </button>
+              
+              <button class="action-card action-card-primary" (click)="showCreateTaskModal(); closeActionsModal()">
+                <div class="action-icon">+</div>
+                <div class="action-title">課題を作成</div>
+                <div class="action-description">新しい課題を追加</div>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -763,8 +816,14 @@ import { Firestore } from '@angular/fire/firestore';
     .group-title {
       margin: 0 0 8px 0;
       color: #2d3748;
-      font-size: 28px;
+      font-size: 32px;
       font-weight: 700;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .group-title:hover {
+      color: #667eea;
     }
 
     .group-description {
@@ -775,13 +834,13 @@ import { Firestore } from '@angular/fire/firestore';
 
     .header-actions {
       display: flex;
-      gap: 12px;
+      gap: 8px;
     }
 
     .btn {
-      padding: 12px 20px;
-      border-radius: 12px;
-      font-size: 14px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
@@ -789,7 +848,7 @@ import { Firestore } from '@angular/fire/firestore';
       text-decoration: none;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
     .btn-primary {
@@ -1820,14 +1879,15 @@ import { Firestore } from '@angular/fire/firestore';
       background: white;
       color: #374151;
       border: 2px solid #e5e7eb;
-      padding: 12px 24px;
+      padding: 8px 12px;
       border-radius: 8px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s ease;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
     .btn-announcement:hover {
@@ -2269,6 +2329,146 @@ import { Firestore } from '@angular/fire/firestore';
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
     }
+
+    /* グループ情報モーダル */
+    .group-info-modal {
+      max-width: 500px;
+    }
+
+    .group-info-content {
+      text-align: center;
+    }
+
+    .info-title {
+      margin: 0 0 16px 0;
+      color: #2d3748;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .info-description {
+      margin: 0 0 24px 0;
+      color: #6b7280;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .info-stats {
+      display: flex;
+      justify-content: space-around;
+      gap: 20px;
+    }
+
+    .info-stats .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .info-stats .stat-label {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .info-stats .stat-value {
+      color: #2d3748;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    /* アクションメニューモーダル */
+    .actions-modal {
+      max-width: 600px;
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+    }
+
+    .action-card {
+      background: white;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .action-card:hover {
+      border-color: #667eea;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-card-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: transparent;
+    }
+
+    .action-card-primary:hover {
+      background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+      border-color: transparent;
+    }
+
+    .action-card-unread {
+      background: #fef3c7;
+      border-color: #f59e0b;
+    }
+
+    .action-card-unread:hover {
+      background: #fde68a;
+      border-color: #d97706;
+    }
+
+    .action-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .action-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 4px;
+    }
+
+    .action-card-primary .action-title {
+      color: white;
+    }
+
+    .action-description {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+
+    .action-card-primary .action-description {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .action-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: #ef4444;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 12px;
+      min-width: 20px;
+      text-align: center;
+    }
   `]
 })
 export class GroupDetailPage implements OnInit, OnDestroy {
@@ -2328,6 +2528,10 @@ export class GroupDetailPage implements OnInit, OnDestroy {
 
   // メンバー表示関連
   showMembers = false;
+
+  // モーダル表示関連
+  showGroupInfoModal = false;
+  showActionsModal = false;
 
   // リアクション関連
   taskReactions: { [taskId: string]: { count: number; hasReacted: boolean } } = {};
@@ -3434,5 +3638,22 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       console.error('leave group error', e);
       alert('退会に失敗しました');
     }
+  }
+
+  // モーダル制御メソッド
+  toggleGroupInfoModal() {
+    this.showGroupInfoModal = !this.showGroupInfoModal;
+  }
+
+  closeGroupInfoModal() {
+    this.showGroupInfoModal = false;
+  }
+
+  toggleActionsModal() {
+    this.showActionsModal = !this.showActionsModal;
+  }
+
+  closeActionsModal() {
+    this.showActionsModal = false;
   }
 }
