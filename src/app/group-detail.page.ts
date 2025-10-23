@@ -155,7 +155,8 @@ import { Firestore } from '@angular/fire/firestore';
               <div class="member-item" *ngFor="let member of members">
                 <div class="member-info">
                   <div class="member-avatar">
-                    <span class="avatar-text">{{ getMemberInitial(getMemberDisplayName(member.userId, member.userName, member.userEmail)) }}</span>
+                    <img *ngIf="getMemberPhotoURL(member.userId)" [src]="getMemberPhotoURL(member.userId)" [alt]="getMemberDisplayName(member.userId, member.userName, member.userEmail)">
+                    <span *ngIf="!getMemberPhotoURL(member.userId)" class="avatar-text">{{ getMemberInitialForAvatar(member.userId, member.userName, member.userEmail) }}</span>
                   </div>
                   <div class="member-details">
                     <h4 class="member-name">{{ getMemberDisplayName(member.userId, member.userName, member.userEmail) }}</h4>
@@ -752,7 +753,10 @@ import { Firestore } from '@angular/fire/firestore';
           <div class="members-list" *ngIf="inviteSearchResults.length > 0">
             <div class="member-item" *ngFor="let u of inviteSearchResults">
               <div class="member-info">
-                <div class="member-avatar"><span class="avatar-text">{{ (u.displayName || u.email).slice(0,1) }}</span></div>
+                <div class="member-avatar">
+                  <img *ngIf="getUserPhotoURL(u.id)" [src]="getUserPhotoURL(u.id)" [alt]="u.displayName || u.email">
+                  <span *ngIf="!getUserPhotoURL(u.id)" class="avatar-text">{{ (u.displayName || u.email).slice(0,1) }}</span>
+                </div>
                 <div class="member-details">
                   <h4 class="member-name">{{ u.displayName || u.email }}</h4>
                   <p class="member-email">{{ u.email }}</p>
@@ -2294,6 +2298,14 @@ import { Firestore } from '@angular/fire/firestore';
       color: white;
       font-weight: 600;
       font-size: 18px;
+      overflow: hidden;
+    }
+
+    .member-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
     }
 
     .avatar-text {
@@ -2544,6 +2556,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   members: GroupMembership[] = []; // メンバー情報をキャッシュ
   memberNameById: { [userId: string]: string } = {}; // ユーザー名キャッシュ
   memberEmailById: { [userId: string]: string } = {}; // メールアドレスキャッシュ
+  memberPhotoById: { [userId: string]: string } = {}; // プロフィール画像URLキャッシュ
   tasks$: Observable<TaskItem[]> = of([]);
   filteredTasks: TaskItem[] = [];
   showTimeline = false;
@@ -3021,6 +3034,22 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     }
   }
 
+  private async loadUserPhotoURL(userId: string): Promise<void> {
+    try {
+      // 既にキャッシュ済みならスキップ
+      if (this.memberPhotoById[userId]) return;
+      
+      const profile = await this.userService.getUserProfile(userId);
+      if (profile?.photoURL) {
+        this.memberPhotoById[userId] = profile.photoURL;
+        // 変更検知をトリガー
+        this.cd.detectChanges();
+      }
+    } catch (error) {
+      console.error('プロフィール画像取得エラー:', error);
+    }
+  }
+
   getPriorityLabel(priority: string): string {
     const labels = {
       low: '低',
@@ -3312,6 +3341,49 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   getMemberInitial(name: string): string {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
+  }
+
+  getMemberInitialForAvatar(userId: string, userName?: string, userEmail?: string): string {
+    // キャッシュされた実際のユーザー名を優先
+    if (this.memberNameById[userId]) {
+      return this.memberNameById[userId].charAt(0).toUpperCase();
+    }
+    
+    // グループメンバーシップのuserNameが「グループオーナー」の場合は無視
+    if (userName && userName !== 'グループオーナー') {
+      return userName.charAt(0).toUpperCase();
+    }
+    
+    // メールアドレスから名前を抽出
+    if (userEmail && userEmail !== 'owner@example.com') {
+      return userEmail.split('@')[0].charAt(0).toUpperCase();
+    }
+    
+    // ユーザー名が取得できていない場合は、非同期で取得を試行
+    this.loadUserDisplayName(userId);
+    return 'U';
+  }
+
+  getMemberPhotoURL(userId: string): string | null {
+    // キャッシュされたプロフィール画像URLを確認
+    if (this.memberPhotoById && this.memberPhotoById[userId]) {
+      return this.memberPhotoById[userId];
+    }
+    
+    // 非同期でプロフィール画像を取得
+    this.loadUserPhotoURL(userId);
+    return null;
+  }
+
+  getUserPhotoURL(userId: string): string | null {
+    // キャッシュされたプロフィール画像URLを確認
+    if (this.memberPhotoById && this.memberPhotoById[userId]) {
+      return this.memberPhotoById[userId];
+    }
+    
+    // 非同期でプロフィール画像を取得
+    this.loadUserPhotoURL(userId);
+    return null;
   }
 
   getRoleLabel(role: string): string {
@@ -3629,8 +3701,29 @@ export class GroupDetailPage implements OnInit, OnDestroy {
 
   async sendInviteToUser(userId: string, displayName: string, email: string) {
     if (!this.group || !this.isGroupOwner) return;
+    
     try {
-      // 通知レコードを作成（pushはFunctions側が拾って送信）
+      // 1. 既にメンバーかチェック
+      const isAlreadyMember = await this.groupService.isMember(this.group.id, userId);
+      if (isAlreadyMember) {
+        alert(`${displayName || email} さんは既にグループのメンバーです`);
+        return;
+      }
+
+      // 2. 既に招待済みかチェック（未読の招待通知があるか）
+      const existingInvites = await this.notificationService.getUserNotifications(userId, 100).pipe(take(1)).toPromise();
+      const hasPendingInvite = existingInvites?.some((notification: any) => 
+        notification.type === 'group_invite' && 
+        notification.data?.groupId === this.group?.id && 
+        !notification.isRead
+      ) || false;
+
+      if (hasPendingInvite) {
+        alert(`${displayName || email} さんには既に招待を送信済みです`);
+        return;
+      }
+
+      // 3. 通知レコードを作成（pushはFunctions側が拾って送信）
       await this.notificationService.createGroupNotification(
         'group_invite' as any,
         this.group.id,

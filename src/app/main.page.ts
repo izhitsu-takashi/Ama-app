@@ -198,9 +198,9 @@ import { ProgressReportService } from './progress-report.service';
                     <div>
                       <strong>{{ inv.groupName }}</strong> への招待
                     </div>
-                    <div style="display:flex; gap:0.5rem;">
-                      <button class="btn" (click)="acceptInvite(inv.id, inv.groupId)" style="background:#10b981; color:#fff; border:none; padding:0.35rem 0.75rem; border-radius:8px;">参加</button>
-                      <button class="btn" (click)="declineInvite(inv.id)" style="background:#ef4444; color:#fff; border:none; padding:0.35rem 0.75rem; border-radius:8px;">拒否</button>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:nowrap;">
+                      <button class="btn" (click)="acceptInvite(inv.id, inv.groupId)" style="background:#10b981; color:#fff; border:none; padding:0.35rem 0.75rem; border-radius:8px; white-space:nowrap;">参加</button>
+                      <button class="btn" (click)="declineInvite(inv.id)" style="background:#ef4444; color:#fff; border:none; padding:0.35rem 0.75rem; border-radius:8px; white-space:nowrap;">拒否</button>
                     </div>
                   </div>
                 </div>
@@ -1878,7 +1878,7 @@ export class MainPage implements OnInit, OnDestroy {
           this.unreadMessageCount = unreadMessageCount;
           this.unreadProgressReports = unreadProgressCount;
           this.pendingInvites = (notifications || [])
-            .filter((n: any) => n.type === 'group_invite' && !n.isRead)
+            .filter((n: any) => n.type === 'group_invite')
             .map((n: any) => ({ id: n.id!, groupId: (n.data as any)?.groupId, groupName: (n.data as any)?.groupName || 'グループ' }));
         },
         error: (error) => {
@@ -1917,14 +1917,17 @@ export class MainPage implements OnInit, OnDestroy {
         } as any);
       }
       
-      // 通知を既読/削除
-      await this.notificationService.markAsRead(inviteId);
+      // 通知を削除
+      await deleteDoc(doc(this.firestore, 'notifications', inviteId));
       
       // UIから即座に削除
       this.pendingInvites = this.pendingInvites.filter(i => i.id !== inviteId);
       
       // 通知リストを再読み込み
       this.loadNotifications();
+      
+      // グループ一覧とメンバー数購読を再読み込み
+      this.loadGroups();
     } catch (e) {
       console.error('accept invite error', e);
     }
@@ -1932,13 +1935,11 @@ export class MainPage implements OnInit, OnDestroy {
 
   async declineInvite(inviteId: string) {
     try {
-      await this.notificationService.markAsRead(inviteId);
+      // 通知を削除
+      await deleteDoc(doc(this.firestore, 'notifications', inviteId));
       
       // UIから即座に削除
       this.pendingInvites = this.pendingInvites.filter(i => i.id !== inviteId);
-      
-      // 通知リストを再読み込み
-      this.loadNotifications();
     } catch (e) {
       console.error('decline invite error', e);
     }
