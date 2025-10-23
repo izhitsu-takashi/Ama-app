@@ -415,7 +415,8 @@ import { Firestore } from '@angular/fire/firestore';
                     [class.due-warning]="isDueWithinDays(task.dueDate, 3) && !isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
                     [class.due-danger]="isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
                     [class.overdue]="isOverdue(task.dueDate)">
-                  {{ formatDate(task.dueDate) }}
+                  <span *ngIf="isOverdue(task.dueDate)" class="overdue-text">期限超過</span>
+                  <span *ngIf="!isOverdue(task.dueDate)">{{ formatDate(task.dueDate) }}</span>
                 </td>
                 <td class="task-assignee-cell">
                   {{ task.assigneeName || getAssigneeName(task.assigneeId) }}
@@ -1003,6 +1004,12 @@ import { Firestore } from '@angular/fire/firestore';
       flex-wrap: wrap;
     }
 
+    .tasks-filters .btn-secondary {
+      height: 42px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
     .stat-item {
       display: flex;
       gap: 4px;
@@ -1089,6 +1096,12 @@ import { Firestore } from '@angular/fire/firestore';
     .task-due-cell.due-warning { color: #f59e0b; font-weight: 600; }
     .task-due-cell.due-danger { color: #ef4444; font-weight: 600; }
     .task-due-cell.overdue { color: #ef4444; font-weight: 600; }
+
+    .overdue-text {
+      color: #ef4444;
+      font-weight: 600;
+      font-size: 14px;
+    }
 
     .task-assignee-cell {
       font-size: 16px; /* 文字サイズアップ */
@@ -1355,13 +1368,13 @@ import { Firestore } from '@angular/fire/firestore';
     }
 
     .btn-small {
-      padding: 3px 6px;
+      padding: 3px 8px;
       font-size: 12px;
       border-radius: 4px;
       border: none;
       cursor: pointer;
       transition: all 0.2s ease;
-      min-width: 32px; /* ボタン幅を統一 */
+      min-width: 40px; /* ボタン幅を統一（完了・編集ボタン用） */
       white-space: nowrap; /* 折り返し防止 */
       height: 24px; /* 高さを統一 */
       display: inline-flex;
@@ -1412,6 +1425,24 @@ import { Firestore } from '@angular/fire/firestore';
 
     .btn-primary:hover {
       background: #2563eb;
+    }
+
+    /* 課題一覧テーブルのボタン専用スタイル */
+    .task-actions-cell .btn-success,
+    .task-actions-cell .btn-primary {
+      padding: 6px 12px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 50px;
+      white-space: nowrap;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
     }
 
     .btn-danger {
