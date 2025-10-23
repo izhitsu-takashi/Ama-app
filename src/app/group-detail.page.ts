@@ -28,46 +28,22 @@ import { Firestore } from '@angular/fire/firestore';
           戻る
         </button>
         <div class="header-content">
-          <h1 class="group-title" (click)="toggleGroupInfoModal()">{{ group?.name }}</h1>
+          <h1 class="group-title">{{ group?.name }}</h1>
           <p class="group-description" *ngIf="group?.description">{{ group?.description }}</p>
         </div>
         <div class="header-actions">
-          <button class="btn btn-primary" (click)="toggleActionsModal()">
+          <button class="btn btn-primary" (click)="showCreateTaskModal()">
+            <span class="btn-icon">+</span>
+            課題を作成
+          </button>
+          <button class="btn btn-secondary menu-btn" (click)="toggleActionsModal()">
             <span class="btn-icon">⚙️</span>
             メニュー
+            <span *ngIf="hasMenuNotifications()" class="menu-notification-badge"></span>
           </button>
         </div>
       </div>
 
-      <!-- グループ情報モーダル -->
-      <div class="modal-overlay" *ngIf="showGroupInfoModal" (click)="closeGroupInfoModal()">
-        <div class="modal group-info-modal" (click)="$event.stopPropagation()">
-          <div class="modal-header">
-            <h2 class="modal-title">グループ情報</h2>
-            <button class="modal-close" (click)="closeGroupInfoModal()">×</button>
-          </div>
-          <div class="modal-form">
-            <div class="group-info-content">
-              <h3 class="info-title">{{ group?.name }}</h3>
-              <p class="info-description" *ngIf="group?.description">{{ group?.description }}</p>
-              <div class="info-stats">
-                <div class="stat-item">
-                  <span class="stat-label">メンバー数:</span>
-                  <span class="stat-value">{{ (members$ | async)?.length || 0 }}人</span>
-                </div>
-                <div class="stat-item">
-                  <span class="stat-label">課題数:</span>
-                  <span class="stat-value">{{ (tasks$ | async)?.length || 0 }}件</span>
-                </div>
-                <div class="stat-item">
-                  <span class="stat-label">完了率:</span>
-                  <span class="stat-value">{{ getCompletionRate() }}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- アクションメニューモーダル -->
       <div class="modal-overlay" *ngIf="showActionsModal" (click)="closeActionsModal()">
@@ -111,12 +87,6 @@ import { Firestore } from '@angular/fire/firestore';
                 <div class="action-icon">📢</div>
                 <div class="action-title">アナウンス</div>
                 <div class="action-description">グループのお知らせ</div>
-              </button>
-              
-              <button class="action-card action-card-primary" (click)="showCreateTaskModal(); closeActionsModal()">
-                <div class="action-icon">+</div>
-                <div class="action-title">課題を作成</div>
-                <div class="action-description">新しい課題を追加</div>
               </button>
             </div>
           </div>
@@ -416,7 +386,6 @@ import { Firestore } from '@angular/fire/firestore';
             <thead>
               <tr>
                 <th>タイトル</th>
-                <th>発生日</th>
                 <th>期限</th>
                 <th>担当者</th>
                 <th>優先度</th>
@@ -431,9 +400,9 @@ import { Firestore } from '@angular/fire/firestore';
                 <td class="task-title-cell">
                   <div class="task-title">{{ task.title }}</div>
                   <div class="task-content" *ngIf="task.content">{{ task.content }}</div>
-                </td>
-                <td class="task-date-cell">
-                  {{ formatDate(task.occurredOn) }}
+                  <div class="task-occurred-date" *ngIf="task.occurredOn">
+                    発生日：{{ formatOccurredDate(task.occurredOn) }}
+                  </div>
                 </td>
                 <td class="task-due-cell" 
                     [class.due-warning]="isDueWithinDays(task.dueDate, 3) && !isDueWithinDays(task.dueDate, 1) && !isOverdue(task.dueDate)"
@@ -543,7 +512,12 @@ import { Firestore } from '@angular/fire/firestore';
               formControlName="title" 
               class="form-input"
               placeholder="課題名を入力"
+              maxlength="20"
+              (input)="onTitleInput($event)"
             />
+            <div *ngIf="titleLength >= 20" class="char-limit-warning">
+              最大20文字までです
+            </div>
           </div>
 
           <div class="form-group">
@@ -553,7 +527,12 @@ import { Firestore } from '@angular/fire/firestore';
               class="form-textarea"
               placeholder="課題の詳細を入力"
               rows="3"
+              maxlength="100"
+              (input)="onContentInput($event)"
             ></textarea>
+            <div *ngIf="contentLength >= 100" class="char-limit-warning">
+              最大100文字までです
+            </div>
           </div>
 
           <div class="form-row">
@@ -639,7 +618,12 @@ import { Firestore } from '@angular/fire/firestore';
               formControlName="title" 
               class="form-input"
               placeholder="課題名を入力"
+              maxlength="20"
+              (input)="onTitleInput($event)"
             />
+            <div *ngIf="titleLength >= 20" class="char-limit-warning">
+              最大20文字までです
+            </div>
           </div>
 
           <div class="form-group">
@@ -649,7 +633,12 @@ import { Firestore } from '@angular/fire/firestore';
               class="form-textarea"
               placeholder="課題の詳細を入力"
               rows="3"
+              maxlength="100"
+              (input)="onContentInput($event)"
             ></textarea>
+            <div *ngIf="contentLength >= 100" class="char-limit-warning">
+              最大100文字までです
+            </div>
           </div>
 
           <div class="form-row">
@@ -818,12 +807,6 @@ import { Firestore } from '@angular/fire/firestore';
       color: #2d3748;
       font-size: 32px;
       font-weight: 700;
-      cursor: pointer;
-      transition: color 0.2s ease;
-    }
-
-    .group-title:hover {
-      color: #667eea;
     }
 
     .group-description {
@@ -1063,7 +1046,8 @@ import { Firestore } from '@angular/fire/firestore';
     }
 
     .task-title-cell {
-      min-width: 200px;
+      min-width: 180px;
+      max-width: 250px;
     }
 
     .task-title {
@@ -1079,7 +1063,13 @@ import { Firestore } from '@angular/fire/firestore';
       line-height: 1.4;
     }
 
-    .task-date-cell,
+    .task-occurred-date {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 4px;
+      font-style: italic;
+    }
+
     .task-due-cell {
       white-space: nowrap;
       font-size: 16px; /* 文字サイズアップ */
@@ -1093,11 +1083,13 @@ import { Firestore } from '@angular/fire/firestore';
     .task-assignee-cell {
       font-size: 16px; /* 文字サイズアップ */
       color: #111827; /* 黒 */
+      min-width: 120px;
     }
 
     .task-priority-cell {
       text-align: left; /* 右寄り解消 */
       padding-left: 12px;
+      min-width: 100px;
     }
 
     .priority-badge {
@@ -1146,6 +1138,10 @@ import { Firestore } from '@angular/fire/firestore';
     .task-status-cell .status-badge {
       font-size: 16px;
       padding: 6px 10px;
+    }
+
+    .task-status-cell {
+      min-width: 100px;
     }
 
     .status-not_started {
@@ -2330,52 +2326,6 @@ import { Firestore } from '@angular/fire/firestore';
       box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
     }
 
-    /* グループ情報モーダル */
-    .group-info-modal {
-      max-width: 500px;
-    }
-
-    .group-info-content {
-      text-align: center;
-    }
-
-    .info-title {
-      margin: 0 0 16px 0;
-      color: #2d3748;
-      font-size: 24px;
-      font-weight: 700;
-    }
-
-    .info-description {
-      margin: 0 0 24px 0;
-      color: #6b7280;
-      font-size: 16px;
-      line-height: 1.5;
-    }
-
-    .info-stats {
-      display: flex;
-      justify-content: space-around;
-      gap: 20px;
-    }
-
-    .info-stats .stat-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .info-stats .stat-label {
-      color: #6b7280;
-      font-size: 14px;
-    }
-
-    .info-stats .stat-value {
-      color: #2d3748;
-      font-size: 20px;
-      font-weight: 700;
-    }
 
     /* アクションメニューモーダル */
     .actions-modal {
@@ -2384,7 +2334,7 @@ import { Firestore } from '@angular/fire/firestore';
 
     .actions-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      grid-template-columns: repeat(2, 1fr);
       gap: 16px;
     }
 
@@ -2469,6 +2419,31 @@ import { Firestore } from '@angular/fire/firestore';
       min-width: 20px;
       text-align: center;
     }
+
+    /* メニューボタンの通知バッジ */
+    .menu-btn {
+      position: relative;
+    }
+
+    .menu-notification-badge {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 12px;
+      height: 12px;
+      background: #ef4444;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    /* 文字数制限警告 */
+    .char-limit-warning {
+      color: #ef4444;
+      font-size: 12px;
+      margin-top: 4px;
+      font-weight: 500;
+    }
   `]
 })
 export class GroupDetailPage implements OnInit, OnDestroy {
@@ -2530,8 +2505,11 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   showMembers = false;
 
   // モーダル表示関連
-  showGroupInfoModal = false;
   showActionsModal = false;
+
+  // 文字数制限関連
+  titleLength = 0;
+  contentLength = 0;
 
   // リアクション関連
   taskReactions: { [taskId: string]: { count: number; hasReacted: boolean } } = {};
@@ -3641,19 +3619,52 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   }
 
   // モーダル制御メソッド
-  toggleGroupInfoModal() {
-    this.showGroupInfoModal = !this.showGroupInfoModal;
-  }
-
-  closeGroupInfoModal() {
-    this.showGroupInfoModal = false;
-  }
-
   toggleActionsModal() {
     this.showActionsModal = !this.showActionsModal;
   }
 
   closeActionsModal() {
     this.showActionsModal = false;
+  }
+
+  // 発生日のフォーマット（月日形式）
+  formatOccurredDate(date: any): string {
+    if (!date) return '';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    return `${month}月${day}日`;
+  }
+
+  // メニューに通知があるかチェック
+  hasMenuNotifications(): boolean {
+    // 参加リクエストがあるかチェック（グループオーナーのみ）
+    const hasJoinRequests = this.isGroupOwner && (this.joinRequests$ as any)?.value?.length > 0;
+    // 未読アナウンスがあるかチェック
+    const hasUnreadAnnouncements = this.hasUnreadAnnouncements();
+    return hasJoinRequests || hasUnreadAnnouncements;
+  }
+
+  // 文字数制限チェック
+  onTitleInput(event: any) {
+    const value = event.target.value;
+    this.titleLength = value.length;
+    
+    // 20文字を超えた場合は入力を制限
+    if (value.length > 20) {
+      event.target.value = value.substring(0, 20);
+      this.titleLength = 20;
+    }
+  }
+
+  onContentInput(event: any) {
+    const value = event.target.value;
+    this.contentLength = value.length;
+    
+    // 100文字を超えた場合は入力を制限
+    if (value.length > 100) {
+      event.target.value = value.substring(0, 100);
+      this.contentLength = 100;
+    }
   }
 }
