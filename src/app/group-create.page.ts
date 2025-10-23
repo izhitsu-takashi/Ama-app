@@ -53,12 +53,17 @@ import { TestDataService } from './test-data.service';
                 formControlName="name" 
                 class="form-input"
                 placeholder="グループ名を入力"
+                maxlength="20"
                 [class.error]="form.get('name')?.invalid && form.get('name')?.touched"
+                (input)="onNameInput($event)"
               />
+              <div *ngIf="nameLength >= 20" class="char-limit-warning">
+                最大20文字までです
+              </div>
               <div *ngIf="form.get('name')?.invalid && form.get('name')?.touched" class="error-message">
                 <span *ngIf="form.get('name')?.errors?.['required']">グループ名を入力してください</span>
                 <span *ngIf="form.get('name')?.errors?.['minlength']">グループ名は2文字以上で入力してください</span>
-                <span *ngIf="form.get('name')?.errors?.['maxlength']">グループ名は50文字以内で入力してください</span>
+                <span *ngIf="form.get('name')?.errors?.['maxlength']">グループ名は20文字以内で入力してください</span>
               </div>
             </div>
 
@@ -69,7 +74,12 @@ import { TestDataService } from './test-data.service';
                 class="form-textarea"
                 placeholder="グループの説明を入力（任意）"
                 rows="4"
+                maxlength="100"
+                (input)="onDescriptionInput($event)"
               ></textarea>
+              <div *ngIf="descriptionLength >= 100" class="char-limit-warning">
+                最大100文字までです
+              </div>
               <div class="field-hint">
                 <span class="hint-icon">💡</span>
                 グループの目的や活動内容を説明してください
@@ -114,12 +124,17 @@ import { TestDataService } from './test-data.service';
                 formControlName="name" 
                 class="form-input"
                 placeholder="グループ名を入力"
+                maxlength="20"
                 [class.error]="form.get('name')?.invalid && form.get('name')?.touched"
+                (input)="onNameInput($event)"
               />
+              <div *ngIf="nameLength >= 20" class="char-limit-warning">
+                最大20文字までです
+              </div>
               <div *ngIf="form.get('name')?.invalid && form.get('name')?.touched" class="error-message">
                 <span *ngIf="form.get('name')?.errors?.['required']">グループ名を入力してください</span>
                 <span *ngIf="form.get('name')?.errors?.['minlength']">グループ名は2文字以上で入力してください</span>
-                <span *ngIf="form.get('name')?.errors?.['maxlength']">グループ名は50文字以内で入力してください</span>
+                <span *ngIf="form.get('name')?.errors?.['maxlength']">グループ名は20文字以内で入力してください</span>
               </div>
             </div>
 
@@ -130,7 +145,12 @@ import { TestDataService } from './test-data.service';
                 class="form-textarea"
                 placeholder="グループの概要や目的を入力してください"
                 rows="4"
+                maxlength="100"
+                (input)="onDescriptionInput($event)"
               ></textarea>
+              <div *ngIf="descriptionLength >= 100" class="char-limit-warning">
+                最大100文字までです
+              </div>
               <div class="field-hint">
                 <span class="hint-icon">💡</span>
                 AIがより適切な分析を行うために、詳細な情報を入力してください
@@ -536,6 +556,14 @@ import { TestDataService } from './test-data.service';
       color: #ef4444;
       font-weight: 500;
       margin-top: 6px;
+    }
+
+    /* 文字数制限警告 */
+    .char-limit-warning {
+      color: #ef4444;
+      font-size: 12px;
+      margin-top: 4px;
+      font-weight: 500;
     }
 
     .field-hint {
@@ -1164,13 +1192,40 @@ export class GroupCreatePage {
   };
 
   form = this.fb.group({
-    name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(50)]],
-    description: ['', [Validators.maxLength(500)]],
+    name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(20)]],
+    description: ['', [Validators.maxLength(100)]],
     isPublic: [true, [Validators.required]]
   });
 
+  // 文字数制限のプロパティ
+  nameLength = 0;
+  descriptionLength = 0;
+
   setActiveTab(tab: 'manual' | 'ai') {
     this.activeTab = tab;
+  }
+
+  // 文字数制限のイベントハンドラー
+  onNameInput(event: any) {
+    const value = event.target.value;
+    this.nameLength = value.length;
+    
+    // 20文字を超えた場合は入力をブロック
+    if (value.length > 20) {
+      event.target.value = value.substring(0, 20);
+      this.nameLength = 20;
+    }
+  }
+
+  onDescriptionInput(event: any) {
+    const value = event.target.value;
+    this.descriptionLength = value.length;
+    
+    // 100文字を超えた場合は入力をブロック
+    if (value.length > 100) {
+      event.target.value = value.substring(0, 100);
+      this.descriptionLength = 100;
+    }
   }
 
   async onSubmit() {

@@ -241,8 +241,13 @@ import { Firestore } from '@angular/fire/firestore';
                   name="title"
                   class="form-input"
                   placeholder="アナウンスのタイトルを入力"
+                  maxlength="20"
+                  (input)="onAnnouncementTitleInput($event)"
                   required
                 >
+                <div *ngIf="announcementTitleLength >= 20" class="char-limit-warning">
+                  最大20文字までです
+                </div>
               </div>
               
               <div class="form-group">
@@ -2498,6 +2503,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     title: '',
     content: ''
   };
+  announcementTitleLength = 0;
   unreadAnnouncements: Set<string> = new Set();
   showAnnouncementMenu: string | null = null;
 
@@ -3459,6 +3465,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       title: '',
       content: ''
     };
+    this.announcementTitleLength = 0;
   }
 
   closeAnnouncementModal(): void {
@@ -3467,6 +3474,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       title: '',
       content: ''
     };
+    this.announcementTitleLength = 0;
   }
 
   async createAnnouncement(): Promise<void> {
@@ -3654,6 +3662,18 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     if (value.length > 20) {
       event.target.value = value.substring(0, 20);
       this.titleLength = 20;
+    }
+  }
+
+  // アナウンスタイトルの文字数制限チェック
+  onAnnouncementTitleInput(event: any) {
+    const value = event.target.value;
+    this.announcementTitleLength = value.length;
+    
+    // 20文字を超えた場合は入力をブロック
+    if (value.length > 20) {
+      event.target.value = value.substring(0, 20);
+      this.announcementTitleLength = 20;
     }
   }
 
