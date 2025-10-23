@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { ProgressReportService } from './progress-report.service';
 import { AuthService } from './auth.service';
+import { GroupService } from './group.service';
 import { ProgressReport, ProgressReportComment } from './models';
 import { Observable, Subject, of } from 'rxjs';
 import { takeUntil, take } from 'rxjs/operators';
@@ -537,6 +538,7 @@ import { takeUntil, take } from 'rxjs/operators';
 export class ProgressReportsPage implements OnInit, OnDestroy {
   private progressReportService = inject(ProgressReportService);
   private auth = inject(AuthService);
+  private groupService = inject(GroupService);
   private router = inject(Router);
   private destroy$ = new Subject<void>();
 
@@ -599,8 +601,32 @@ export class ProgressReportsPage implements OnInit, OnDestroy {
     this.router.navigate(['/progress-report-detail', report.id]);
   }
 
-  navigateToGroup(groupId: string) {
-    this.router.navigate(['/group-detail', groupId]);
+  async navigateToGroup(groupId: string) {
+    try {
+      // 現在のユーザーを取得
+      const currentUser = await this.auth.currentUser$.pipe(take(1)).toPromise();
+      if (!currentUser) {
+        alert('ログインが必要です。');
+        return;
+      }
+
+      // ユーザーのグループ一覧を取得
+      const userGroups = await this.groupService.getUserGroups(currentUser.uid).pipe(take(1)).toPromise();
+      
+      // 指定されたグループに参加しているかチェック
+      const isMember = userGroups?.some(group => group.id === groupId);
+      
+      if (isMember) {
+        // 参加している場合はグループ詳細ページに遷移
+        this.router.navigate(['/group', groupId]);
+      } else {
+        // 参加していない場合はメッセージを表示
+        alert('グループに参加していません。グループ一覧からグループ名を検索して参加をお願いします。');
+      }
+    } catch (error) {
+      console.error('グループ遷移エラー:', error);
+      alert('グループ情報の取得に失敗しました。');
+    }
   }
 
   async markAsRead(reportId: string) {

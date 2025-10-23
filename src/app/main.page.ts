@@ -16,6 +16,7 @@ import { Firestore, collection, addDoc, serverTimestamp, query, where, collectio
 import { map, switchMap, take, takeUntil, startWith } from 'rxjs/operators';
 import { DesktopNotificationService } from './desktop-notification.service';
 import { FcmService } from './fcm.service';
+import { ProgressReportService } from './progress-report.service';
 
 @Component({
   selector: 'app-main',
@@ -64,7 +65,7 @@ import { FcmService } from './fcm.service';
       <main class="main-content">
         <!-- 上部アクションボタン -->
         <div class="action-buttons">
-          <button class="action-btn primary" routerLink="/progress-reports">
+          <button class="action-btn primary" routerLink="/progress-reports" [class.has-unread-progress]="unreadProgressReports > 0">
             📊 進捗報告
           </button>
           
@@ -1596,6 +1597,17 @@ import { FcmService } from './fcm.service';
     .btn.secondary:hover {
       background: #e5e7eb;
     }
+
+    .has-unread-progress {
+      background: #fbbf24 !important;
+      color: #92400e !important;
+      border-color: #f59e0b !important;
+    }
+
+    .has-unread-progress:hover {
+      background: #f59e0b !important;
+      color: #78350f !important;
+    }
   `]
 })
 export class MainPage implements OnInit, OnDestroy {
@@ -1611,6 +1623,7 @@ export class MainPage implements OnInit, OnDestroy {
   private firestore = inject(Firestore);
   private desktopNotifications = inject(DesktopNotificationService);
   private fcm = inject(FcmService);
+  private progressReportService = inject(ProgressReportService);
 
   currentUser: User | null = null;
   userGroups$: Observable<Group[]> = of([]);
@@ -1618,6 +1631,7 @@ export class MainPage implements OnInit, OnDestroy {
   recentTasks$: Observable<TaskItem[]> = of([]);
   unreadNotifications = 0;
   unreadMessageCount = 0;
+  unreadProgressReports = 0;
   todayTodos$: Observable<TodoItem[]> = of([]);
   isAdmin$: Observable<boolean> = of(false);
   private destroy$ = new Subject<void>();
@@ -1856,25 +1870,30 @@ export class MainPage implements OnInit, OnDestroy {
       // 通常の通知のみを取得（🔔バッジ用）
       const regularNotifications$ = this.notificationService.getUnreadCount(this.currentUser.id);
       const unreadMessages$ = this.messageService.getUnreadCount();
+      const unreadProgressReports$ = this.progressReportService.getUnreadCount(this.currentUser.id);
       const invites$ = this.notificationService.getUserNotifications(this.currentUser.id, 100);
-      const sub = combineLatest([regularNotifications$, unreadMessages$, invites$]).subscribe({
-        next: ([regularCount, unreadMessageCount, notifications]) => {
+      const sub = combineLatest([regularNotifications$, unreadMessages$, unreadProgressReports$, invites$]).subscribe({
+        next: ([regularCount, unreadMessageCount, unreadProgressCount, notifications]) => {
           this.unreadNotifications = regularCount;
           this.unreadMessageCount = unreadMessageCount;
+          this.unreadProgressReports = unreadProgressCount;
           this.pendingInvites = (notifications || [])
-            .filter(n => n.type === 'group_invite' && !n.isRead)
-            .map(n => ({ id: n.id!, groupId: (n.data as any)?.groupId, groupName: (n.data as any)?.groupName || 'グループ' }));
+            .filter((n: any) => n.type === 'group_invite' && !n.isRead)
+            .map((n: any) => ({ id: n.id!, groupId: (n.data as any)?.groupId, groupName: (n.data as any)?.groupName || 'グループ' }));
         },
         error: (error) => {
           console.error('Error loading notifications:', error);
           this.unreadNotifications = 0;
           this.unreadMessageCount = 0;
+          this.unreadProgressReports = 0;
           this.pendingInvites = [];
         }
       });
       this.subscriptions.push(sub as any);
     } else {
       this.unreadNotifications = 0;
+      this.unreadMessageCount = 0;
+      this.unreadProgressReports = 0;
       this.pendingInvites = [];
     }
   }

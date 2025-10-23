@@ -314,4 +314,22 @@ export class ProgressReportService {
   async deleteComment(commentId: string): Promise<void> {
     await deleteDoc(doc(this.firestore, 'progressReportComments', commentId));
   }
+
+  // 未読の進捗報告数を取得
+  getUnreadCount(userId: string): Observable<number> {
+    return collectionData(
+      query(
+        collection(this.firestore, 'progressReports'),
+        where('recipientId', '==', userId),
+        where('status', '==', 'sent')
+      ),
+      { idField: 'id' }
+    ).pipe(
+      map(reports => (reports as ProgressReport[]).length),
+      catchError(error => {
+        console.error('Error loading unread progress reports:', error);
+        return of(0);
+      })
+    );
+  }
 }

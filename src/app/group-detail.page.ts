@@ -141,7 +141,7 @@ import { Firestore } from '@angular/fire/firestore';
             <div class="header-actions">
               <button 
                 *ngIf="isGroupOwner" 
-                class="btn btn-invite-header" 
+                class="btn btn-invite-header btn-medium" 
                 (click)="openInviteModal()"
                 title="ユーザーを招待"
               >
@@ -167,11 +167,11 @@ import { Firestore } from '@angular/fire/firestore';
                 </div>
                 <div class="member-meta">
                   <span class="join-date">参加日: {{ formatDate(member.joinedAt) }}</span>
+                </div>
+                <div class="member-actions" *ngIf="member.userId === getCurrentUserId() && !isGroupOwner">
                   <button 
-                    *ngIf="member.userId === getCurrentUserId() && !isGroupOwner" 
-                    class="btn btn-danger btn-sm" 
+                    class="btn btn-danger btn-medium" 
                     (click)="leaveGroup()"
-                    style="margin-left: 0.5rem; background: #ef4444; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;"
                   >
                     退会
                   </button>
@@ -197,28 +197,30 @@ import { Firestore } from '@angular/fire/firestore';
             <button class="modal-close" (click)="showJoinRequests = false">×</button>
           </div>
           <div class="modal-form">
-            <div class="join-requests-list" *ngIf="(joinRequests$ | async) as requests; else noJoinRequests">
-              <div class="join-request-item" *ngFor="let request of requests">
-                <div class="request-info">
-                  <div class="request-header">
-                    <h4 class="request-user">{{ request.userName }}</h4>
-                    <span class="request-date">{{ formatDate(request.createdAt) }}</span>
+            <div class="join-requests-list" *ngIf="(joinRequests$ | async) as requests">
+              <div *ngIf="requests.length > 0; else noJoinRequests">
+                <div class="join-request-item" *ngFor="let request of requests">
+                  <div class="request-info">
+                    <div class="request-header">
+                      <h4 class="request-user">{{ request.userName }}</h4>
+                      <span class="request-date">{{ formatDate(request.createdAt) }}</span>
+                    </div>
+                    <p class="request-email">{{ request.userEmail }}</p>
                   </div>
-                  <p class="request-email">{{ request.userEmail }}</p>
-                </div>
-                <div class="request-actions">
-                  <button class="btn btn-success" (click)="approveJoinRequest(request.id!)">承認</button>
-                  <button class="btn btn-danger" (click)="rejectJoinRequest(request.id!)">拒否</button>
+                  <div class="request-actions">
+                    <button class="btn btn-success btn-small" (click)="approveJoinRequest(request.id!)">承認</button>
+                    <button class="btn btn-danger btn-small" (click)="rejectJoinRequest(request.id!)">拒否</button>
+                  </div>
                 </div>
               </div>
+              <ng-template #noJoinRequests>
+                <div class="empty-state">
+                  <div class="empty-icon">📝</div>
+                  <h3 class="empty-title">参加リクエストがありません</h3>
+                  <p class="empty-description">グループへの参加リクエストが届くとここに表示されます</p>
+                </div>
+              </ng-template>
             </div>
-            <ng-template #noJoinRequests>
-              <div class="empty-state">
-                <div class="empty-icon">👥</div>
-                <h3 class="empty-title">参加リクエストがありません</h3>
-                <p class="empty-description">グループへの参加リクエストが届くとここに表示されます</p>
-              </div>
-            </ng-template>
           </div>
         </div>
       </div>
@@ -756,7 +758,7 @@ import { Firestore } from '@angular/fire/firestore';
                 </div>
               </div>
               <div class="member-meta">
-                <button class="btn" (click)="sendInviteToUser(u.id, u.displayName, u.email)">招待を送信</button>
+                <button class="btn btn-medium btn-blue" (click)="sendInviteToUser(u.id, u.displayName, u.email)">招待を送信</button>
               </div>
             </div>
           </div>
@@ -1353,19 +1355,45 @@ import { Firestore } from '@angular/fire/firestore';
     }
 
     .btn-small {
-      padding: 6px 10px;
+      padding: 3px 6px;
+      font-size: 12px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 32px; /* ボタン幅を統一 */
+      white-space: nowrap; /* 折り返し防止 */
+      height: 24px; /* 高さを統一 */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center; /* 文字を中央に */
+      line-height: 1;
+    }
+
+    .btn-medium {
+      padding: 6px 12px;
       font-size: 14px;
       border-radius: 6px;
       border: none;
       cursor: pointer;
       transition: all 0.2s ease;
-      min-width: 48px; /* ボタン幅を統一 */
-      white-space: nowrap; /* 折り返し防止 */
-      height: 32px; /* 高さを統一 */
+      min-width: 48px;
+      white-space: nowrap;
+      height: 32px;
       display: inline-flex;
       align-items: center;
-      justify-content: center; /* 文字を中央に */
+      justify-content: center;
       line-height: 1;
+    }
+
+    .btn-blue {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: white;
+    }
+
+    .btn-blue:hover {
+      background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+      transform: translateY(-1px);
     }
 
     .btn-success {
@@ -1559,6 +1587,8 @@ import { Firestore } from '@angular/fire/firestore';
     .empty-description {
       margin: 0 0 24px 0;
       color: #6b7280;
+      font-size: 14px;
+      line-height: 1.5;
     }
 
     /* モーダル */
@@ -2201,12 +2231,13 @@ import { Firestore } from '@angular/fire/firestore';
     .member-item {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       padding: 16px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 12px;
       transition: all 0.2s;
+      position: relative;
     }
 
     .member-item:hover {
@@ -2276,6 +2307,13 @@ import { Firestore } from '@angular/fire/firestore';
 
     .member-meta {
       text-align: right;
+      flex: 1;
+    }
+
+    .member-actions {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
     }
 
     .join-date {
@@ -2496,6 +2534,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   joinRequests$: Observable<JoinRequest[]> = of([]);
   showJoinRequests = false;
   isGroupOwner = false;
+  joinRequestCount = 0;
 
   // アナウンス関連
   announcements: Announcement[] = [];
@@ -2596,6 +2635,10 @@ export class GroupDetailPage implements OnInit, OnDestroy {
           // グループオーナーの場合、参加リクエストを読み込み
           if (this.isGroupOwner) {
             this.joinRequests$ = this.joinRequestService.getGroupJoinRequests(group.id);
+            // 参加リクエスト数を監視
+            this.joinRequests$.pipe(takeUntil(this.destroy$)).subscribe(requests => {
+              this.joinRequestCount = requests.length;
+            });
           }
         });
         
@@ -3650,7 +3693,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   // メニューに通知があるかチェック
   hasMenuNotifications(): boolean {
     // 参加リクエストがあるかチェック（グループオーナーのみ）
-    const hasJoinRequests = this.isGroupOwner && (this.joinRequests$ as any)?.value?.length > 0;
+    const hasJoinRequests = this.isGroupOwner && this.joinRequestCount > 0;
     // 未読アナウンスがあるかチェック
     const hasUnreadAnnouncements = this.hasUnreadAnnouncements();
     return hasJoinRequests || hasUnreadAnnouncements;

@@ -360,9 +360,9 @@ export class AiReportGeneratorService {
   private getPriorityLabel(priority: string): string {
     switch (priority) {
       case 'urgent': return '緊急';
-      case 'high': return '高';
-      case 'medium': return '中';
-      case 'low': return '低';
+      case 'high': return '優先度高';
+      case 'medium': return '優先度中';
+      case 'low': return '優先度低';
       default: return '未設定';
     }
   }
