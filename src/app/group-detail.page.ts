@@ -1054,12 +1054,20 @@ import { Firestore } from '@angular/fire/firestore';
       font-size: 16px;
     }
 
+    .tasks-table th:not(:first-child) {
+      text-align: center;
+    }
+
     .tasks-table td {
       padding: 16px 12px;
       border-bottom: 1px solid #f1f5f9;
       vertical-align: top;
       background: white;
       font-size: 16px; /* タイトル以外の文字を大きく */
+    }
+
+    .tasks-table td:not(:first-child) {
+      text-align: center;
     }
 
     .task-row:hover {
