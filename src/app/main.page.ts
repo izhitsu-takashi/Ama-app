@@ -1232,7 +1232,7 @@ import { ProgressReportService } from './progress-report.service';
       padding: clamp(0.75rem, 2vw, 1.5rem); /* 可変パディング */
       cursor: pointer;
       transition: all 0.2s;
-      border: 2px solid transparent;
+      border: 2px solid #e2e8f0; /* グループの淵を少し濃い色に */
       display: flex;
       align-items: center;
       justify-content: space-between;
