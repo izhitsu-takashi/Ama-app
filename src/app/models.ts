@@ -292,6 +292,7 @@ export interface TodoItem {
   isCompleted: boolean;
   relatedId?: Id; // 関連するタスクやイベントのID
   groupId?: Id; // グループID（タスクの場合）
+  groupName?: string; // グループ名（表示用）
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

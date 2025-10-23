@@ -115,8 +115,7 @@ import { FcmService } from './fcm.service';
           <div class="todo-content">
             <div class="todo-header">
               <span class="todo-type">{{ getTypeEmoji(todo.type) }}</span>
-              <span class="todo-title">{{ todo.title }}</span>
-              <span class="todo-priority">{{ getPriorityEmoji(todo.priority) }}</span>
+              <span class="todo-title">{{ getTodoDisplayTitle(todo) }}</span>
             </div>
             
             <div *ngIf="todo.description" class="todo-description">
@@ -126,6 +125,7 @@ import { FcmService } from './fcm.service';
             <div *ngIf="todo.dueDate" class="todo-due-date">
               ⏰ {{ formatTodoDate(todo.dueDate) }}
             </div>
+            
           </div>
           
           <div class="todo-actions">
@@ -787,6 +787,12 @@ import { FcmService } from './fcm.service';
       display: flex;
       align-items: center;
       gap: 0.25rem;
+    }
+
+    .todo-group-name {
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-top: 4px;
     }
 
     .calendar-section, .right-section {
@@ -1946,11 +1952,11 @@ export class MainPage implements OnInit, OnDestroy {
 
   getTypeEmoji(type: string): string {
     const emojis = {
-      task: '📋',
-      event: '📅',
-      deadline: '⏰'
+      task: '',
+      event: '',
+      deadline: ''
     };
-    return emojis[type as keyof typeof emojis] || '📝';
+    return emojis[type as keyof typeof emojis] || '';
   }
 
   formatTodoDate(date: any): string {
@@ -1977,6 +1983,14 @@ export class MainPage implements OnInit, OnDestroy {
       hour: '2-digit',
       minute: '2-digit'
     });
+  }
+
+  // TODO表示タイトルを取得（課題期限の場合はグループ名も含める）
+  getTodoDisplayTitle(todo: any): string {
+    if ((todo.type === 'deadline' || todo.type === 'task') && todo.groupName) {
+      return `${todo.title} (${todo.groupName})`;
+    }
+    return todo.title;
   }
 
   
@@ -2066,7 +2080,7 @@ export class MainPage implements OnInit, OnDestroy {
           .map(t => ({
             id: 'task_' + t.id,
             userId: this.currentUser!.id,
-            title: `[期限] ${t.title} (${this.getGroupName(t.groupId)})`,
+            title: `${t.title} (${this.getGroupName(t.groupId)})`,
             startDate: t.dueDate,
             endDate: t.dueDate,
             type: 'task_due',

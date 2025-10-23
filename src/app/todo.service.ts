@@ -50,6 +50,7 @@ export class TodoService {
 
             // 今日期限のタスクをTodoItemに変換
             todayTasks.forEach(task => {
+              const group = groups.find(g => g.id === task.groupId);
               todos.push({
                 id: `task-${task.id}`,
                 title: task.title,
@@ -60,6 +61,7 @@ export class TodoService {
                 isCompleted: task.status === 'completed',
                 relatedId: task.id,
                 groupId: task.groupId,
+                groupName: group?.name,
                 createdAt: task.createdAt,
                 updatedAt: task.updatedAt
               });
@@ -69,6 +71,7 @@ export class TodoService {
             const todayTaskIds = new Set(todayTasks.map(t => t.id));
             upcomingTasks.forEach(task => {
               if (!todayTaskIds.has(task.id)) {
+                const group = groups.find(g => g.id === task.groupId);
                 todos.push({
                   id: `task-${task.id}`,
                   title: task.title,
@@ -79,6 +82,7 @@ export class TodoService {
                   isCompleted: task.status === 'completed',
                   relatedId: task.id,
                   groupId: task.groupId,
+                  groupName: group?.name,
                   createdAt: task.createdAt,
                   updatedAt: task.updatedAt
                 });
