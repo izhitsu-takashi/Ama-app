@@ -32,6 +32,15 @@ import { FcmService } from './fcm.service';
           </h1>
         </div>
         <div class="header-right">
+          <!-- 管理者ボタン -->
+          <button 
+            class="admin-header-btn" 
+            routerLink="/admin"
+            *ngIf="isAdmin$ | async"
+            title="管理者ダッシュボード"
+          >
+            👑 管理者
+          </button>
           <div class="notification-container">
             <button class="notification-btn" routerLink="/notifications">
               <span class="bell-icon" 
@@ -87,15 +96,6 @@ import { FcmService } from './fcm.service';
             🏢 部門課題
           </button>
           
-          <!-- 管理者メニュー -->
-          <button 
-            class="action-btn admin-btn" 
-            routerLink="/admin"
-            *ngIf="isAdmin$ | async"
-            title="管理者ダッシュボード"
-          >
-            👑 管理者
-          </button>
         </div>
 
         <!-- コンテンツエリア -->
@@ -607,14 +607,20 @@ import { FcmService } from './fcm.service';
       color: #667eea;
     }
 
-    .action-btn.admin-btn {
+    .admin-header-btn {
       background: linear-gradient(135deg, #f59e0b, #d97706);
       color: white;
       font-weight: 600;
       border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-right: 0.75rem;
     }
 
-    .action-btn.admin-btn:hover {
+    .admin-header-btn:hover {
       background: linear-gradient(135deg, #d97706, #b45309);
       transform: translateY(-1px);
     }

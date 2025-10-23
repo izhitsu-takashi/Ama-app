@@ -84,6 +84,14 @@ import { takeUntil } from 'rxjs/operators';
                 </div>
                 <div class="group-actions">
                   <button 
+                    class="action-btn join-btn" 
+                    (click)="joinGroupAsOwner(group)"
+                    title="グループに参加（オーナー権限）"
+                    *ngIf="!isCurrentUserInGroup(group)"
+                  >
+                    👑 参加
+                  </button>
+                  <button 
                     class="action-btn danger-btn" 
                     (click)="deleteGroup(group)"
                     title="グループを削除"
@@ -374,6 +382,17 @@ import { takeUntil } from 'rxjs/operators';
       transition: all 0.2s ease;
     }
 
+    .join-btn {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
+      margin-right: 0.5rem;
+    }
+
+    .join-btn:hover {
+      background: linear-gradient(135deg, #d97706, #b45309);
+      transform: translateY(-1px);
+    }
+
     .danger-btn {
       background: #fee2e2;
       color: #dc2626;
@@ -623,6 +642,33 @@ export class AdminGroupsPage implements OnInit, OnDestroy {
       month: 'short', 
       day: 'numeric'
     });
+  }
+
+  isCurrentUserInGroup(group: Group): boolean {
+    const currentUserId = this.authService.currentUser?.uid;
+    return currentUserId ? group.memberIds.includes(currentUserId) : false;
+  }
+
+  async joinGroupAsOwner(group: Group) {
+    if (!confirm(`グループ「${group.name}」にオーナー権限で参加しますか？`)) {
+      return;
+    }
+
+    try {
+      const currentUserId = this.authService.currentUser?.uid;
+      if (!currentUserId) {
+        alert('ユーザー情報が見つかりません');
+        return;
+      }
+
+      // グループに参加（オーナー権限）
+      await this.groupService.addMember(group.id, currentUserId, 'admin');
+      this.loadGroups(); // グループリストを再読み込み
+      alert('グループにオーナー権限で参加しました');
+    } catch (error) {
+      console.error('グループ参加エラー:', error);
+      alert('グループへの参加に失敗しました');
+    }
   }
 
   async deleteGroup(group: Group) {

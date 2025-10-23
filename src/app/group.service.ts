@@ -263,9 +263,25 @@ export class GroupService {
       collection(this.firestore, 'groups'),
       { idField: 'id' }
     ).pipe(
-      map((groups: any[]) => {
+      switchMap((groups: any[]) => {
+        // 各グループのメンバーシップを取得
+        const groupPromises = groups.map(async (group: any) => {
+          const membersSnapshot = await getDocs(
+            query(collection(this.firestore, 'groupMemberships'), where('groupId', '==', group.id))
+          );
+          const memberIds = membersSnapshot.docs.map(doc => doc.data()['userId']);
+          
+          return {
+            ...group,
+            memberIds: memberIds
+          } as Group;
+        });
+        
+        return from(Promise.all(groupPromises));
+      }),
+      map((groups: Group[]) => {
         // クライアント側でソートとリミット
-        return (groups as Group[])
+        return groups
           .sort((a, b) => {
             const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
             const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);

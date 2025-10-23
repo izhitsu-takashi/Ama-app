@@ -826,7 +826,7 @@ import { Firestore } from '@angular/fire/firestore';
     }
 
     .btn {
-      padding: 8px 12px;
+      padding: 12px 18px;
       border-radius: 8px;
       font-size: 12px;
       font-weight: 600;
@@ -837,6 +837,9 @@ import { Firestore } from '@angular/fire/firestore';
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      min-width: 100px;
+      height: 54px;
+      justify-content: center;
     }
 
     .btn-primary {

@@ -92,6 +92,24 @@ import { takeUntil } from 'rxjs/operators';
                   <span class="label">最終更新:</span>
                   <span class="value">{{ formatDate(user.updatedAt) }}</span>
                 </div>
+                <div class="detail-item">
+                  <span class="label">所属:</span>
+                  <div class="department-edit">
+                    <select 
+                      [(ngModel)]="user.department" 
+                      (change)="updateUserDepartment(user)"
+                      class="department-select"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="development">開発部</option>
+                      <option value="consulting">コンサルティング部</option>
+                      <option value="sales">営業部</option>
+                      <option value="corporate">総務部</option>
+                      <option value="training">研修部</option>
+                      <option value="other">その他</option>
+                    </select>
+                  </div>
+                </div>
               </div>
               
               <div class="user-actions">
@@ -374,6 +392,27 @@ import { takeUntil } from 'rxjs/operators';
       font-size: 0.875rem;
     }
 
+    .department-edit {
+      display: flex;
+      align-items: center;
+    }
+
+    .department-select {
+      padding: 0.25rem 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      width: 150px;
+      background: white;
+      cursor: pointer;
+    }
+
+    .department-select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    }
+
     .user-actions {
       display: flex;
       gap: 0.5rem;
@@ -568,6 +607,16 @@ export class AdminUsersPage implements OnInit, OnDestroy {
     } catch (error) {
       console.error('権限変更エラー:', error);
       alert('権限の変更に失敗しました');
+    }
+  }
+
+  async updateUserDepartment(user: User) {
+    try {
+      await this.userService.updateUserProfile(user.id, { department: user.department });
+      alert('所属を更新しました');
+    } catch (error) {
+      console.error('所属更新エラー:', error);
+      alert('所属の更新に失敗しました');
     }
   }
 
