@@ -82,59 +82,55 @@ import { AutoReportSchedule, Group, User } from './models';
             <h3>送信先設定</h3>
             <div class="form-row">
               <div class="form-group">
-                <label>送信先タイプ *</label>
-                <div class="radio-group">
-                  <label>
-                    <input type="radio" formControlName="recipientType" value="person">
-                    個人
-                  </label>
-                  <label>
-                    <input type="radio" formControlName="recipientType" value="group">
-                    グループ
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <!-- 個人選択 -->
-            <div *ngIf="recipientType === 'person'" class="form-row">
-              <div class="form-group">
-                <label for="userSearch">ユーザー検索</label>
+                <label for="userSearch">送信先ユーザー検索</label>
                 <input 
                   type="text" 
                   id="userSearch" 
                   [(ngModel)]="userSearchTerm" 
                   [ngModelOptions]="{standalone: true}"
                   (input)="onUserSearch()"
-                  placeholder="ユーザー名で検索..."
+                  placeholder="ユーザー名またはメールアドレスで検索..."
                   class="search-input">
                 
                 <div *ngIf="showUserDropdown && filteredUsers.length > 0" class="dropdown">
                   <div 
                     *ngFor="let user of filteredUsers" 
-                    class="dropdown-item"
-                    (click)="selectUser(user)">
-                    {{ user.displayName || (user.email ? user.email.split('@')[0] : 'ユーザー') }}
+                    class="dropdown-item user-item"
+                    (click)="toggleUserSelection(user)">
+                    <div class="user-avatar">
+                      <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || 'ユーザー'" class="avatar-image">
+                      <div *ngIf="!user.photoURL" class="default-avatar">
+                        {{ getUserInitials(user) }}
+                      </div>
+                    </div>
+                    <div class="user-info">
+                      <div class="user-name">{{ user.displayName || '名前未設定' }}</div>
+                      <div class="user-email">{{ user.email }}</div>
+                    </div>
+                    <div class="user-selection">
+                      <span *ngIf="isUserSelected(user)" class="selected-icon">✓</span>
+                    </div>
                   </div>
                 </div>
                 
-                <div *ngIf="selectedUser" class="selected-user">
-                  <span>選択中: {{ selectedUser.displayName || (selectedUser.email ? selectedUser.email.split('@')[0] : 'ユーザー') }}</span>
-                  <button type="button" (click)="clearUserSelection()" class="clear-btn">×</button>
+                <div *ngIf="selectedUsers.length > 0" class="selected-users">
+                  <h4>選択中のユーザー ({{ selectedUsers.length }}人)</h4>
+                  <div class="selected-users-list">
+                    <div *ngFor="let user of selectedUsers" class="selected-user-item">
+                      <div class="user-avatar">
+                        <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || 'ユーザー'" class="avatar-image">
+                        <div *ngIf="!user.photoURL" class="default-avatar">
+                          {{ getUserInitials(user) }}
+                        </div>
+                      </div>
+                      <div class="user-info">
+                        <div class="user-name">{{ user.displayName || '名前未設定' }}</div>
+                        <div class="user-email">{{ user.email }}</div>
+                      </div>
+                      <button type="button" (click)="removeUser(user)" class="remove-btn">×</button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            <!-- グループ選択 -->
-            <div *ngIf="recipientType === 'group'" class="form-row">
-              <div class="form-group">
-                <label for="groupSelect">送信先グループ *</label>
-                <select id="groupSelect" formControlName="groupId">
-                  <option value="">グループを選択してください</option>
-                  <option *ngFor="let group of userGroups$ | async" [value]="group.id">
-                    {{ group.name }}
-                  </option>
-                </select>
               </div>
             </div>
           </div>
@@ -197,7 +193,12 @@ import { AutoReportSchedule, Group, User } from './models';
               </div>
               <div class="detail-row">
                 <span class="label">送信先:</span>
-                <span>{{ schedule.recipientName || schedule.groupName }}</span>
+                <span *ngIf="schedule.recipientNames && schedule.recipientNames.length > 0">
+                  {{ schedule.recipientNames.join(', ') }}
+                </span>
+                <span *ngIf="!schedule.recipientNames || schedule.recipientNames.length === 0">
+                  {{ schedule.recipientName || schedule.groupName }}
+                </span>
               </div>
               <div class="detail-row">
                 <span class="label">添付グループ:</span>
@@ -331,7 +332,7 @@ import { AutoReportSchedule, Group, User } from './models';
       background: rgba(248, 249, 250, 0.8);
       border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.2);
-      overflow: hidden;
+      overflow: visible;
       box-sizing: border-box;
     }
 
@@ -348,12 +349,14 @@ import { AutoReportSchedule, Group, User } from './models';
       margin-bottom: 15px;
       width: 100%;
       box-sizing: border-box;
+      overflow: visible;
     }
 
     .form-group {
       flex: 1;
       min-width: 0;
       box-sizing: border-box;
+      overflow: visible;
     }
 
     .form-group label {
@@ -412,6 +415,7 @@ import { AutoReportSchedule, Group, User } from './models';
 
     .form-group {
       position: relative;
+      overflow: visible;
     }
 
     .dropdown {
@@ -423,10 +427,12 @@ import { AutoReportSchedule, Group, User } from './models';
       border: 2px solid rgba(102, 126, 234, 0.3);
       border-top: none;
       border-radius: 0 0 8px 8px;
-      max-height: 200px;
+      max-height: 300px;
       overflow-y: auto;
-      z-index: 1000;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      min-width: 100%;
+      width: 100%;
     }
 
     .dropdown-item {
@@ -445,17 +451,155 @@ import { AutoReportSchedule, Group, User } from './models';
       border-bottom: none;
     }
 
-    .selected-user {
+    .user-item {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 12px;
       padding: 12px 16px;
+      border-bottom: 1px solid #f1f3f4;
+      transition: background-color 0.2s ease;
+      min-height: 60px;
+      white-space: nowrap;
+    }
+
+    .user-item:hover {
       background: rgba(102, 126, 234, 0.1);
-      border: 2px solid rgba(102, 126, 234, 0.3);
-      border-radius: 8px;
-      margin-top: 8px;
+    }
+
+    .user-item:last-child {
+      border-bottom: none;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .avatar-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .default-avatar {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .user-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+    }
+
+    .user-email {
+      font-size: 12px;
+      color: #718096;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+    }
+
+    .user-selection {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .selected-icon {
       color: #667eea;
-      font-weight: 500;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .selected-users {
+      margin-top: 16px;
+      padding: 16px;
+      background: rgba(102, 126, 234, 0.05);
+      border: 2px solid rgba(102, 126, 234, 0.2);
+      border-radius: 8px;
+    }
+
+    .selected-users h4 {
+      margin: 0 0 12px 0;
+      color: #667eea;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .selected-users-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .selected-user-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      background: white;
+      border: 1px solid rgba(102, 126, 234, 0.3);
+      border-radius: 6px;
+    }
+
+    .selected-user-item .user-avatar {
+      width: 32px;
+      height: 32px;
+    }
+
+    .selected-user-item .user-name {
+      font-size: 14px;
+      margin-bottom: 1px;
+    }
+
+    .selected-user-item .user-email {
+      font-size: 11px;
+    }
+
+    .remove-btn {
+      background: rgba(229, 62, 62, 0.1);
+      border: none;
+      color: #e53e3e;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .remove-btn:hover {
+      background: rgba(229, 62, 62, 0.2);
+      transform: scale(1.1);
     }
 
     .clear-btn {
@@ -694,6 +838,56 @@ import { AutoReportSchedule, Group, User } from './models';
       .schedule-actions {
         flex-wrap: wrap;
       }
+
+      .dropdown {
+        max-height: 250px;
+        left: 0;
+        right: 0;
+        width: 100%;
+      }
+
+      .user-item {
+        min-height: 50px;
+        padding: 8px 12px;
+        gap: 8px;
+      }
+
+      .user-avatar {
+        width: 32px;
+        height: 32px;
+      }
+
+      .user-name {
+        font-size: 14px;
+        max-width: 150px;
+      }
+
+      .user-email {
+        font-size: 11px;
+        max-width: 150px;
+      }
+
+      .selected-users {
+        padding: 12px;
+      }
+
+      .selected-user-item {
+        padding: 6px 8px;
+        gap: 8px;
+      }
+
+      .selected-user-item .user-avatar {
+        width: 28px;
+        height: 28px;
+      }
+
+      .selected-user-item .user-name {
+        font-size: 13px;
+      }
+
+      .selected-user-item .user-email {
+        font-size: 10px;
+      }
     }
   `]
 })
@@ -713,10 +907,9 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
   allUsers$!: Observable<User[]>;
 
   // フォーム関連
-  recipientType: 'person' | 'group' = 'person';
   userSearchTerm = '';
   filteredUsers: User[] = [];
-  selectedUser: User | null = null;
+  selectedUsers: User[] = [];
   showUserDropdown = false;
 
   // 状態管理
@@ -730,14 +923,8 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
       frequency: ['weekly', Validators.required],
       sendTime: ['09:00', Validators.required],
       startDate: [new Date().toISOString().split('T')[0], Validators.required],
-      recipientType: ['person', Validators.required],
-      recipientId: [null],
-      groupId: [null],
       attachedGroupId: ['']
     });
-
-    // recipientTypeの初期値を設定
-    this.recipientType = 'person';
   }
 
   ngOnInit(): void {
@@ -806,17 +993,37 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
     });
   }
 
-  selectUser(user: User): void {
-    this.selectedUser = user;
-    this.scheduleForm.patchValue({ recipientId: user.id });
+  toggleUserSelection(user: User): void {
+    const index = this.selectedUsers.findIndex(u => u.id === user.id);
+    if (index > -1) {
+      this.selectedUsers.splice(index, 1);
+    } else {
+      this.selectedUsers.push(user);
+    }
     this.userSearchTerm = '';
     this.showUserDropdown = false;
     this.filteredUsers = [];
   }
 
-  clearUserSelection(): void {
-    this.selectedUser = null;
-    this.scheduleForm.patchValue({ recipientId: null });
+  isUserSelected(user: User): boolean {
+    return this.selectedUsers.some(u => u.id === user.id);
+  }
+
+  removeUser(user: User): void {
+    const index = this.selectedUsers.findIndex(u => u.id === user.id);
+    if (index > -1) {
+      this.selectedUsers.splice(index, 1);
+    }
+  }
+
+  getUserInitials(user: User): string {
+    if (user.displayName) {
+      return user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    if (user.email) {
+      return user.email.split('@')[0].slice(0, 2).toUpperCase();
+    }
+    return 'U';
   }
 
   markFormGroupTouched(): void {
@@ -832,13 +1039,8 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
     console.log('Form value:', this.scheduleForm.value);
     
     // カスタムバリデーション
-    const formValue = this.scheduleForm.value;
-    if (formValue.recipientType === 'person' && !this.selectedUser) {
+    if (this.selectedUsers.length === 0) {
       alert('送信先のユーザーを選択してください');
-      return;
-    }
-    if (formValue.recipientType === 'group' && !formValue.groupId) {
-      alert('送信先のグループを選択してください');
       return;
     }
     
@@ -850,19 +1052,6 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
 
     this.loading = true;
 
-    // 送信先の設定
-    let recipientId: string | undefined;
-    let recipientName: string | undefined;
-    let groupId: string | undefined;
-    let groupName: string | undefined;
-
-    if (formValue.recipientType === 'person') {
-      recipientId = formValue.recipientId;
-      recipientName = this.selectedUser?.displayName || (this.selectedUser?.email ? this.selectedUser.email.split('@')[0] : 'ユーザー');
-    } else {
-      groupId = formValue.groupId;
-    }
-
     const currentUser = this.authService.currentUser;
     if (!currentUser) {
       console.error('ユーザーが認証されていません');
@@ -872,11 +1061,7 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
 
     // グループ名を取得するためにObservableを使用
     this.userGroups$.pipe(takeUntil(this.destroy$)).subscribe(groups => {
-      if (formValue.recipientType === 'group' && groupId) {
-        const selectedGroup = groups.find(g => g.id === groupId);
-        groupName = selectedGroup?.name;
-      }
-
+      const formValue = this.scheduleForm.value;
       const attachedGroup = groups.find(g => g.id === formValue.attachedGroupId);
       const attachedGroupName = attachedGroup?.name;
 
@@ -891,27 +1076,12 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
         frequency: formValue.frequency,
         startDate: Timestamp.fromDate(new Date(formValue.startDate)),
         sendTime: formValue.sendTime,
-        recipientType: formValue.recipientType,
+        recipientType: 'person',
+        recipientIds: this.selectedUsers.map(user => user.id),
+        recipientNames: this.selectedUsers.map(user => user.displayName || user.email?.split('@')[0] || 'ユーザー'),
         nextSendAt: Timestamp.fromDate(startDate),
         isActive: true
       };
-
-      // 送信先の設定（undefinedの場合はフィールドを除外）
-      if (formValue.recipientType === 'person') {
-        if (recipientId) {
-          scheduleData.recipientId = recipientId;
-        }
-        if (recipientName) {
-          scheduleData.recipientName = recipientName;
-        }
-      } else {
-        if (groupId) {
-          scheduleData.groupId = groupId;
-        }
-        if (groupName) {
-          scheduleData.groupName = groupName;
-        }
-      }
 
       // 添付グループの設定（空でない場合のみ）
       if (formValue.attachedGroupId && formValue.attachedGroupId.trim() !== '') {
@@ -942,8 +1112,7 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
             console.log('Schedule created with ID:', scheduleId);
             this.loading = false;
             this.scheduleForm.reset();
-            this.selectedUser = null;
-            this.recipientType = 'person';
+            this.selectedUsers = [];
             
             // 少し遅延を入れてからリストを更新
             setTimeout(() => {
@@ -964,7 +1133,6 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
 
   editSchedule(schedule: AutoReportSchedule): void {
     this.editingSchedule = schedule;
-    this.recipientType = schedule.recipientType;
     this.activeTab = 'create'; // 新規作成タブに切り替え
     
     this.scheduleForm.patchValue({
@@ -972,18 +1140,12 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
       frequency: schedule.frequency,
       sendTime: schedule.sendTime,
       startDate: schedule.startDate.toDate().toISOString().split('T')[0],
-      recipientType: schedule.recipientType,
-      recipientId: schedule.recipientId,
-      groupId: schedule.groupId,
       attachedGroupId: schedule.attachedGroupId
     });
 
-    if (schedule.recipientType === 'person' && schedule.recipientId) {
+    if (schedule.recipientIds && schedule.recipientIds.length > 0) {
       this.allUsers$.pipe(takeUntil(this.destroy$)).subscribe(users => {
-        const user = users.find(u => u.id === schedule.recipientId);
-        if (user) {
-          this.selectedUser = user;
-        }
+        this.selectedUsers = users.filter(u => schedule.recipientIds!.includes(u.id));
       });
     }
   }
@@ -991,8 +1153,7 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
   cancelEdit(): void {
     this.editingSchedule = null;
     this.scheduleForm.reset();
-    this.selectedUser = null;
-    this.recipientType = 'person';
+    this.selectedUsers = [];
   }
 
   toggleScheduleActive(schedule: AutoReportSchedule): void {

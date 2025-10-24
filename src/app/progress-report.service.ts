@@ -30,8 +30,28 @@ export class ProgressReportService {
   // 進捗報告通知を送信
   private async sendProgressReportNotification(report: ProgressReport): Promise<void> {
     try {
-      if (report.recipientId) {
-        // 特定の人への送信
+      if (report.recipientIds && report.recipientIds.length > 0) {
+        // 複数ユーザーへの送信
+        const notificationPromises = report.recipientIds
+          .filter(recipientId => recipientId !== report.senderId) // 送信者以外
+          .map(recipientId => 
+            this.notificationService.createNotification({
+              userId: recipientId,
+              type: 'progress_report',
+              title: '新しい進捗報告が届きました',
+              message: `${report.senderName}さんから進捗報告「${report.title}」が送信されました`,
+              content: report.content,
+              data: {
+                reportId: report.id,
+                senderId: report.senderId,
+                senderName: report.senderName
+              }
+            })
+          );
+        
+        await Promise.all(notificationPromises);
+      } else if (report.recipientId) {
+        // 特定の人への送信（後方互換性）
         await this.notificationService.createNotification({
           userId: report.recipientId,
           type: 'progress_report',

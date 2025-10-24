@@ -6,7 +6,6 @@ import { GroupService } from './group.service';
 import { AuthService } from './auth.service';
 import { AiProjectAnalyzerService, ProjectInput, ProjectAnalysis, LearningData } from './ai-project-analyzer.service';
 import { TaskService } from './task.service';
-import { TestDataService } from './test-data.service';
 
 @Component({
   selector: 'app-group-create',
@@ -234,15 +233,6 @@ import { TestDataService } from './test-data.service';
                   <span *ngIf="analyzing" class="loading-spinner">⏳</span>
                 </button>
                 
-                <!-- テスト用ボタン -->
-                <button 
-                  type="button" 
-                  class="btn btn-test"
-                  (click)="createTestData()"
-                  [disabled]="loading"
-                >
-                  🧪 テストデータ作成
-                </button>
               </div>
 
               <!-- AI分析結果 -->
@@ -834,28 +824,6 @@ import { TestDataService } from './test-data.service';
       box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
     }
 
-    .btn-test {
-      background: #f59e0b;
-      color: white;
-      border: none;
-      border-radius: 12px;
-      padding: 12px 24px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      margin-top: 10px;
-    }
-
-    .btn-test:hover:not(:disabled) {
-      background: #d97706;
-      transform: translateY(-2px);
-    }
-
-    .btn-test:disabled {
-      background: #9ca3af;
-      cursor: not-allowed;
-    }
 
     .ai-results {
       margin-top: 30px;
@@ -1170,7 +1138,6 @@ export class GroupCreatePage {
   private auth = inject(AuthService);
   private aiAnalyzer = inject(AiProjectAnalyzerService);
   private taskService = inject(TaskService);
-  private testDataService = inject(TestDataService);
 
   loading = false;
   error = '';
@@ -1307,16 +1274,6 @@ export class GroupCreatePage {
     return priorityMap[priority] || priority;
   }
 
-  async createTestData(): Promise<void> {
-    this.loading = true;
-    try {
-      await this.testDataService.createTestData();
-    } catch (error) {
-      this.error = 'テストデータの作成に失敗しました: ' + (error as Error).message;
-    } finally {
-      this.loading = false;
-    }
-  }
 
   private async createTasksFromAnalysis(groupId: string, userId: string) {
     if (!this.projectAnalysis) return;

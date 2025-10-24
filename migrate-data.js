@@ -69,3 +69,4 @@ async function migrateData() {
 // migrateData();
 console.log('このスクリプトを実行するには、サービスアカウントキーを設定してください');
 
+

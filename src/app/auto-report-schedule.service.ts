@@ -223,12 +223,15 @@ export class AutoReportScheduleService {
         updatedAt: serverTimestamp()
       };
 
-      // 送信先の設定（undefinedの場合はフィールドを除外）
+      // 送信先の設定（複数ユーザー対応）
       if (schedule.recipientType === 'person') {
-        if (schedule.recipientId) {
+        if (schedule.recipientIds && schedule.recipientIds.length > 0) {
+          // 複数ユーザー送信
+          reportData_toSend.recipientIds = schedule.recipientIds;
+          reportData_toSend.recipientNames = schedule.recipientNames;
+        } else if (schedule.recipientId) {
+          // 単一ユーザー送信（後方互換性）
           reportData_toSend.recipientId = schedule.recipientId;
-        }
-        if (schedule.recipientName) {
           reportData_toSend.recipientName = schedule.recipientName;
         }
       } else {

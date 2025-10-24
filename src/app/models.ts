@@ -162,8 +162,10 @@ export interface ProgressReport {
   content: string;
   senderId: Id;
   senderName: string;
-  recipientId?: Id; // 特定の人への送信
+  recipientId?: Id; // 特定の人への送信（後方互換性）
   recipientName?: string;
+  recipientIds?: Id[]; // 複数ユーザーへの送信
+  recipientNames?: string[];
   groupId?: Id; // グループへの送信
   groupName?: string;
   attachedGroupId?: Id; // 添付するグループ（個人送信時でも関連グループを指定可能）
@@ -235,6 +237,8 @@ export interface AutoReportSchedule {
   recipientType: 'person' | 'group';
   recipientId?: Id;
   recipientName?: string;
+  recipientIds?: Id[];
+  recipientNames?: string[];
   groupId?: Id;
   groupName?: string;
   attachedGroupId?: Id;
