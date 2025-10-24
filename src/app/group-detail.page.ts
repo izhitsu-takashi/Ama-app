@@ -357,7 +357,7 @@ import { Firestore } from '@angular/fire/firestore';
             <div class="tasks-stats">
               <span class="stat-item">
                 <span class="stat-label">課題数:</span>
-                <span class="stat-value">{{ (tasks$ | async)?.length || 0 }}件</span>
+                <span class="stat-value">{{ filteredTasks.length }}件</span>
               </span>
               <span class="stat-item">
                 <span class="stat-label">完了率:</span>
@@ -406,7 +406,7 @@ import { Firestore } from '@angular/fire/firestore';
           </div>
         </div>
 
-        <div class="tasks-table-container" *ngIf="(tasks$ | async) as tasks; else emptyTasks">
+        <div class="tasks-table-container" *ngIf="filteredTasks.length > 0; else emptyTasks">
           <table class="tasks-table">
             <thead>
               <tr>
@@ -3046,6 +3046,9 @@ export class GroupDetailPage implements OnInit, OnDestroy {
           return 0;
         });
       }
+      
+      // 変更検知をトリガーしてUIを更新
+      this.cd.detectChanges();
     });
   }
 

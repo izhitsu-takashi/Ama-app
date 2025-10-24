@@ -263,11 +263,19 @@ import { ProgressReportService } from './progress-report.service';
           <form [formGroup]="eventForm" (ngSubmit)="createCalendarEvent()" class="modal-form">
             <div class="form-group">
               <label class="form-label">タイトル</label>
-              <input type="text" formControlName="title" class="form-input" placeholder="予定のタイトル" />
+              <input type="text" formControlName="title" class="form-input" placeholder="予定のタイトル" maxlength="20" />
+              <div class="character-count">
+                <span [class.error]="(eventForm.get('title')?.value?.length || 0) > 20">{{ eventForm.get('title')?.value?.length || 0 }}/20</span>
+              </div>
+              <div *ngIf="(eventForm.get('title')?.value?.length || 0) > 20" class="error-message">タイトルは20文字以内で入力してください</div>
             </div>
             <div class="form-group">
               <label class="form-label">メモ</label>
-              <textarea formControlName="description" class="form-textarea" rows="3" placeholder="メモ"></textarea>
+              <textarea formControlName="description" class="form-textarea" rows="3" placeholder="メモ" maxlength="50"></textarea>
+              <div class="character-count">
+                <span [class.error]="(eventForm.get('description')?.value?.length || 0) > 50">{{ eventForm.get('description')?.value?.length || 0 }}/50</span>
+              </div>
+              <div *ngIf="(eventForm.get('description')?.value?.length || 0) > 50" class="error-message">メモは50文字以内で入力してください</div>
             </div>
             <div class="form-group">
               <label class="form-label">カラー</label>
@@ -287,7 +295,7 @@ import { ProgressReportService } from './progress-report.service';
             </div>
             <div class="modal-actions">
               <button type="button" class="btn secondary" (click)="hideCreateEventModal()">キャンセル</button>
-              <button type="submit" class="btn primary" [disabled]="eventForm.invalid || loading">{{ loading ? '作成中...' : '作成' }}</button>
+              <button type="submit" class="btn primary" [disabled]="eventForm.invalid || loading || (eventForm.get('title')?.value?.length || 0) > 20 || (eventForm.get('description')?.value?.length || 0) > 50">{{ loading ? '作成中...' : '作成' }}</button>
             </div>
           </form>
         </div>
@@ -1210,14 +1218,14 @@ import { ProgressReportService } from './progress-report.service';
       justify-content:center;
       line-height: 1;
     }
-    .event-actions .btn.success { background-color:#3b82f6 !important; } /* 明るめの青 */
-    .event-actions .btn.success:hover { background-color:#2563eb !important; }
+    .event-actions .btn.success { background-color:#ffffff !important; color:#16a34a !important; border:1px solid #16a34a !important; } /* 白背景・緑文字 */
+    .event-actions .btn.success:hover { background-color:#f0fdf4 !important; }
     .btn.tertiary { background: rgba(255,255,255,0.15); color:#fff; }
     .btn.tertiary:hover { background: rgba(255,255,255,0.28); }
     .btn.success { background-color: #16a34a !important; color:#ffffff !important; border:none !important; }
     .btn.success:hover { background-color: #15803d !important; }
-    .btn.danger { background-color: #ef4444 !important; color:#ffffff !important; border:none !important; }
-    .btn.danger:hover { background-color: #dc2626 !important; }
+    .btn.danger { background-color: #ffffff !important; color:#ef4444 !important; border:1px solid #ef4444 !important; }
+    .btn.danger:hover { background-color: #fef2f2 !important; }
     .btn.small { font-size: .85rem; line-height:1; }
 
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items:center; justify-content:center; z-index: 1000; }
@@ -1231,6 +1239,9 @@ import { ProgressReportService } from './progress-report.service';
     .form-label { display:block; margin-bottom: .375rem; color:#374151; font-weight:500; }
     .form-input, .form-textarea { width:100%; max-width:100%; box-sizing:border-box; padding:.625rem .75rem; border:1px solid #d1d5db; border-radius:.5rem; font-size:.95rem; }
     .form-textarea { min-height: 80px; }
+    .character-count { text-align: right; margin-top: 0.25rem; font-size: 0.875rem; }
+    .character-count .error { color: #ef4444; font-weight: 500; }
+    .error-message { color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem; }
     .modal-actions { display:flex; justify-content:flex-end; gap:.75rem; margin-top: 1rem; }
     .day-events-actions { margin-bottom: 1rem; }
     .btn.primary { background:#667eea; color:#fff; border:none; padding:.5rem 1rem; border-radius:.5rem; }
@@ -1923,8 +1934,8 @@ export class MainPage implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   colorOptions: string[] = ['#ef4444','#f59e0b','#eab308','#22c55e','#3b82f6','#6366f1','#a855f7'];
   eventForm = this.fb.group({
-    title: ['', [Validators.required, Validators.minLength(1)]],
-    description: [''],
+    title: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(20)]],
+    description: ['', [Validators.maxLength(50)]],
     start: ['', [Validators.required]],
     end: ['', [Validators.required]],
     color: ['#3b82f6']

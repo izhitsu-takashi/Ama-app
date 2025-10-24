@@ -222,7 +222,7 @@ export class TodoService {
     return 'medium';
   }
 
-  // Todoを優先度と期限でソート
+  // Todoを期限が近い順でソート
   private sortTodosByPriority(todos: TodoItem[]): TodoItem[] {
     const priorityOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
     
@@ -232,17 +232,20 @@ export class TodoService {
         return a.isCompleted ? 1 : -1;
       }
 
-      // 優先度でソート
-      const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
-      if (priorityDiff !== 0) {
-        return priorityDiff;
-      }
-
-      // 期限でソート（期限が近い順）
+      // 期限でソート（期限が近い順を最優先）
       if (a.dueDate && b.dueDate) {
         const aDate = a.dueDate.toDate ? a.dueDate.toDate() : new Date(a.dueDate);
         const bDate = b.dueDate.toDate ? b.dueDate.toDate() : new Date(b.dueDate);
-        return aDate.getTime() - bDate.getTime();
+        const dateDiff = aDate.getTime() - bDate.getTime();
+        if (dateDiff !== 0) {
+          return dateDiff;
+        }
+      }
+
+      // 期限が同じ場合は優先度でソート
+      const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
+      if (priorityDiff !== 0) {
+        return priorityDiff;
       }
 
       return 0;
