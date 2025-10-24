@@ -2711,6 +2711,11 @@ export class MainPage implements OnInit, OnDestroy {
   // グループの参加リクエストをチェック
   private async checkGroupJoinRequests(groupId: string) {
     try {
+      // 認証状態をチェック
+      if (!this.currentUser) {
+        return;
+      }
+
       const joinRequestsQuery = query(
         collection(this.firestore, 'joinRequests'),
         where('groupId', '==', groupId),
@@ -2727,6 +2732,10 @@ export class MainPage implements OnInit, OnDestroy {
         hasNewAnnouncements: existingNotification.hasNewAnnouncements
       };
     } catch (error) {
+      // 権限エラーの場合はスキップ（ログを出力しない）
+      if (error instanceof Error && error.message.includes('permissions')) {
+        return;
+      }
       console.error('Error checking join requests:', error);
     }
   }
@@ -2734,6 +2743,11 @@ export class MainPage implements OnInit, OnDestroy {
   // グループの新しいアナウンスをチェック
   private async checkGroupAnnouncements(groupId: string) {
     try {
+      // 認証状態をチェック
+      if (!this.currentUser) {
+        return;
+      }
+
       // ユーザーの最後の確認日時を取得
       const lastChecked = await this.getUserLastAnnouncementCheck(groupId);
       
@@ -2761,6 +2775,10 @@ export class MainPage implements OnInit, OnDestroy {
         hasNewAnnouncements: hasNewAnnouncements
       };
     } catch (error) {
+      // 権限エラーの場合はスキップ（ログを出力しない）
+      if (error instanceof Error && error.message.includes('permissions')) {
+        return;
+      }
       console.error('Error checking announcements:', error);
     }
   }
@@ -2787,6 +2805,10 @@ export class MainPage implements OnInit, OnDestroy {
       const fallbackDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       return fallbackDate;
     } catch (error) {
+      // 権限エラーの場合は7日前からチェック（ログを出力しない）
+      if (error instanceof Error && error.message.includes('permissions')) {
+        return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      }
       console.error('Error getting user last check:', error);
       return new Date(0);
     }

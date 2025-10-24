@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, query, where, collectionData, orderBy, getDocs } from '@angular/fire/firestore';
-import { Observable, of } from 'rxjs';
+import { Observable, of, combineLatest } from 'rxjs';
 import { map, catchError, take, switchMap } from 'rxjs/operators';
 import { ProgressReport, ProgressReportComment, Id } from './models';
 import { NotificationService } from './notification.service';
@@ -169,15 +169,35 @@ export class ProgressReportService {
 
   // 受信した進捗報告一覧取得
   getReceivedProgressReports(recipientId: string): Observable<ProgressReport[]> {
-    return collectionData(
+    // 複数のクエリを実行して結果をマージ
+    const singleRecipientQuery = collectionData(
       query(
         collection(this.firestore, 'progressReports'),
         where('recipientId', '==', recipientId)
       ),
       { idField: 'id' }
-    ).pipe(
-      map(reports => {
-        return (reports as ProgressReport[]).sort((a, b) => {
+    );
+
+    const multipleRecipientsQuery = collectionData(
+      query(
+        collection(this.firestore, 'progressReports'),
+        where('recipientIds', 'array-contains', recipientId)
+      ),
+      { idField: 'id' }
+    );
+
+    return combineLatest([
+      singleRecipientQuery,
+      multipleRecipientsQuery
+    ]).pipe(
+      map(([singleReports, multipleReports]) => {
+        // 重複を除去してマージ
+        const allReports = [...singleReports, ...multipleReports];
+        const uniqueReports = allReports.filter((report, index, self) => 
+          index === self.findIndex(r => r['id'] === report['id'])
+        );
+        
+        return (uniqueReports as ProgressReport[]).sort((a, b) => {
           const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
           const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
           return dateB.getTime() - dateA.getTime();
@@ -337,16 +357,36 @@ export class ProgressReportService {
 
   // 未読の進捗報告数を取得
   getUnreadCount(userId: string): Observable<number> {
-    return collectionData(
-      query(
-        collection(this.firestore, 'progressReports'),
-        where('recipientId', '==', userId),
-        where('status', '==', 'sent')
-      ),
-      { idField: 'id' }
-    ).pipe(
-      map(reports => (reports as ProgressReport[]).length),
+    // 単一受信者と複数受信者の両方のクエリを作成
+    const singleRecipientQuery = query(
+      collection(this.firestore, 'progressReports'),
+      where('recipientId', '==', userId),
+      where('status', '==', 'sent')
+    );
+    
+    const multipleRecipientsQuery = query(
+      collection(this.firestore, 'progressReports'),
+      where('recipientIds', 'array-contains', userId),
+      where('status', '==', 'sent')
+    );
+
+    return combineLatest([
+      collectionData(singleRecipientQuery, { idField: 'id' }),
+      collectionData(multipleRecipientsQuery, { idField: 'id' })
+    ]).pipe(
+      map(([singleReports, multipleReports]) => {
+        // 重複を除去してマージ
+        const allReports = [...singleReports, ...multipleReports];
+        const uniqueReports = allReports.filter((report, index, self) => 
+          index === self.findIndex(r => r['id'] === report['id'])
+        );
+        
+        return uniqueReports.length;
+      }),
       catchError(error => {
+        if (error instanceof Error && error.message.includes('permissions')) {
+          return of(0);
+        }
         console.error('Error loading unread progress reports:', error);
         return of(0);
       })

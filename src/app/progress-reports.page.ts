@@ -132,7 +132,7 @@ import { takeUntil, take } from 'rxjs/operators';
               </div>
               
               <div class="report-meta">
-                <span class="meta-item">📤 {{ report.recipientName || report.groupName || '送信先不明' }}</span>
+                <span class="meta-item">📤 {{ getRecipientDisplayName(report) }}</span>
                 <span class="meta-item" *ngIf="report.attachedGroupName">
                   📎 <a class="group-link" (click)="navigateToGroup(report.attachedGroupId!)">{{ report.attachedGroupName }}</a>
                 </span>
@@ -583,6 +583,38 @@ export class ProgressReportsPage implements OnInit, OnDestroy {
       'read': '既読'
     };
     return labels[status as keyof typeof labels] || status;
+  }
+
+  getRecipientDisplayName(report: ProgressReport): string {
+    // 単一受信者の場合
+    if (report.recipientName) {
+      return report.recipientName;
+    }
+    
+    // グループ送信の場合
+    if (report.groupName) {
+      return report.groupName;
+    }
+    
+    // 複数受信者の場合
+    if (report.recipientNames && report.recipientNames.length > 0) {
+      if (report.recipientNames.length === 1) {
+        return report.recipientNames[0];
+      } else {
+        return `${report.recipientNames[0]} 他${report.recipientNames.length - 1}名`;
+      }
+    }
+    
+    // 受信者IDのみが設定されている場合
+    if (report.recipientIds && report.recipientIds.length > 0) {
+      if (report.recipientIds.length === 1) {
+        return 'ユーザー';
+      } else {
+        return `複数ユーザー (${report.recipientIds.length}名)`;
+      }
+    }
+    
+    return '送信先不明';
   }
 
   formatDate(date: any): string {

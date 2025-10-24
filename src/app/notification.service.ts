@@ -42,6 +42,10 @@ export class NotificationService {
           .slice(0, limitCount);
       }),
       catchError(error => {
+        // 権限エラーの場合は空配列を返す（ログを出力しない）
+        if (error instanceof Error && error.message.includes('permissions')) {
+          return of([]);
+        }
         console.error('Error loading notifications:', error);
         return of([]);
       })
@@ -63,6 +67,10 @@ export class NotificationService {
     ).pipe(
       map(notifications => notifications.length),
       catchError(error => {
+        // 権限エラーの場合は0を返す（ログを出力しない）
+        if (error instanceof Error && error.message.includes('permissions')) {
+          return of(0);
+        }
         console.error('Error loading unread count:', error);
         return of(0);
       })
@@ -194,6 +202,10 @@ export class NotificationService {
         });
       }),
       catchError(error => {
+        // 権限エラーの場合は空配列を返す（ログを出力しない）
+        if (error instanceof Error && error.message.includes('permissions')) {
+          return of([]);
+        }
         console.error('Error loading reminders:', error);
         return of([]);
       })

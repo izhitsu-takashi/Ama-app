@@ -80,12 +80,13 @@ export const sendPushOnNotificationCreate = functions.firestore
     }
   });
 
-// 自動進捗レポート送信のスケジュール関数（5分間隔で実行）
+// 自動進捗レポート送信のスケジュール関数（1分間隔で実行）
 export const scheduledProgressReport = functions.pubsub
-  .schedule('*/5 * * * *') // 5分間隔で実行
+  .schedule('* * * * *') // 1分間隔で実行
   .timeZone('Asia/Tokyo')
   .onRun(async (context) => {
     try {
+      console.log('自動進捗レポート送信スケジューラー開始');
       const db = admin.firestore();
       const now = admin.firestore.Timestamp.now();
       
@@ -97,8 +98,11 @@ export const scheduledProgressReport = functions.pubsub
       const schedulesSnapshot = await schedulesQuery.get();
       
       if (schedulesSnapshot.empty) {
+        console.log('送信予定のスケジュールがありません');
         return;
       }
+      
+      console.log(`処理対象のスケジュール数: ${schedulesSnapshot.docs.length}`);
       
       for (const scheduleDoc of schedulesSnapshot.docs) {
         const schedule = scheduleDoc.data();
@@ -138,31 +142,30 @@ export const scheduledProgressReport = functions.pubsub
 
           // 進捗レポートを作成
           const reportData: any = {
-            title: `${schedule.title} - ${new Date().toLocaleDateString('ja-JP')}`,
+            title: schedule.title,
             content: generateReportContent(filteredTasks, schedule.attachedGroupName || 'グループ'),
             senderId: schedule.userId,
             senderName: senderName,
             status: 'sent',
-            recipientType: schedule.recipientType,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
           };
           
-          // 送信先の設定
-          if (schedule.recipientType === 'person') {
-            if (schedule.recipientId) {
-              reportData.recipientId = schedule.recipientId;
+          // 送信先の設定（新しい仕様に対応）
+          if (schedule.recipientIds && schedule.recipientIds.length > 0) {
+            // 複数受信者対応
+            reportData.recipientIds = schedule.recipientIds;
+            reportData.recipientNames = schedule.recipientNames || [];
+            // 表示用の送信先名を設定（最初の受信者名または「複数ユーザー」）
+            if (schedule.recipientNames && schedule.recipientNames.length > 0) {
+              reportData.recipientName = schedule.recipientNames.length === 1 
+                ? schedule.recipientNames[0] 
+                : `${schedule.recipientNames[0]} 他${schedule.recipientNames.length - 1}名`;
             }
-            if (schedule.recipientName) {
-              reportData.recipientName = schedule.recipientName;
-            }
-          } else {
-            if (schedule.groupId) {
-              reportData.groupId = schedule.groupId;
-            }
-            if (schedule.groupName) {
-              reportData.groupName = schedule.groupName;
-            }
+          } else if (schedule.recipientId) {
+            // 単一受信者（後方互換性）
+            reportData.recipientId = schedule.recipientId;
+            reportData.recipientName = schedule.recipientName;
           }
           
           // 添付グループの設定
@@ -174,7 +177,11 @@ export const scheduledProgressReport = functions.pubsub
           }
           
           // 進捗レポートを保存
-          await db.collection('progress_reports').add(reportData);
+          const reportRef = await db.collection('progressReports').add(reportData);
+          console.log(`進捗レポート作成完了: ${reportRef.id}`);
+          
+          // 通知を送信
+          await sendProgressReportNotifications(db, reportData);
           
           // 次の送信日時を計算・更新
           const nextSendAt = calculateNextSendAt(
@@ -187,6 +194,8 @@ export const scheduledProgressReport = functions.pubsub
             lastSentAt: admin.firestore.FieldValue.serverTimestamp(),
             nextSendAt: admin.firestore.Timestamp.fromDate(nextSendAt)
           });
+          
+          console.log(`スケジュール更新完了: 次回送信 ${nextSendAt.toLocaleString('ja-JP')}`);
           
         } catch (error) {
           console.error(`スケジュール処理エラー: ${schedule.title}`, error);
@@ -219,6 +228,48 @@ function calculateNextSendAt(currentDate: Date, frequency: string, sendTime: str
   }
   
   return nextDate;
+}
+
+// 進捗レポート通知送信
+async function sendProgressReportNotifications(db: admin.firestore.Firestore, reportData: any): Promise<void> {
+  try {
+    const recipients: string[] = [];
+    
+    // 受信者IDを取得
+    if (reportData.recipientIds && reportData.recipientIds.length > 0) {
+      recipients.push(...reportData.recipientIds);
+    } else if (reportData.recipientId) {
+      recipients.push(reportData.recipientId);
+    }
+    
+    if (recipients.length === 0) {
+      console.log('通知送信先がありません');
+      return;
+    }
+    
+    // 各受信者に通知を送信
+    for (const recipientId of recipients) {
+      const notificationData = {
+        userId: recipientId,
+        type: 'progress_report',
+        title: '新しい進捗報告',
+        content: `${reportData.senderName}さんから進捗報告が送信されました`,
+        message: `${reportData.senderName}さんから進捗報告が送信されました`,
+        data: {
+          reportId: reportData.id,
+          senderId: reportData.senderId,
+          senderName: reportData.senderName
+        },
+        isRead: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      await db.collection('notifications').add(notificationData);
+      console.log(`通知送信完了: ${recipientId}`);
+    }
+  } catch (error) {
+    console.error('通知送信エラー:', error);
+  }
 }
 
 // レポート内容生成

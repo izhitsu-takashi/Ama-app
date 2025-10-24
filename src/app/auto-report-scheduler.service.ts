@@ -1,11 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { AutoReportScheduleService } from './auto-report-schedule.service';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AutoReportSchedulerService {
   private autoReportScheduleService = inject(AutoReportScheduleService);
+  private authService = inject(AuthService);
   private intervalId: any;
 
   constructor() {}
@@ -39,6 +41,12 @@ export class AutoReportSchedulerService {
         }
       }
     } catch (error) {
+      // 権限エラーの場合はスケジューラーを停止
+      if (error instanceof Error && error.message.includes('permissions')) {
+        console.log('認証エラーのためスケジューラーを停止します');
+        this.stopScheduler();
+        return;
+      }
       console.error('スケジュールチェックエラー:', error);
     }
   }

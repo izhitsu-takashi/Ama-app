@@ -216,7 +216,6 @@ import { AutoReportSchedule, Group, User } from './models';
             
             <div class="schedule-actions">
               <button (click)="editSchedule(schedule)" class="btn small">編集</button>
-              <button (click)="testSendSchedule(schedule)" class="btn small" [disabled]="!schedule.isActive">テスト送信</button>
               <button (click)="toggleScheduleActive(schedule)" class="btn small" [class]="schedule.isActive ? 'secondary' : 'primary'">
                 {{ schedule.isActive ? '無効化' : '有効化' }}
               </button>
@@ -985,10 +984,15 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
     }
 
     this.allUsers$.pipe(takeUntil(this.destroy$)).subscribe(users => {
-      this.filteredUsers = users.filter(user => 
-        (user.displayName?.toLowerCase().includes(this.userSearchTerm.toLowerCase()) ||
-         user.email?.toLowerCase().includes(this.userSearchTerm.toLowerCase()))
-      ).slice(0, 10);
+      this.filteredUsers = users.filter(user => {
+        // 自分を除外
+        const currentUser = this.authService.currentUser;
+        if (user.id === currentUser?.uid) {
+          return false;
+        }
+        return (user.displayName?.toLowerCase().includes(this.userSearchTerm.toLowerCase()) ||
+               user.email?.toLowerCase().includes(this.userSearchTerm.toLowerCase()));
+      }).slice(0, 10);
       this.showUserDropdown = this.filteredUsers.length > 0;
     });
   }
@@ -1174,33 +1178,6 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
     }
   }
 
-  testSendSchedule(schedule: AutoReportSchedule): void {
-    if (confirm('このスケジュールでテスト送信を実行しますか？')) {
-      this.loading = true;
-      console.log('テスト送信開始:', schedule.title);
-      console.log('スケジュール詳細:', {
-        id: schedule.id,
-        title: schedule.title,
-        isActive: schedule.isActive,
-        nextSendAt: schedule.nextSendAt.toDate().toISOString(),
-        attachedGroupId: schedule.attachedGroupId,
-        recipientType: schedule.recipientType
-      });
-      
-      this.autoReportScheduleService.sendScheduledReport(schedule)
-        .then(() => {
-          console.log('テスト送信が完了しました');
-          alert('テスト送信が完了しました！');
-          this.loading = false;
-          this.loadSchedules(); // スケジュール一覧を更新
-        })
-        .catch(error => {
-          console.error('テスト送信エラー:', error);
-          alert('テスト送信に失敗しました: ' + (error.message || '不明なエラー'));
-          this.loading = false;
-        });
-    }
-  }
 
   getFrequencyLabel(frequency: string): string {
     switch (frequency) {

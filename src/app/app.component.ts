@@ -14,11 +14,7 @@ export class AppComponent implements OnInit {
   private autoReportScheduler = inject(AutoReportSchedulerService);
 
   ngOnInit(): void {
-    // 自動送信スケジューラーを有効化
-    try {
-      this.autoReportScheduler.startScheduler();
-    } catch (error) {
-      console.error('スケジューラー初期化エラー:', error);
-    }
+    // Cloud Functionsで自動送信を処理するため、クライアント側スケジューラーは無効化
+    console.log('Cloud Functionsで自動送信を処理します');
   }
 }

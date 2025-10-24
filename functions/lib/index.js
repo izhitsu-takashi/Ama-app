@@ -1,17 +1,91 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendEmail = exports.sendVerificationEmail = exports.manualProgressReport = exports.scheduledProgressReport = void 0;
+exports.sendEmail = exports.sendVerificationEmail = exports.manualProgressReport = exports.scheduledProgressReport = exports.sendPushOnNotificationCreate = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
-// 自動進捗レポート送信のスケジュール関数（5分間隔で実行）
+// ================================
+// FCM: Firestore通知 -> デバイストークンへ配信
+// ================================
+exports.sendPushOnNotificationCreate = functions.firestore
+    .document('notifications/{notificationId}')
+    .onCreate(async (snap, context) => {
+    try {
+        const notification = snap.data();
+        const userId = notification === null || notification === void 0 ? void 0 : notification.userId;
+        if (!userId)
+            return;
+        const db = admin.firestore();
+        // 対象ユーザーのデバイストークンを取得
+        const devicesSnap = await db.collection('users').doc(userId).collection('devices').get();
+        const tokens = devicesSnap.docs.map(d => d.id).filter(Boolean);
+        if (tokens.length === 0)
+            return;
+        // 通知内容
+        const title = notification.title || '新しい通知';
+        const body = notification.content || notification.message || '';
+        // クリック時の遷移URL（typeに応じてbest-effort）
+        const url = (() => {
+            const data = notification.data || {};
+            switch (notification.type) {
+                case 'message_received':
+                    return '/messages';
+                case 'announcement':
+                    return data.groupId ? `/group/${data.groupId}` : '/';
+                case 'progress_report':
+                case 'progress_report_comment':
+                    return '/progress-reports';
+                case 'group_join_request':
+                case 'group_invite':
+                    return data.groupId ? `/group/${data.groupId}` : '/groups';
+                case 'task_due':
+                case 'task_due_soon':
+                case 'task_assigned':
+                case 'task_comment':
+                case 'task_reaction':
+                    return '/tasks';
+                default:
+                    return '/';
+            }
+        })();
+        const message = {
+            tokens,
+            notification: {
+                title,
+                body,
+            },
+            data: {
+                url,
+                type: String(notification.type || ''),
+            }
+        };
+        const res = await admin.messaging().sendMulticast(message);
+        // 不達トークンをクリーンアップ
+        const deletions = [];
+        res.responses.forEach((r, idx) => {
+            if (!r.success) {
+                const code = (r.error && r.error.errorInfo && r.error.errorInfo.code) || '';
+                if (code.includes('registration-token-not-registered') || code.includes('invalid-argument')) {
+                    const token = tokens[idx];
+                    deletions.push(db.collection('users').doc(userId).collection('devices').doc(token).delete());
+                }
+            }
+        });
+        if (deletions.length)
+            await Promise.all(deletions);
+    }
+    catch (e) {
+        console.error('sendPushOnNotificationCreate error', e);
+    }
+});
+// 自動進捗レポート送信のスケジュール関数（1分間隔で実行）
 exports.scheduledProgressReport = functions.pubsub
-    .schedule('*/5 * * * *') // 5分間隔で実行
+    .schedule('* * * * *') // 1分間隔で実行
     .timeZone('Asia/Tokyo')
     .onRun(async (context) => {
     var _a;
-    console.log('自動進捗レポート送信を開始します');
     try {
+        console.log('自動進捗レポート送信スケジューラー開始');
         const db = admin.firestore();
         const now = admin.firestore.Timestamp.now();
         // 送信予定のスケジュールを取得
@@ -20,10 +94,10 @@ exports.scheduledProgressReport = functions.pubsub
             .where('nextSendAt', '<=', now);
         const schedulesSnapshot = await schedulesQuery.get();
         if (schedulesSnapshot.empty) {
-            console.log('送信予定のスケジュールはありません');
+            console.log('送信予定のスケジュールがありません');
             return;
         }
-        console.log(`送信予定のスケジュール数: ${schedulesSnapshot.size}`);
+        console.log(`処理対象のスケジュール数: ${schedulesSnapshot.docs.length}`);
         for (const scheduleDoc of schedulesSnapshot.docs) {
             const schedule = scheduleDoc.data();
             const scheduleId = scheduleDoc.id;
@@ -54,31 +128,30 @@ exports.scheduledProgressReport = functions.pubsub
                 const senderName = (userData === null || userData === void 0 ? void 0 : userData.displayName) || ((_a = userData === null || userData === void 0 ? void 0 : userData.email) === null || _a === void 0 ? void 0 : _a.split('@')[0]) || 'ユーザー';
                 // 進捗レポートを作成
                 const reportData = {
-                    title: `${schedule.title} - ${new Date().toLocaleDateString('ja-JP')}`,
+                    title: schedule.title,
                     content: generateReportContent(filteredTasks, schedule.attachedGroupName || 'グループ'),
                     senderId: schedule.userId,
                     senderName: senderName,
                     status: 'sent',
-                    recipientType: schedule.recipientType,
                     createdAt: admin.firestore.FieldValue.serverTimestamp(),
                     updatedAt: admin.firestore.FieldValue.serverTimestamp()
                 };
-                // 送信先の設定
-                if (schedule.recipientType === 'person') {
-                    if (schedule.recipientId) {
-                        reportData.recipientId = schedule.recipientId;
-                    }
-                    if (schedule.recipientName) {
-                        reportData.recipientName = schedule.recipientName;
+                // 送信先の設定（新しい仕様に対応）
+                if (schedule.recipientIds && schedule.recipientIds.length > 0) {
+                    // 複数受信者対応
+                    reportData.recipientIds = schedule.recipientIds;
+                    reportData.recipientNames = schedule.recipientNames || [];
+                    // 表示用の送信先名を設定（最初の受信者名または「複数ユーザー」）
+                    if (schedule.recipientNames && schedule.recipientNames.length > 0) {
+                        reportData.recipientName = schedule.recipientNames.length === 1
+                            ? schedule.recipientNames[0]
+                            : `${schedule.recipientNames[0]} 他${schedule.recipientNames.length - 1}名`;
                     }
                 }
-                else {
-                    if (schedule.groupId) {
-                        reportData.groupId = schedule.groupId;
-                    }
-                    if (schedule.groupName) {
-                        reportData.groupName = schedule.groupName;
-                    }
+                else if (schedule.recipientId) {
+                    // 単一受信者（後方互換性）
+                    reportData.recipientId = schedule.recipientId;
+                    reportData.recipientName = schedule.recipientName;
                 }
                 // 添付グループの設定
                 if (schedule.attachedGroupId) {
@@ -88,21 +161,22 @@ exports.scheduledProgressReport = functions.pubsub
                     }
                 }
                 // 進捗レポートを保存
-                await db.collection('progress_reports').add(reportData);
-                console.log(`進捗レポートを作成しました: ${schedule.title}`);
+                const reportRef = await db.collection('progressReports').add(reportData);
+                console.log(`進捗レポート作成完了: ${reportRef.id}`);
+                // 通知を送信
+                await sendProgressReportNotifications(db, reportData);
                 // 次の送信日時を計算・更新
                 const nextSendAt = calculateNextSendAt(schedule.nextSendAt.toDate(), schedule.frequency, schedule.sendTime);
                 await db.collection('auto_report_schedules').doc(scheduleId).update({
                     lastSentAt: admin.firestore.FieldValue.serverTimestamp(),
                     nextSendAt: admin.firestore.Timestamp.fromDate(nextSendAt)
                 });
-                console.log(`スケジュール更新完了: ${schedule.title}`);
+                console.log(`スケジュール更新完了: 次回送信 ${nextSendAt.toLocaleString('ja-JP')}`);
             }
             catch (error) {
                 console.error(`スケジュール処理エラー: ${schedule.title}`, error);
             }
         }
-        console.log('自動進捗レポート送信が完了しました');
     }
     catch (error) {
         console.error('自動進捗レポート送信でエラーが発生しました:', error);
@@ -127,6 +201,45 @@ function calculateNextSendAt(currentDate, frequency, sendTime) {
             break;
     }
     return nextDate;
+}
+// 進捗レポート通知送信
+async function sendProgressReportNotifications(db, reportData) {
+    try {
+        const recipients = [];
+        // 受信者IDを取得
+        if (reportData.recipientIds && reportData.recipientIds.length > 0) {
+            recipients.push(...reportData.recipientIds);
+        }
+        else if (reportData.recipientId) {
+            recipients.push(reportData.recipientId);
+        }
+        if (recipients.length === 0) {
+            console.log('通知送信先がありません');
+            return;
+        }
+        // 各受信者に通知を送信
+        for (const recipientId of recipients) {
+            const notificationData = {
+                userId: recipientId,
+                type: 'progress_report',
+                title: '新しい進捗報告',
+                content: `${reportData.senderName}さんから進捗報告が送信されました`,
+                message: `${reportData.senderName}さんから進捗報告が送信されました`,
+                data: {
+                    reportId: reportData.id,
+                    senderId: reportData.senderId,
+                    senderName: reportData.senderName
+                },
+                isRead: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            };
+            await db.collection('notifications').add(notificationData);
+            console.log(`通知送信完了: ${recipientId}`);
+        }
+    }
+    catch (error) {
+        console.error('通知送信エラー:', error);
+    }
 }
 // レポート内容生成
 function generateReportContent(tasks, groupName) {

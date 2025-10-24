@@ -101,7 +101,10 @@ export class AutoReportScheduleService {
       
       return schedules;
     } catch (error) {
-      console.error('スケジュール取得エラー:', error);
+      // 権限エラーの場合は空配列を返す（ログを出力しない）
+      if (error instanceof Error && error.message.includes('permissions')) {
+        return [];
+      }
       
       // インデックスエラーの場合は、シンプルなクエリで代替
       if (error instanceof Error && error.message && error.message.includes('index')) {
@@ -109,6 +112,7 @@ export class AutoReportScheduleService {
         return this.getSchedulesToSendFallback();
       }
       
+      console.error('スケジュール取得エラー:', error);
       throw error;
     }
   }
@@ -149,13 +153,22 @@ export class AutoReportScheduleService {
     if (nextDate <= now) {
       switch (frequency) {
         case 'daily':
-          nextDate.setDate(nextDate.getDate() + 1);
+          // 今日の送信時刻が過ぎている場合は明日、そうでなければ今日
+          if (nextDate.getTime() < now.getTime()) {
+            nextDate.setDate(nextDate.getDate() + 1);
+          }
           break;
         case 'weekly':
-          nextDate.setDate(nextDate.getDate() + 7);
+          // 今週の送信時刻が過ぎている場合は来週、そうでなければ今週
+          if (nextDate.getTime() < now.getTime()) {
+            nextDate.setDate(nextDate.getDate() + 7);
+          }
           break;
         case 'monthly':
-          nextDate.setMonth(nextDate.getMonth() + 1);
+          // 今月の送信時刻が過ぎている場合は来月、そうでなければ今月
+          if (nextDate.getTime() < now.getTime()) {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+          }
           break;
       }
     }
@@ -164,7 +177,7 @@ export class AutoReportScheduleService {
   }
 
   // スケジュールに基づく進捗報告送信
-  async sendScheduledReport(schedule: AutoReportSchedule): Promise<void> {
+  async sendScheduledReport(schedule: AutoReportSchedule, isTestSend: boolean = false): Promise<void> {
     try {
       // 添付グループのタスクを取得
       if (!schedule.attachedGroupId) {
@@ -211,9 +224,9 @@ export class AutoReportScheduleService {
       const userDoc = await this.userService.getUserProfile(schedule.userId);
       const senderName = userDoc?.displayName || userDoc?.email?.split('@')[0] || 'ユーザー';
 
-      // 進捗報告を作成・送信
+      // 進捗報告を作成・送信（テスト送信も通常送信も同じ処理）
       const reportData_toSend: any = {
-        title: generatedReport.title,
+        title: isTestSend ? `【テスト送信】${generatedReport.title}` : generatedReport.title,
         content: generatedReport.content,
         senderId: schedule.userId,
         senderName: senderName,
@@ -241,6 +254,16 @@ export class AutoReportScheduleService {
         if (schedule.groupName) {
           reportData_toSend.groupName = schedule.groupName;
         }
+        
+        // グループ送信の場合は、グループメンバーをrecipientIdsに設定
+        if (schedule.groupId) {
+          const groupMembers = await this.getGroupMembers(schedule.groupId);
+          const memberIds = groupMembers.map(member => member.userId).filter(id => id !== schedule.userId);
+          const memberNames = groupMembers.map(member => member.displayName || member.email?.split('@')[0] || 'ユーザー').filter((name, index) => groupMembers[index].userId !== schedule.userId);
+          
+          reportData_toSend.recipientIds = memberIds;
+          reportData_toSend.recipientNames = memberNames;
+        }
       }
 
       // 添付グループの設定（空でない場合のみ）
@@ -253,24 +276,40 @@ export class AutoReportScheduleService {
 
       await this.progressReportService.createProgressReport(reportData_toSend);
 
-      // 次の送信日時を更新
-      const nextSendAt = this.calculateNextSendAt(
-        schedule.nextSendAt.toDate(),
-        schedule.frequency,
-        schedule.sendTime
-      );
+      if (!isTestSend) {
+        // 通常の自動送信の場合のみ次回送信日時を更新
+        const nextSendAt = this.calculateNextSendAt(
+          schedule.nextSendAt.toDate(),
+          schedule.frequency,
+          schedule.sendTime
+        );
 
-      console.log('次の送信日時を更新中...');
-      await this.updateSchedule(schedule.id, {
-        lastSentAt: serverTimestamp() as Timestamp,
-        nextSendAt: Timestamp.fromDate(nextSendAt)
-      });
+        console.log('次の送信日時を更新中...');
+        await this.updateSchedule(schedule.id, {
+          lastSentAt: serverTimestamp() as Timestamp,
+          nextSendAt: Timestamp.fromDate(nextSendAt)
+        });
+      }
 
-      console.log('自動送信が完了しました:', schedule.title);
+      console.log(`${isTestSend ? 'テスト送信' : '自動送信'}が完了しました:`, schedule.title);
 
     } catch (error) {
       console.error('自動送信エラー:', error);
       throw error;
     }
   }
+
+  // グループメンバーを取得
+  private async getGroupMembers(groupId: string): Promise<any[]> {
+    try {
+      const membersSnapshot = await getDocs(
+        query(collection(this.firestore, 'groupMemberships'), where('groupId', '==', groupId))
+      );
+      return membersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error('グループメンバー取得エラー:', error);
+      return [];
+    }
+  }
+
 }

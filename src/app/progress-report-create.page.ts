@@ -108,38 +108,6 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
           </div>
 
           <div class="form-group">
-            <label class="form-label">送信先</label>
-            <div class="recipient-options">
-              <div class="option-group">
-                <input 
-                  type="radio" 
-                  id="recipient-person" 
-                  name="recipientType" 
-                  value="person"
-                  [(ngModel)]="recipientType"
-                  [ngModelOptions]="{standalone: true}"
-                  (change)="onRecipientTypeChange()"
-                />
-                <label for="recipient-person" class="radio-label">特定の人に送信</label>
-              </div>
-              
-              <div class="option-group">
-                <input 
-                  type="radio" 
-                  id="recipient-group" 
-                  name="recipientType" 
-                  value="group"
-                  [(ngModel)]="recipientType"
-                  [ngModelOptions]="{standalone: true}"
-                  (change)="onRecipientTypeChange()"
-                />
-                <label for="recipient-group" class="radio-label">グループに送信</label>
-              </div>
-            </div>
-          </div>
-
-          <!-- 特定の人への送信 -->
-          <div class="form-group" *ngIf="recipientType === 'person'">
             <label class="form-label">送信先ユーザー</label>
             <div class="user-search-container">
               <input 
@@ -157,6 +125,10 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
                   *ngFor="let user of filteredUsers"
                   (click)="selectUser(user)"
                 >
+                  <div class="user-avatar">
+                    <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || 'ユーザー'" class="avatar-image">
+                    <span *ngIf="!user.photoURL" class="default-avatar">{{ getUserInitials(user) }}</span>
+                  </div>
                   <div class="user-info">
                     <span class="user-name">{{ user.displayName || (user.email ? user.email.split('@')[0] : 'ユーザー') }}</span>
                     <span class="user-email" *ngIf="user.email">{{ user.email }}</span>
@@ -174,20 +146,6 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
             </div>
             <div *ngIf="reportForm.get('recipientId')?.invalid && reportForm.get('recipientId')?.touched" class="error-message">
               送信先を選択してください
-            </div>
-          </div>
-
-          <!-- グループへの送信 -->
-          <div class="form-group" *ngIf="recipientType === 'group'">
-            <label class="form-label">送信先グループ</label>
-            <select formControlName="groupId" class="form-select">
-              <option value="">グループを選択</option>
-              <option *ngFor="let group of (userGroups$ | async)" [value]="group.id">
-                {{ group.name }}
-              </option>
-            </select>
-            <div *ngIf="reportForm.get('groupId')?.invalid && reportForm.get('groupId')?.touched" class="error-message">
-              グループを選択してください
             </div>
           </div>
 
@@ -434,6 +392,9 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
       cursor: pointer;
       border-bottom: 1px solid #f3f4f6;
       transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
     }
 
     .user-option:hover {
@@ -444,10 +405,37 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
       border-bottom: none;
     }
 
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .avatar-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .default-avatar {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+
     .user-info {
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
+      flex: 1;
     }
 
     .user-name {
@@ -631,7 +619,6 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
   selectedUser: User | null = null;
   userSearchTerm = '';
   showUserDropdown = false;
-  recipientType: 'person' | 'group' = 'person';
   loading = false;
   editingReportId: string | null = null;
   isEditing = false;
@@ -644,15 +631,13 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
   reportForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(2)]],
     content: ['', [Validators.required, Validators.minLength(10)]],
-    recipientId: [''],
-    groupId: [''],
+    recipientId: ['', [Validators.required]],
     attachedGroupId: [''] // 添付グループ
   });
 
   ngOnInit() {
     this.loadUserGroups();
     this.loadAvailableUsers();
-    this.onRecipientTypeChange();
     this.initializeAIPeriod();
     
     // 編集モードのチェック
@@ -701,17 +686,6 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
     });
   }
 
-  onRecipientTypeChange() {
-    if (this.recipientType === 'person') {
-      this.reportForm.get('groupId')?.clearValidators();
-      this.reportForm.get('recipientId')?.setValidators([Validators.required]);
-    } else {
-      this.reportForm.get('recipientId')?.clearValidators();
-      this.reportForm.get('groupId')?.setValidators([Validators.required]);
-    }
-    this.reportForm.get('recipientId')?.updateValueAndValidity();
-    this.reportForm.get('groupId')?.updateValueAndValidity();
-  }
 
   onUserSearch() {
     if (this.userSearchTerm.trim().length === 0) {
@@ -721,6 +695,11 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
 
     const searchTerm = this.userSearchTerm.toLowerCase().trim();
     this.filteredUsers = this.availableUsers.filter(user => {
+      // 自分を除外
+      const currentUser = this.auth.currentUser;
+      if (user.id === currentUser?.uid) {
+        return false;
+      }
       const displayName = (user.displayName || '').toLowerCase();
       const email = (user.email || '').toLowerCase();
       return displayName.includes(searchTerm) || email.includes(searchTerm);
@@ -845,7 +824,6 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
         });
 
         if (report.recipientId) {
-          this.recipientType = 'person';
           this.reportForm.patchValue({ recipientId: report.recipientId });
           // ユーザー情報を設定
           const user = this.availableUsers.find(u => u.id === report.recipientId);
@@ -853,17 +831,12 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
             this.selectedUser = user;
             this.userSearchTerm = user.displayName || (user.email ? user.email.split('@')[0] : 'ユーザー');
           }
-        } else if (report.groupId) {
-          this.recipientType = 'group';
-          this.reportForm.patchValue({ groupId: report.groupId });
         }
 
         // 添付グループの読み込み
         if (report.attachedGroupId) {
           this.reportForm.patchValue({ attachedGroupId: report.attachedGroupId });
         }
-
-        this.onRecipientTypeChange();
       }
     } catch (error) {
       console.error('進捗報告読み込みエラー:', error);
@@ -894,15 +867,10 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
         status: 'draft'
       };
 
-      if (this.recipientType === 'person' && formData.recipientId) {
+      if (formData.recipientId) {
         const recipient = this.availableUsers.find(u => u.id === formData.recipientId);
         reportData.recipientId = formData.recipientId;
         reportData.recipientName = recipient?.displayName || (recipient?.email ? recipient.email.split('@')[0] : 'ユーザー');
-      } else if (this.recipientType === 'group' && formData.groupId) {
-        const groups = await firstValueFrom(this.userGroups$);
-        const group = groups?.find(g => g.id === formData.groupId);
-        reportData.groupId = formData.groupId;
-        reportData.groupName = group?.name || 'グループ';
       }
 
       // 添付グループの処理
@@ -951,15 +919,10 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
         status: 'sent'
       };
 
-      if (this.recipientType === 'person' && formData.recipientId) {
+      if (formData.recipientId) {
         const recipient = this.availableUsers.find(u => u.id === formData.recipientId);
         reportData.recipientId = formData.recipientId;
         reportData.recipientName = recipient?.displayName || (recipient?.email ? recipient.email.split('@')[0] : 'ユーザー');
-      } else if (this.recipientType === 'group' && formData.groupId) {
-        const groups = await firstValueFrom(this.userGroups$);
-        const group = groups?.find(g => g.id === formData.groupId);
-        reportData.groupId = formData.groupId;
-        reportData.groupName = group?.name || 'グループ';
       }
 
       // 添付グループの処理
@@ -980,5 +943,14 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
     } finally {
       this.loading = false;
     }
+  }
+
+  getUserInitials(user: User): string {
+    if (user.displayName) {
+      return user.displayName.charAt(0).toUpperCase();
+    } else if (user.email) {
+      return user.email.charAt(0).toUpperCase();
+    }
+    return 'U';
   }
 }
