@@ -74,34 +74,8 @@ export class FcmService {
   private setupForegroundHandler(): void {
     if (!this.messaging) return;
     onMessage(this.messaging, (payload) => {
-      try {
-        const n = payload.notification;
-        if (!n || Notification.permission !== 'granted') return;
-        
-        // より詳細な通知オプション
-        const options: NotificationOptions = {
-          body: n.body || '',
-          icon: (n as any).icon || '/assets/icons/icon-192.png',
-          badge: '/assets/icons/icon-72.png',
-          data: payload.data || {},
-          tag: `ama-foreground-${Date.now()}`,
-          requireInteraction: false,
-          silent: false
-        };
-        
-        const notification = new Notification(n.title || 'AMA - 新しい通知', options);
-        
-        // 通知クリック時の処理
-        notification.onclick = (event) => {
-          event.preventDefault();
-          const url = payload.data?.['url'] || '/';
-          window.focus();
-          window.location.href = url;
-        };
-        
-      } catch (error) {
-        console.error('フォアグラウンド通知エラー:', error);
-      }
+      // フォアグラウンド通知は無効化
+      console.log('フォアグラウンド通知を受信しましたが、デスクトップ通知機能は無効化されています');
     });
   }
 

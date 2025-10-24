@@ -14,7 +14,6 @@ import { Observable, Subscription, combineLatest, of, Subject } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { Firestore, collection, addDoc, serverTimestamp, query, where, collectionData, updateDoc, doc, deleteDoc, getDocs } from '@angular/fire/firestore';
 import { map, switchMap, take, takeUntil, startWith } from 'rxjs/operators';
-import { DesktopNotificationService } from './desktop-notification.service';
 import { FcmService } from './fcm.service';
 import { ProgressReportService } from './progress-report.service';
 
@@ -23,7 +22,26 @@ import { ProgressReportService } from './progress-report.service';
   standalone: true,
   imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule],
   template: `
-    <div class="main-container">
+    <!-- ローディング画面 -->
+    <div class="loading-overlay" *ngIf="isLoading">
+      <div class="loading-container">
+        <div class="loading-spinner">
+          <div class="spinner"></div>
+        </div>
+        <div class="loading-text">
+          <h2>AMA</h2>
+          <p>データを読み込み中...</p>
+        </div>
+        <div class="loading-progress">
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+          </div>
+          <div class="progress-text">{{ getLoadingProgress() }}%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-container" [class.loading-hidden]="isLoading">
       <!-- ヘッダー -->
       <header class="header">
         <div class="header-left">
@@ -1744,6 +1762,98 @@ import { ProgressReportService } from './progress-report.service';
       background: #f59e0b !important;
       color: #78350f !important;
     }
+
+    /* ローディング画面のスタイル */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .loading-container {
+      text-align: center;
+      color: #2d3748;
+      max-width: 400px;
+      padding: 2rem;
+    }
+
+    .loading-spinner {
+      margin-bottom: 2rem;
+    }
+
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid #e2e8f0;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+
+    .loading-text h2 {
+      font-size: 2.5rem;
+      font-weight: 900;
+      margin: 0 0 0.5rem 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .loading-text p {
+      font-size: 1.1rem;
+      margin: 0 0 2rem 0;
+      opacity: 0.9;
+    }
+
+    .loading-progress {
+      margin-top: 2rem;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-text {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .main-container.loading-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
   `]
 })
 export class MainPage implements OnInit, OnDestroy {
@@ -1757,7 +1867,6 @@ export class MainPage implements OnInit, OnDestroy {
   private messageService = inject(MessageService);
   private todoService = inject(TodoService);
   private firestore = inject(Firestore);
-  private desktopNotifications = inject(DesktopNotificationService);
   private fcm = inject(FcmService);
   private progressReportService = inject(ProgressReportService);
   private cdr = inject(ChangeDetectorRef);
@@ -1769,6 +1878,17 @@ export class MainPage implements OnInit, OnDestroy {
   unreadNotifications = 0;
   unreadMessageCount = 0;
   unreadProgressReports = 0;
+  
+  // ローディング状態管理
+  isLoading = true;
+  loadingSteps = {
+    user: false,
+    groups: false,
+    tasks: false,
+    notifications: false,
+    todos: false,
+    calendar: false
+  };
   
   // グループ通知バッジ用
   groupNotifications: { [groupId: string]: { hasJoinRequests: boolean; hasNewAnnouncements: boolean } } = {};
@@ -1818,6 +1938,9 @@ export class MainPage implements OnInit, OnDestroy {
     this.loadTodayTodos();
     this.checkAdminStatus();
     
+    // 初期ローディング完了をチェック
+    this.checkInitialLoadingComplete();
+    
     // 通知ページから戻ってきた時に通知数を更新
     this.router.events.pipe(
       takeUntil(this.destroy$)
@@ -1827,11 +1950,9 @@ export class MainPage implements OnInit, OnDestroy {
       }
     });
     
-    // Initialize desktop notifications after user is ready
+    // Initialize FCM (will no-op if unsupported)
     setTimeout(async () => {
       try {
-        this.desktopNotifications.init();
-        // Initialize FCM (will no-op if unsupported)
         const VAPID_KEY = 'BHiPS0bFe5WmP0KbdL_FSPXsx7UZfo0Eo1HI0irRTI8pRS5FepX6Ni892j1Zbb0xFMqI-BLlpPxGq_vM5KdHAdI';
         await this.fcm.init(VAPID_KEY);
         if (VAPID_KEY) {
@@ -1870,6 +1991,7 @@ export class MainPage implements OnInit, OnDestroy {
             createdAt: new Date(),
             updatedAt: new Date()
           };
+          this.markLoadingStepComplete('user');
           // ユーザーデータが設定された後にグループと課題を読み込み
           this.loadGroups();
           this.loadRecentTasks();
@@ -1901,6 +2023,7 @@ export class MainPage implements OnInit, OnDestroy {
         this.loadGroupDeadlineStatus(groups.map(g => g.id));
         // グループ通知をチェック
         this.checkGroupNotifications();
+        this.markLoadingStepComplete('groups');
         
         // 定期的に通知をチェック（5分間隔）
         setInterval(() => {
@@ -2016,8 +2139,12 @@ export class MainPage implements OnInit, OnDestroy {
             const bDate = b.dueDate ? (b.dueDate.toDate ? b.dueDate.toDate() : new Date(b.dueDate)) : new Date('9999-12-31');
             return aDate.getTime() - bDate.getTime();
           });
-        })
+        }),
+        take(1)
       );
+      this.recentTasks$.subscribe(() => {
+        this.markLoadingStepComplete('tasks');
+      });
     } else {
       this.recentTasks$ = of([]);
     }
@@ -2038,6 +2165,7 @@ export class MainPage implements OnInit, OnDestroy {
           this.pendingInvites = (notifications || [])
             .filter((n: any) => n.type === 'group_invite')
             .map((n: any) => ({ id: n.id!, groupId: (n.data as any)?.groupId, groupName: (n.data as any)?.groupName || 'グループ' }));
+          this.markLoadingStepComplete('notifications');
         },
         error: (error) => {
           console.error('Error loading notifications:', error);
@@ -2105,6 +2233,9 @@ export class MainPage implements OnInit, OnDestroy {
 
   private loadTodayTodos() {
     this.todayTodos$ = this.todoService.getTodayTodos();
+    this.todayTodos$.pipe(take(1)).subscribe(() => {
+      this.markLoadingStepComplete('todos');
+    });
   }
 
   private checkAdminStatus() {
@@ -2290,6 +2421,7 @@ export class MainPage implements OnInit, OnDestroy {
     if (this.selectedDate) {
       this.selectedDayEvents = this.getEventsForDate(this.selectedDate);
     }
+    this.markLoadingStepComplete('calendar');
   }
 
   // 編集/削除
@@ -3015,5 +3147,50 @@ export class MainPage implements OnInit, OnDestroy {
       alert('画像の処理に失敗しました。');
       this.uploadingImage = false;
     }
+  }
+
+  // ローディング状態をチェックして完了時にローディングを終了
+  private checkInitialLoadingComplete(): void {
+    // 各ステップの完了をチェック
+    const checkComplete = () => {
+      const allStepsComplete = Object.values(this.loadingSteps).every(step => step === true);
+      if (allStepsComplete && this.isLoading) {
+        // 少し遅延を入れてスムーズな表示にする
+        setTimeout(() => {
+          this.isLoading = false;
+          this.cdr.detectChanges();
+        }, 500);
+      }
+    };
+
+    // 各ステップの完了を監視
+    const checkInterval = setInterval(() => {
+      checkComplete();
+      if (!this.isLoading) {
+        clearInterval(checkInterval);
+      }
+    }, 100);
+
+    // 最大10秒でタイムアウト
+    setTimeout(() => {
+      if (this.isLoading) {
+        this.isLoading = false;
+        this.cdr.detectChanges();
+        clearInterval(checkInterval);
+      }
+    }, 10000);
+  }
+
+  // 各ローディングステップを完了としてマーク
+  private markLoadingStepComplete(step: keyof typeof this.loadingSteps): void {
+    this.loadingSteps[step] = true;
+    this.cdr.detectChanges();
+  }
+
+  // ローディング進捗を計算
+  getLoadingProgress(): number {
+    const completedSteps = Object.values(this.loadingSteps).filter(step => step === true).length;
+    const totalSteps = Object.keys(this.loadingSteps).length;
+    return Math.round((completedSteps / totalSteps) * 100);
   }
 }
