@@ -163,7 +163,8 @@ exports.scheduledProgressReport = functions.pubsub
                 // 進捗レポートを保存
                 const reportRef = await db.collection('progressReports').add(reportData);
                 console.log(`進捗レポート作成完了: ${reportRef.id}`);
-                // 通知を送信
+                // レポートIDを設定してから通知を送信
+                reportData.id = reportRef.id;
                 await sendProgressReportNotifications(db, reportData);
                 // 次の送信日時を計算・更新
                 const nextSendAt = calculateNextSendAt(schedule.nextSendAt.toDate(), schedule.frequency, schedule.sendTime);
@@ -185,8 +186,13 @@ exports.scheduledProgressReport = functions.pubsub
 // 次の送信日時計算
 function calculateNextSendAt(currentDate, frequency, sendTime) {
     const [hours, minutes] = sendTime.split(':').map(Number);
-    const nextDate = new Date(currentDate);
-    // 送信時刻を設定
+    // 現在の日本時間を取得
+    const now = new Date();
+    const japanOffset = 9 * 60; // 日本時間はUTC+9
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const japanTime = new Date(utc + (japanOffset * 60000));
+    // 次の送信日時を日本時間で計算
+    const nextDate = new Date(japanTime);
     nextDate.setHours(hours, minutes, 0, 0);
     // 頻度に応じて次の送信日を計算
     switch (frequency) {
@@ -200,7 +206,9 @@ function calculateNextSendAt(currentDate, frequency, sendTime) {
             nextDate.setMonth(nextDate.getMonth() + 1);
             break;
     }
-    return nextDate;
+    // UTCに変換（日本時間から9時間引く）
+    const utcDate = new Date(nextDate.getTime() - (japanOffset * 60000));
+    return utcDate;
 }
 // 進捗レポート通知送信
 async function sendProgressReportNotifications(db, reportData) {
@@ -235,10 +243,60 @@ async function sendProgressReportNotifications(db, reportData) {
             };
             await db.collection('notifications').add(notificationData);
             console.log(`通知送信完了: ${recipientId}`);
+            // プッシュ通知も送信
+            await sendPushNotificationToUser(db, recipientId, {
+                title: '新しい進捗報告',
+                body: `${reportData.senderName}さんから進捗報告が送信されました`,
+                data: {
+                    url: '/progress-reports',
+                    type: 'progress_report',
+                    reportId: reportData.id
+                }
+            });
         }
     }
     catch (error) {
         console.error('通知送信エラー:', error);
+    }
+}
+// プッシュ通知送信
+async function sendPushNotificationToUser(db, userId, notification) {
+    try {
+        // ユーザーのデバイストークンを取得
+        const devicesSnapshot = await db.collection('users').doc(userId).collection('devices').get();
+        const tokens = devicesSnapshot.docs.map(doc => doc.id).filter(Boolean);
+        if (tokens.length === 0) {
+            console.log(`ユーザー ${userId} のデバイストークンが見つかりません`);
+            return;
+        }
+        const message = {
+            tokens,
+            notification: {
+                title: notification.title,
+                body: notification.body,
+            },
+            data: notification.data || {}
+        };
+        const response = await admin.messaging().sendMulticast(message);
+        console.log(`プッシュ通知送信完了: ${response.successCount}/${response.failureCount} 成功/失敗`);
+        // 無効なトークンをクリーンアップ
+        const deletions = [];
+        response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+                const code = (resp.error && resp.error.errorInfo && resp.error.errorInfo.code) || '';
+                if (code.includes('registration-token-not-registered') || code.includes('invalid-argument')) {
+                    const token = tokens[idx];
+                    deletions.push(db.collection('users').doc(userId).collection('devices').doc(token).delete());
+                }
+            }
+        });
+        if (deletions.length > 0) {
+            await Promise.all(deletions);
+            console.log(`${deletions.length}個の無効なトークンを削除しました`);
+        }
+    }
+    catch (error) {
+        console.error('プッシュ通知送信エラー:', error);
     }
 }
 // レポート内容生成

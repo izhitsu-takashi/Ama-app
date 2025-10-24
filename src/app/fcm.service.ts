@@ -26,6 +26,7 @@ export class FcmService {
 
     this.initialized = true;
     this.setupForegroundHandler();
+    this.setupServiceWorkerMessageHandler();
   }
 
   async requestPermissionAndRegisterToken(vapidKey: string): Promise<void> {
@@ -76,11 +77,48 @@ export class FcmService {
       try {
         const n = payload.notification;
         if (!n || Notification.permission !== 'granted') return;
-        new Notification(n.title || '新しい通知', {
+        
+        // より詳細な通知オプション
+        const options: NotificationOptions = {
           body: n.body || '',
-          icon: (n as any).icon || '/assets/icons/icon-192.png'
-        });
-      } catch {}
+          icon: (n as any).icon || '/assets/icons/icon-192.png',
+          badge: '/assets/icons/icon-72.png',
+          data: payload.data || {},
+          tag: `ama-foreground-${Date.now()}`,
+          requireInteraction: false,
+          silent: false
+        };
+        
+        const notification = new Notification(n.title || 'AMA - 新しい通知', options);
+        
+        // 通知クリック時の処理
+        notification.onclick = (event) => {
+          event.preventDefault();
+          const url = payload.data?.['url'] || '/';
+          window.focus();
+          window.location.href = url;
+        };
+        
+      } catch (error) {
+        console.error('フォアグラウンド通知エラー:', error);
+      }
     });
+  }
+
+  private setupServiceWorkerMessageHandler(): void {
+    // Service Workerからのメッセージを処理
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'notification-clicked') {
+          const { url, action } = event.data;
+          console.log('Service Worker通知クリック:', { url, action });
+          
+          // 必要に応じてページ遷移や状態更新を実行
+          if (url && url !== window.location.pathname) {
+            window.location.href = url;
+          }
+        }
+      });
+    }
   }
 }
