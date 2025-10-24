@@ -243,7 +243,7 @@ import { Firestore } from '@angular/fire/firestore';
             <button class="modal-close" (click)="closeAnnouncementModal()">×</button>
           </div>
           <div class="modal-form">
-            <form (ngSubmit)="createAnnouncement()" #announcementForm="ngForm">
+            <form (ngSubmit)="createAnnouncement(announcementForm)" #announcementForm="ngForm" novalidate>
               <div class="form-group">
                 <label for="announcementTitle" class="form-label">タイトル</label>
                 <input 
@@ -252,6 +252,7 @@ import { Firestore } from '@angular/fire/firestore';
                   [(ngModel)]="announcementData.title" 
                   name="title"
                   class="form-input"
+                  [class.error]="announcementFormSubmitted && !announcementData.title.trim()"
                   placeholder="アナウンスのタイトルを入力"
                   maxlength="20"
                   (input)="onAnnouncementTitleInput($event)"
@@ -259,6 +260,9 @@ import { Firestore } from '@angular/fire/firestore';
                 >
                 <div *ngIf="announcementTitleLength >= 20" class="char-limit-warning">
                   最大20文字までです
+                </div>
+                <div *ngIf="announcementFormSubmitted && !announcementData.title.trim()" class="error-message">
+                  タイトルの入力は必須です
                 </div>
               </div>
               
@@ -269,10 +273,14 @@ import { Firestore } from '@angular/fire/firestore';
                   [(ngModel)]="announcementData.content" 
                   name="content"
                   class="form-textarea"
+                  [class.error]="announcementFormSubmitted && !announcementData.content.trim()"
                   placeholder="アナウンスの内容を入力"
                   rows="6"
                   required
                 ></textarea>
+                <div *ngIf="announcementFormSubmitted && !announcementData.content.trim()" class="error-message">
+                  内容の入力は必須です
+                </div>
               </div>
               
               
@@ -283,7 +291,7 @@ import { Firestore } from '@angular/fire/firestore';
                 <button 
                   type="submit" 
                   class="btn btn-primary" 
-                  [disabled]="!announcementForm.valid || creatingAnnouncement"
+                  [disabled]="creatingAnnouncement"
                 >
                   <span *ngIf="!creatingAnnouncement">📢 アナウンス投稿</span>
                   <span *ngIf="creatingAnnouncement">⏳ 投稿中...</span>
@@ -1966,6 +1974,12 @@ import { Firestore } from '@angular/fire/firestore';
       margin-top: 4px;
     }
 
+    .form-input.error,
+    .form-textarea.error {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+    }
+
     .form-textarea {
       resize: vertical;
     }
@@ -2830,6 +2844,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     content: ''
   };
   announcementTitleLength = 0;
+  announcementFormSubmitted = false;
   unreadAnnouncements: Set<string> = new Set();
   showAnnouncementMenu: string | null = null;
 
@@ -3063,7 +3078,6 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       if (timelineContainer) {
         const containerWidth = timelineContainer.clientWidth;
         this.dayWidth = Math.max(containerWidth / 30, 20);
-        console.log('Timeline container width:', containerWidth, 'Day width:', this.dayWidth);
         
         this.tasks$.pipe(take(1)).subscribe(tasks => this.buildTimeline(tasks));
       } else {
@@ -3114,7 +3128,6 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     // 既存のツールチップを削除
     this.hideSimpleTooltip();
     
-    console.log('Showing tooltip for:', item);
     
     // 吹き出しツールチップを作成
     const tooltip = document.createElement('div');
@@ -3169,7 +3182,6 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
     
-    console.log('Tooltip positioned:', { left, top, rect, tooltipRect });
   }
 
   hideSimpleTooltip() {
@@ -3215,19 +3227,11 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         const totalDays = days.length;
         const actualDayWidth = gridWidth / totalDays;
         this.timelineTodayOffset = todayIndex >= 0 ? todayIndex * actualDayWidth : 0;
-        console.log('Today marker offset:', this.timelineTodayOffset, 'Actual day width:', actualDayWidth);
       } else {
         this.timelineTodayOffset = todayIndex >= 0 ? todayIndex * this.dayWidth : 0;
       }
     }, 100);
 
-    console.log('Timeline Debug:', {
-      start: start.toLocaleDateString(),
-      end: end.toLocaleDateString(),
-      today: today.toLocaleDateString(),
-      todayIndex,
-      dayWidth: this.dayWidth
-    });
 
     // バーに必要な位置と幅を計算（動的な日幅を使用）。
     // 既存データ: occurredOn(開始)〜dueDate(終了)。
@@ -3242,17 +3246,9 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       const startDate = toMidnight(startDateRaw);
       const endDate = toMidnight(endDateRaw);
 
-      console.log('Task Debug:', {
-        title: t.title,
-        startDateRaw: startDateRaw.toLocaleDateString(),
-        endDateRaw: endDateRaw.toLocaleDateString(),
-        startDate: startDate.toLocaleDateString(),
-        endDate: endDate.toLocaleDateString()
-      });
 
       // 可視範囲外はスキップ
       if (endDate < start || startDate > end) {
-        console.log('Task out of range:', t.title);
         return;
       }
 
@@ -3271,16 +3267,7 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         day.getDate() === clampedEnd.getDate()
       );
       
-      console.log('Index Debug:', {
-        title: t.title,
-        startIndex,
-        endIndex,
-        clampedStart: clampedStart.toLocaleDateString(),
-        clampedEnd: clampedEnd.toLocaleDateString()
-      });
-      
       if (startIndex === -1 || endIndex === -1) {
-        console.log('Index not found for task:', t.title);
         return;
       }
       
@@ -3292,22 +3279,12 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         const gridWidth = timelineGrid.clientWidth;
         const totalDays = days.length;
         actualDayWidth = gridWidth / totalDays;
-        console.log('Grid width:', gridWidth, 'Total days:', totalDays, 'Actual day width:', actualDayWidth);
       }
 
       const left = Math.max(0, startIndex * actualDayWidth);
       const widthDays = Math.max(1, endIndex - startIndex + 1);
       const width = widthDays * actualDayWidth - 4;
 
-      console.log('Final Position:', {
-        title: t.title,
-        left,
-        width,
-        widthDays,
-        actualDayWidth,
-        startIndex,
-        endIndex
-      });
 
       items.push({
         id: t.id,
@@ -4032,6 +4009,11 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     // 現在の日時を保存
     localStorage.setItem(`announcements_checked_${this.group.id}_${currentUser.uid}`, new Date().toISOString());
     this.unreadAnnouncements.clear();
+    
+    // メインページに通知バッジ更新を通知
+    window.dispatchEvent(new CustomEvent('updateGroupNotificationBadge', {
+      detail: { groupId: this.group.id }
+    }));
   }
 
   hasUnreadAnnouncements(): boolean {
@@ -4096,10 +4078,19 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       content: ''
     };
     this.announcementTitleLength = 0;
+    this.announcementFormSubmitted = false;
   }
 
-  async createAnnouncement(): Promise<void> {
-    if (!this.group || !this.announcementData.title.trim() || !this.announcementData.content.trim()) {
+  async createAnnouncement(form: any): Promise<void> {
+    // フォームを送信済み状態にする
+    this.announcementFormSubmitted = true;
+    
+    // バリデーション: タイトルと内容が入力されているかチェック
+    if (!this.announcementData.title.trim() || !this.announcementData.content.trim()) {
+      return;
+    }
+
+    if (!this.group) {
       return;
     }
 

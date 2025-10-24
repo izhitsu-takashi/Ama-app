@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { AuthService } from './auth.service';
@@ -1760,6 +1760,7 @@ export class MainPage implements OnInit, OnDestroy {
   private desktopNotifications = inject(DesktopNotificationService);
   private fcm = inject(FcmService);
   private progressReportService = inject(ProgressReportService);
+  private cdr = inject(ChangeDetectorRef);
 
   currentUser: User | null = null;
   userGroups$: Observable<Group[]> = of([]);
@@ -1911,24 +1912,11 @@ export class MainPage implements OnInit, OnDestroy {
           const groupId = event.detail.groupId;
           if (groupId) {
             this.markAnnouncementsAsRead(groupId);
+            // 通知状態を再チェック
+            this.checkGroupNotifications();
           }
         });
         
-        // デバッグ用：手動で通知バッジをテスト
-        (window as any).testGroupNotification = (groupId: string) => {
-          this.groupNotifications[groupId] = {
-            hasJoinRequests: false,
-            hasNewAnnouncements: true
-          };
-          console.log('Manually set notification for group:', groupId, this.groupNotifications[groupId]);
-          console.log('Current groupNotifications:', this.groupNotifications);
-        };
-        
-        // デバッグ用：現在の通知状態を確認
-        (window as any).checkGroupNotifications = () => {
-          console.log('Current groupNotifications:', this.groupNotifications);
-          return this.groupNotifications;
-        };
       });
     } else {
       this.userGroups$ = of([]);
@@ -2714,10 +2702,7 @@ export class MainPage implements OnInit, OnDestroy {
   checkGroupNotifications() {
     if (!this.currentUser) return;
 
-    console.log('Checking group notifications for groups:', this.userGroupsCache.map(g => g.name));
-    
     this.userGroupsCache.forEach(group => {
-      console.log('Checking notifications for group:', group.name, group.id);
       this.checkGroupJoinRequests(group.id);
       this.checkGroupAnnouncements(group.id);
     });
@@ -2734,8 +2719,6 @@ export class MainPage implements OnInit, OnDestroy {
       const joinRequestsSnapshot = await getDocs(joinRequestsQuery);
       const hasJoinRequests = !joinRequestsSnapshot.empty;
 
-      console.log('Join requests check for group:', groupId, 'hasJoinRequests:', hasJoinRequests);
-
       // 既存の通知状態を保持しつつ、参加リクエスト状態を更新
       const existingNotification = this.groupNotifications[groupId] || { hasJoinRequests: false, hasNewAnnouncements: false };
       
@@ -2743,8 +2726,6 @@ export class MainPage implements OnInit, OnDestroy {
         hasJoinRequests: hasJoinRequests,
         hasNewAnnouncements: existingNotification.hasNewAnnouncements
       };
-      
-      console.log('Updated groupNotifications for', groupId, ':', this.groupNotifications[groupId]);
     } catch (error) {
       console.error('Error checking join requests:', error);
     }
@@ -2753,26 +2734,24 @@ export class MainPage implements OnInit, OnDestroy {
   // グループの新しいアナウンスをチェック
   private async checkGroupAnnouncements(groupId: string) {
     try {
-      // インデックスエラーを避けるため、まずグループIDのみでフィルタリング
-      console.log('Checking announcements for group:', groupId);
+      // ユーザーの最後の確認日時を取得
+      const lastChecked = await this.getUserLastAnnouncementCheck(groupId);
       
+      // インデックスエラーを避けるため、まずグループIDのみでフィルタリング
       const announcementsQuery = query(
         collection(this.firestore, 'announcements'),
         where('groupId', '==', groupId)
       );
       const announcementsSnapshot = await getDocs(announcementsQuery);
       
-      // クライアント側で日付フィルタリング
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const recentAnnouncements = announcementsSnapshot.docs.filter(doc => {
+      // ユーザーの最後の確認日時以降のアナウンスをフィルタリング
+      const newAnnouncements = announcementsSnapshot.docs.filter(doc => {
         const data = doc.data();
         const createdAt = data['createdAt']?.toDate ? data['createdAt'].toDate() : new Date(data['createdAt']);
-        return createdAt > oneDayAgo;
+        return createdAt > lastChecked;
       });
       
-      const hasNewAnnouncements = recentAnnouncements.length > 0;
-
-      console.log('Announcement check for group:', groupId, 'hasNewAnnouncements:', hasNewAnnouncements, 'recent announcements found:', recentAnnouncements.length);
+      const hasNewAnnouncements = newAnnouncements.length > 0;
 
       // 既存の通知状態を保持しつつ、アナウンス状態を更新
       const existingNotification = this.groupNotifications[groupId] || { hasJoinRequests: false, hasNewAnnouncements: false };
@@ -2781,8 +2760,6 @@ export class MainPage implements OnInit, OnDestroy {
         hasJoinRequests: existingNotification.hasJoinRequests,
         hasNewAnnouncements: hasNewAnnouncements
       };
-      
-      console.log('Updated groupNotifications for', groupId, ':', this.groupNotifications[groupId]);
     } catch (error) {
       console.error('Error checking announcements:', error);
     }
@@ -2803,13 +2780,11 @@ export class MainPage implements OnInit, OnDestroy {
       if (!userCheckSnapshot.empty) {
         const userCheck = userCheckSnapshot.docs[0].data();
         const lastChecked = userCheck['lastChecked']?.toDate() || new Date(0);
-        console.log('User last checked announcements for group', groupId, ':', lastChecked);
         return lastChecked;
       }
       
       // 初回の場合は7日前からチェック
       const fallbackDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      console.log('No user check record found for group', groupId, ', using fallback date:', fallbackDate);
       return fallbackDate;
     } catch (error) {
       console.error('Error getting user last check:', error);
@@ -2855,13 +2830,18 @@ export class MainPage implements OnInit, OnDestroy {
         await addDoc(collection(this.firestore, 'userAnnouncementChecks'), userCheckData);
       }
 
-      // 通知バッジを更新
-      this.groupNotifications[groupId] = {
-        ...this.groupNotifications[groupId],
-        hasNewAnnouncements: false
-      };
-
-      console.log('Announcements marked as read for group:', groupId);
+      // 通知バッジを即座に更新
+      if (this.groupNotifications[groupId]) {
+        this.groupNotifications[groupId].hasNewAnnouncements = false;
+      } else {
+        this.groupNotifications[groupId] = {
+          hasJoinRequests: false,
+          hasNewAnnouncements: false
+        };
+      }
+      
+      // 強制的に変更検知をトリガー
+      this.cdr.detectChanges();
     } catch (error) {
       console.error('Error marking announcements as read:', error);
     }
