@@ -1,13 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, query, where, collectionData, orderBy, limit, getDocs, writeBatch, docData } from '@angular/fire/firestore';
-import { Observable, from, of } from 'rxjs';
-import { map, catchError, switchMap, shareReplay, take } from 'rxjs/operators';
+import { Observable, from, of, Subject } from 'rxjs';
+import { map, catchError, switchMap, shareReplay, take, takeUntil } from 'rxjs/operators';
 import { Notification, Reminder } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
   private firestore = inject(Firestore);
   private notificationCache = new Map<string, Promise<string>>(); // 重複通知を防ぐキャッシュ
+  private destroy$ = new Subject<void>(); // ログアウト時のリスナー停止用
 
   // 通知作成
   async createNotification(notificationData: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<void> {
@@ -31,6 +32,7 @@ export class NotificationService {
       ),
       { idField: 'id' }
     ).pipe(
+      takeUntil(this.destroy$), // ログアウト時に停止
       map(notifications => {
         // クライアント側でソートとリミット
         return (notifications as Notification[])
@@ -65,6 +67,7 @@ export class NotificationService {
         where('isRead', '==', false)
       )
     ).pipe(
+      takeUntil(this.destroy$), // ログアウト時に停止
       map(notifications => notifications.length),
       catchError(error => {
         // 権限エラーの場合は0を返す（ログを出力しない）
@@ -482,5 +485,13 @@ export class NotificationService {
       }),
       shareReplay(1) // 結果をキャッシュして重複実行を防ぐ
     );
+  }
+
+  // ログアウト時にすべてのリスナーを停止
+  stopAllListeners(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    // 新しいdestroy$を作成（サービスが再利用される場合に備えて）
+    this.destroy$ = new Subject<void>();
   }
 }

@@ -71,6 +71,15 @@ export class FcmService {
     }
   }
 
+  // ログアウト時にFCMトークンをクリーンアップ
+  async cleanupOnLogout(): Promise<void> {
+    try {
+      await this.unregisterToken();
+    } catch (error) {
+      console.error('FCM cleanup error:', error);
+    }
+  }
+
   private setupForegroundHandler(): void {
     if (!this.messaging) return;
     onMessage(this.messaging, (payload) => {

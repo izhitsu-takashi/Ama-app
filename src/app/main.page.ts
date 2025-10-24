@@ -1976,6 +1976,36 @@ export class MainPage implements OnInit, OnDestroy {
     }
   }
 
+  async logout() {
+    try {
+      // ログアウト前にすべてのリアルタイムリスナーを停止
+      this.destroy$.next();
+      this.destroy$.complete();
+      this.subscriptions.forEach(sub => sub.unsubscribe());
+      this.calendarSubscriptions.forEach(sub => sub.unsubscribe());
+      
+      // 各サービスのリスナーも停止
+      this.notificationService.stopAllListeners();
+      this.progressReportService.stopAllListeners();
+      
+      // FCMトークンをクリーンアップ
+      await this.fcm.cleanupOnLogout();
+      
+      // 新しいdestroy$を作成（コンポーネントが破棄されない場合に備えて）
+      this.destroy$ = new Subject<void>();
+      
+      // Firebase認証からログアウト
+      await this.auth.logout();
+      
+      // ログアウト後にページをリロードしてクリーンな状態にする
+      window.location.reload();
+    } catch (error) {
+      console.error('Logout error:', error);
+      // エラーが発生してもページをリロード
+      window.location.reload();
+    }
+  }
+
   private loadUserData() {
     const sub = this.auth.currentUser$.subscribe(user => {
       if (user) {
@@ -2606,30 +2636,6 @@ export class MainPage implements OnInit, OnDestroy {
     return result;
   }
 
-  // イベントハンドラー
-  async logout() {
-    try {
-      // すべてのサブスクリプションをクリーンアップ
-      this.subscriptions.forEach(sub => sub.unsubscribe());
-      this.subscriptions = [];
-      
-      // カレンダー関連のサブスクリプションもクリーンアップ
-      if (this.calendarSubscriptions) {
-        this.calendarSubscriptions.forEach(sub => sub.unsubscribe());
-        this.calendarSubscriptions = [];
-      }
-      
-      // ログアウト処理
-      await this.auth.logout();
-      
-      // ログインページに遷移
-      this.router.navigate(['/login']);
-    } catch (error) {
-      console.error('Logout error:', error);
-      // エラーが発生してもログインページに遷移
-      this.router.navigate(['/login']);
-    }
-  }
 
   showNotifications() {
     // TODO: 通知一覧モーダルを表示

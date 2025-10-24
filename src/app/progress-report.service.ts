@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp, query, where, collectionData, orderBy, getDocs } from '@angular/fire/firestore';
-import { Observable, of, combineLatest } from 'rxjs';
-import { map, catchError, take, switchMap } from 'rxjs/operators';
+import { Observable, of, combineLatest, Subject } from 'rxjs';
+import { map, catchError, take, switchMap, takeUntil } from 'rxjs/operators';
 import { ProgressReport, ProgressReportComment, Id } from './models';
 import { NotificationService } from './notification.service';
 
@@ -9,6 +9,7 @@ import { NotificationService } from './notification.service';
 export class ProgressReportService {
   private firestore = inject(Firestore);
   private notificationService = inject(NotificationService);
+  private destroy$ = new Subject<void>(); // ログアウト時のリスナー停止用
 
   // 進捗報告作成
   async createProgressReport(reportData: Omit<ProgressReport, 'id' | 'createdAt' | 'updatedAt'>): Promise<ProgressReport> {
@@ -190,6 +191,7 @@ export class ProgressReportService {
       singleRecipientQuery,
       multipleRecipientsQuery
     ]).pipe(
+      takeUntil(this.destroy$), // ログアウト時に停止
       map(([singleReports, multipleReports]) => {
         // 重複を除去してマージ
         const allReports = [...singleReports, ...multipleReports];
@@ -374,6 +376,7 @@ export class ProgressReportService {
       collectionData(singleRecipientQuery, { idField: 'id' }),
       collectionData(multipleRecipientsQuery, { idField: 'id' })
     ]).pipe(
+      takeUntil(this.destroy$), // ログアウト時に停止
       map(([singleReports, multipleReports]) => {
         // 重複を除去してマージ
         const allReports = [...singleReports, ...multipleReports];
@@ -391,5 +394,13 @@ export class ProgressReportService {
         return of(0);
       })
     );
+  }
+
+  // ログアウト時にすべてのリスナーを停止
+  stopAllListeners(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    // 新しいdestroy$を作成（サービスが再利用される場合に備えて）
+    this.destroy$ = new Subject<void>();
   }
 }

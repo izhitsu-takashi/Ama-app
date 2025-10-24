@@ -52,6 +52,16 @@ export class AuthService {
     try {
       // ログアウト前にFirebaseの接続をクリーンアップ
       await signOut(this.auth);
+      
+      // 管理者権限をクリア
+      this.setAdminStatus(false);
+      
+      // ローカルストレージをクリア
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('isAdmin');
+        localStorage.removeItem('userProfile');
+      }
+      
     } catch (error) {
       console.error('Logout error:', error);
       // エラーが発生してもログアウト処理を続行
