@@ -184,6 +184,13 @@ export class AnnouncementService {
     authorId: string
   ): Promise<void> {
     try {
+      // グループ情報を取得
+      const group = await this.groupService.getGroup(groupId);
+      if (!group) {
+        console.error('グループが見つかりません:', groupId);
+        return;
+      }
+
       // グループメンバーを取得
       const groupMembers = await firstValueFrom(
         this.groupService.getGroupMembers(groupId).pipe(
@@ -203,8 +210,12 @@ export class AnnouncementService {
           userId: recipientId,
           type: 'announcement',
           title: `新しいアナウンス: ${title}`,
-          content: `グループに新しいアナウンスが投稿されました`,
-          message: `グループに新しいアナウンスが投稿されました`
+          content: `${group.name}に新しいアナウンスが投稿されました`,
+          message: `${group.name}に新しいアナウンスが投稿されました`,
+          data: {
+            groupId: groupId,
+            groupName: group.name
+          }
         });
       }
     } catch (error) {

@@ -2776,6 +2776,14 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   private notificationService = inject(NotificationService);
   private announcementService = inject(AnnouncementService);
   private cd = inject(ChangeDetectorRef);
+  
+  // メインページの通知バッジ更新用（簡易実装）
+  private updateMainPageNotificationBadge() {
+    // メインページの通知バッジを更新するためのイベントを発火
+    window.dispatchEvent(new CustomEvent('updateGroupNotificationBadge', {
+      detail: { groupId: this.group?.id }
+    }));
+  }
   private firestore = inject(Firestore);
 
   private destroy$ = new Subject<void>();
@@ -3993,6 +4001,9 @@ export class GroupDetailPage implements OnInit, OnDestroy {
     ).subscribe(announcements => {
       this.announcements = announcements;
       this.checkUnreadAnnouncements();
+      
+      // アナウンスを確認した時にメインページの通知バッジを更新
+      this.updateMainPageNotificationBadge();
     });
   }
 
