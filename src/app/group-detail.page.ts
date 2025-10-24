@@ -97,34 +97,43 @@ import { Firestore } from '@angular/fire/firestore';
       <div class="timeline-section" *ngIf="showTimeline">
         <div class="timeline-header">
           <h2 class="section-title">タイムライン</h2>
-          <div class="timeline-legend">
-            <span class="legend-item"><span class="legend-color priority-low"></span>低</span>
-            <span class="legend-item"><span class="legend-color priority-medium"></span>中</span>
-            <span class="legend-item"><span class="legend-color priority-high"></span>高</span>
-            <span class="legend-item"><span class="legend-color priority-urgent"></span>緊急</span>
+          <div class="timeline-controls">
+            <div class="timeline-legend">
+              <span class="legend-item"><span class="legend-color priority-low"></span>低</span>
+              <span class="legend-item"><span class="legend-color priority-medium"></span>中</span>
+              <span class="legend-item"><span class="legend-color priority-high"></span>高</span>
+              <span class="legend-item"><span class="legend-color priority-urgent"></span>緊急</span>
+            </div>
           </div>
         </div>
-        <div class="timeline-container">
-          <div class="timeline-grid">
-            <div class="timeline-day" *ngFor="let d of timelineDays">
-              <span class="day-label">{{ d | date:'MM/dd' }}</span>
+        <div class="timeline-container" #timelineContainer>
+          <div class="timeline-scroll-area" (scroll)="onTimelineScroll($event)">
+            <div class="timeline-grid">
+              <div class="timeline-day" *ngFor="let day of timelineDays; let i = index" [style.width.px]="dayWidth">
+                <div class="day-date">{{ formatTimelineDate(day, i) }}</div>
+                <div class="day-weekday">{{ getWeekdayName(day) }}</div>
+              </div>
+              <div class="today-marker" *ngIf="timelineTodayOffset >= 0" [style.left.px]="timelineTodayOffset"></div>
             </div>
-            <div class="today-marker" *ngIf="timelineTodayOffset >= 0" [style.left.px]="timelineTodayOffset"></div>
-          </div>
-          <div class="timeline-rows">
-            <div class="timeline-row" *ngFor="let item of timelineItems">
-              <div 
-                class="timeline-bar" 
-                [class]="'priority-' + item.priority"
-                [style.left.px]="item.left"
-                [style.width.px]="item.width"
-                (click)="openTaskFromTimeline(item.id)"
-              >
-                <div class="bar-tooltip">
-                  <div class="tooltip-title">{{ item.title }}</div>
-                  <div class="tooltip-line">期限: {{ item.due | date:'MM/dd' }}</div>
-                  <div class="tooltip-line">担当: {{ item.assignee }}</div>
-                  <div class="tooltip-line">進捗: {{ item.progress || 0 }}%</div>
+            <div class="timeline-rows">
+              <div class="timeline-row" *ngFor="let item of timelineItems">
+                <div 
+                  class="timeline-bar" 
+                  [class]="'priority-' + item.priority"
+                  [style.left.px]="item.left"
+                  [style.width.px]="item.width"
+                  (click)="openTaskFromTimeline(item.id)"
+                  (mouseenter)="showSimpleTooltip($event, item)"
+                  (mouseleave)="hideSimpleTooltip()"
+                >
+                  <span class="bar-title">{{ item.title }}</span>
+                  <div class="bar-progress" [style.width.%]="item.progress"></div>
+                  <div class="bar-tooltip">
+                    <div class="tooltip-title">{{ item.title }}</div>
+                    <div class="tooltip-line">期限: {{ item.due | date:'MM/dd' }}</div>
+                    <div class="tooltip-line">担当: {{ item.assignee }}</div>
+                    <div class="tooltip-line">進捗: {{ item.progress || 0 }}%</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -924,6 +933,13 @@ import { Firestore } from '@angular/fire/firestore';
       margin-bottom: 12px;
     }
 
+    .timeline-controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+
     .timeline-legend { display:flex; gap:12px; color:#6b7280; font-size: 13px; }
     .legend-item { display:flex; align-items:center; gap:6px; }
     .legend-color { width:12px; height:12px; border-radius:3px; display:inline-block; }
@@ -932,22 +948,227 @@ import { Firestore } from '@angular/fire/firestore';
     .legend-color.priority-high { background:#fb923c; }
     .legend-color.priority-urgent { background:#ef4444; }
 
-    .timeline-container { overflow-x: visible; overflow-y: visible; padding-bottom: 8px; position: relative; }
-    .timeline-grid { position: relative; display:flex; min-width: 800px; border-bottom:1px solid #e5e7eb; padding-bottom: 8px; overflow: visible; }
-    .timeline-day { flex: 0 0 40px; text-align:center; color:#9ca3af; font-size: 12px; position: relative; }
-    .timeline-day::after { content:''; position:absolute; right:0; top:0; bottom:0; width:1px; background:#f1f5f9; }
-    .day-label { display:inline-block; }
-    .today-marker { position:absolute; top:0; bottom:-8px; width:2px; background:#ef4444; }
+    .timeline-container { 
+      overflow: hidden; 
+      padding-bottom: 8px; 
+      position: relative; 
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
 
-    .timeline-rows { position: relative; overflow: visible; pointer-events: none; }
+    .timeline-scroll-area {
+      overflow-x: auto;
+      overflow-y: visible;
+      max-height: 400px;
+    }
+
+    .timeline-grid { 
+      position: relative; 
+      display: flex; 
+      min-width: fit-content; 
+      border-bottom: 1px solid #e5e7eb; 
+      padding-bottom: 8px; 
+      background: #f9fafb;
+    }
+
+    .timeline-day { 
+      text-align: center; 
+      color: #6b7280; 
+      font-size: 11px; 
+      position: relative; 
+      border-right: 1px solid #e5e7eb;
+      padding: 4px 2px;
+      min-width: 60px;
+    }
+
+    .day-date {
+      font-weight: 600;
+      color: #374151;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .day-weekday {
+      font-size: 10px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .today-marker { 
+      position: absolute; 
+      top: 0; 
+      bottom: -8px; 
+      width: 2px; 
+      background: #ef4444; 
+      z-index: 10;
+    }
+
+    .timeline-rows { 
+      position: relative; 
+      overflow: visible; 
+      pointer-events: none; 
+      background: white;
+      padding: 8px 0;
+    }
+    
     .timeline-row, .timeline-bar { pointer-events: auto; }
-    .timeline-row { position: relative; height: 16px; margin: 8px 0; }
-    .timeline-bar { position:absolute; top:2px; height: 12px; border-radius: 6px; background:#e5e7eb; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05); }
+    .timeline-row { position: relative; height: 20px; margin: 6px 0; }
+    
+    .timeline-bar { 
+      position: absolute; 
+      top: 2px; 
+      height: 16px; 
+      border-radius: 8px; 
+      background: #e5e7eb; 
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      overflow: hidden;
+    }
+
+    .timeline-bar:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .timeline-bar:hover .bar-tooltip {
+      display: block;
+    }
+
+    /* 吹き出しツールチップのスタイル */
+    .bubble-tooltip {
+      position: absolute !important;
+      background: white !important;
+      border: 1px solid #e5e7eb !important;
+      border-radius: 8px !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+      pointer-events: none !important;
+      z-index: 1000 !important;
+      max-width: 250px !important;
+      min-width: 180px !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    }
+
+    .bubble-tooltip-content {
+      position: relative !important;
+      padding: 12px !important;
+    }
+
+    .bubble-tooltip-title {
+      font-weight: 600 !important;
+      color: #1f2937 !important;
+      font-size: 13px !important;
+      line-height: 1.4 !important;
+      margin-bottom: 6px !important;
+      word-break: break-word !important;
+    }
+
+    .bubble-tooltip-deadline {
+      color: #6b7280 !important;
+      font-size: 11px !important;
+      margin-bottom: 6px !important;
+    }
+
+    .bubble-tooltip-row {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      margin-bottom: 6px !important;
+    }
+
+    .bubble-tooltip-priority {
+      padding: 2px 6px !important;
+      border-radius: 4px !important;
+      font-size: 9px !important;
+      font-weight: 600 !important;
+      text-transform: uppercase !important;
+    }
+
+    .bubble-tooltip-priority.priority-low {
+      background: #dbeafe !important;
+      color: #1e40af !important;
+    }
+
+    .bubble-tooltip-priority.priority-medium {
+      background: #dcfce7 !important;
+      color: #166534 !important;
+    }
+
+    .bubble-tooltip-priority.priority-high {
+      background: #fed7aa !important;
+      color: #c2410c !important;
+    }
+
+    .bubble-tooltip-priority.priority-urgent {
+      background: #fee2e2 !important;
+      color: #dc2626 !important;
+    }
+
+    .bubble-tooltip-status {
+      color: #6b7280 !important;
+      font-size: 10px !important;
+    }
+
+    .bubble-tooltip-assignee {
+      color: #6b7280 !important;
+      font-size: 11px !important;
+    }
+
+    .bubble-tooltip-arrow {
+      position: absolute !important;
+      bottom: -6px !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      width: 0 !important;
+      height: 0 !important;
+      border-left: 6px solid transparent !important;
+      border-right: 6px solid transparent !important;
+      border-top: 6px solid white !important;
+    }
+
+    .bubble-tooltip-arrow::before {
+      content: '' !important;
+      position: absolute !important;
+      bottom: 1px !important;
+      left: -6px !important;
+      width: 0 !important;
+      height: 0 !important;
+      border-left: 6px solid transparent !important;
+      border-right: 6px solid transparent !important;
+      border-top: 6px solid #e5e7eb !important;
+    }
+
+    .bar-title {
+      position: absolute;
+      top: 50%;
+      left: 8px;
+      transform: translateY(-50%);
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: calc(100% - 16px);
+    }
+
+    .bar-progress {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: rgba(255,255,255,0.3);
+      border-radius: 8px;
+      transition: width 0.3s ease;
+    }
+
     /* タイムラインも同配色に統一（低=青, 中=緑, 高=オレンジ, 緊急=赤） */
-    .timeline-bar.priority-low { background:#60a5fa; }
-    .timeline-bar.priority-medium { background:#34d399; }
-    .timeline-bar.priority-high { background:#fb923c; }
-    .timeline-bar.priority-urgent { background:#ef4444; }
+    .timeline-bar.priority-low { background: linear-gradient(135deg, #60a5fa, #3b82f6); }
+    .timeline-bar.priority-medium { background: linear-gradient(135deg, #34d399, #10b981); }
+    .timeline-bar.priority-high { background: linear-gradient(135deg, #fb923c, #f59e0b); }
+    .timeline-bar.priority-urgent { background: linear-gradient(135deg, #ef4444, #dc2626); }
 
     .timeline-bar { position: relative; }
     .bar-tooltip { 
@@ -2571,6 +2792,9 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   timelineDays: Date[] = [];
   timelineItems: Array<{ id:string; title:string; priority:string; left:number; width:number; due: any; assignee: string; progress:number }>=[];
   timelineTodayOffset = -1;
+  dayWidth = 40;
+  timelineStartDate = new Date();
+  timelineEndDate = new Date();
 
   showCreateModal = false;
   showEditModal = false;
@@ -2679,6 +2903,9 @@ export class GroupDetailPage implements OnInit, OnDestroy {
         
         // アナウンスを読み込み
         this.loadAnnouncements(group.id);
+        
+        // タイムライン初期化
+        this.initializeTimeline();
         
         // グループオーナーチェック
         this.auth.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(user => {
@@ -2810,53 +3037,269 @@ export class GroupDetailPage implements OnInit, OnDestroy {
   toggleTimeline() {
     this.showTimeline = !this.showTimeline;
     if (this.showTimeline) {
+      this.initializeTimeline();
       this.tasks$.pipe(take(1)).subscribe(tasks => this.buildTimeline(tasks));
     }
   }
 
+  initializeTimeline() {
+    const today = new Date();
+    
+    // 1ヶ月固定（今日から前後15日）
+    this.timelineStartDate = new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000);
+    this.timelineEndDate = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000);
+    
+    // タイムラインコンテナの実際の幅を取得
+    setTimeout(() => {
+      const timelineContainer = document.querySelector('.timeline-scroll-area');
+      if (timelineContainer) {
+        const containerWidth = timelineContainer.clientWidth;
+        this.dayWidth = Math.max(containerWidth / 30, 20);
+        console.log('Timeline container width:', containerWidth, 'Day width:', this.dayWidth);
+        
+        this.tasks$.pipe(take(1)).subscribe(tasks => this.buildTimeline(tasks));
+      } else {
+        // フォールバック
+        this.dayWidth = 40;
+        this.tasks$.pipe(take(1)).subscribe(tasks => this.buildTimeline(tasks));
+      }
+    }, 100);
+  }
+
+  formatTimelineDate(date: Date, index: number): string {
+    // 月の表示は最初の日のみ、または月が変わった時のみ
+    if (index === 0) {
+      return date.toLocaleDateString('ja-JP', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
+    
+    // 前の日と月が違う場合は月を表示
+    if (index > 0 && this.timelineDays[index - 1].getMonth() !== date.getMonth()) {
+      return date.toLocaleDateString('ja-JP', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
+    
+    // それ以外は日付のみ
+    return date.getDate().toString();
+  }
+
+  getWeekdayName(date: Date): string {
+    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+    return weekdays[date.getDay()];
+  }
+
+  onTimelineScroll(event: Event) {
+    // スクロール位置に基づいて表示期間を調整
+    const scrollElement = event.target as HTMLElement;
+    const scrollLeft = scrollElement.scrollLeft;
+    const maxScroll = scrollElement.scrollWidth - scrollElement.clientWidth;
+    
+    // スクロール位置に応じて期間を調整（必要に応じて実装）
+    // 現在は基本的なスクロール機能のみ
+  }
+
+  showSimpleTooltip(event: MouseEvent, item: any) {
+    // 既存のツールチップを削除
+    this.hideSimpleTooltip();
+    
+    console.log('Showing tooltip for:', item);
+    
+    // 吹き出しツールチップを作成
+    const tooltip = document.createElement('div');
+    tooltip.className = 'bubble-tooltip';
+    tooltip.style.cssText = `
+      position: absolute !important;
+      background: white !important;
+      border: 1px solid #e5e7eb !important;
+      border-radius: 8px !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+      pointer-events: none !important;
+      z-index: 1000 !important;
+      max-width: 320px !important;
+      min-width: 220px !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    `;
+    
+    tooltip.innerHTML = `
+      <div style="position: relative !important; padding: 16px !important;">
+        <div style="font-weight: 600 !important; color: #1f2937 !important; font-size: 16px !important; line-height: 1.4 !important; margin-bottom: 8px !important; word-break: break-word !important;">${item.title}</div>
+        <div style="color: #6b7280 !important; font-size: 14px !important; margin-bottom: 8px !important;">期限: ${item.due ? new Date(item.due).toLocaleDateString('ja-JP') : '未設定'}</div>
+        <div style="display: flex !important; align-items: center !important; gap: 10px !important; margin-bottom: 8px !important;">
+          <span style="padding: 4px 8px !important; border-radius: 4px !important; font-size: 12px !important; font-weight: 600 !important; text-transform: uppercase !important; background: ${this.getPriorityColor(item.priority)} !important; color: white !important;">${this.getPriorityLabel(item.priority)}</span>
+          <span style="color: #6b7280 !important; font-size: 13px !important;">進行中</span>
+        </div>
+        <div style="color: #6b7280 !important; font-size: 14px !important;">担当者: ${item.assignee}</div>
+        <div style="position: absolute !important; bottom: -8px !important; left: 50% !important; transform: translateX(-50%) !important; width: 0 !important; height: 0 !important; border-left: 8px solid transparent !important; border-right: 8px solid transparent !important; border-top: 8px solid white !important;"></div>
+      </div>
+    `;
+    
+    document.body.appendChild(tooltip);
+    
+    // 位置を調整（バーの真上に表示）
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    // バーの中央上に配置
+    let left = rect.left + rect.width / 2 - tooltipRect.width / 2;
+    let top = rect.top - tooltipRect.height - 10;
+    
+    // 画面の端を考慮した位置調整
+    if (left < 10) {
+      left = 10;
+    }
+    if (left + tooltipRect.width > window.innerWidth - 10) {
+      left = window.innerWidth - tooltipRect.width - 10;
+    }
+    if (top < 10) {
+      top = rect.bottom + 10;
+    }
+    
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    
+    console.log('Tooltip positioned:', { left, top, rect, tooltipRect });
+  }
+
+  hideSimpleTooltip() {
+    const tooltip = document.querySelector('.bubble-tooltip');
+    if (tooltip) {
+      tooltip.remove();
+    }
+  }
+
   private buildTimeline(tasks: TaskItem[]) {
-    // 日付をローカルの0時に正規化
-    const toMidnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    // 日付をローカルの0時に正規化（より正確に）
+    const toMidnight = (d: Date) => {
+      const date = new Date(d);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    };
 
-    // 対象期間: 今日を中心に過去7日〜先14日 = 22日分（いずれも0時基準）
-    const now = new Date();
-    const today = toMidnight(now);
-    const start = toMidnight(new Date(today));
-    start.setDate(start.getDate() - 7);
-    const end = toMidnight(new Date(today));
-    end.setDate(end.getDate() + 14);
+    // 新しい期間設定を使用
+    const today = toMidnight(new Date());
+    const start = toMidnight(new Date(this.timelineStartDate));
+    const end = toMidnight(new Date(this.timelineEndDate));
 
-    // 目盛り生成
+    // 目盛り生成（より正確に）
     const days: Date[] = [];
     const dayMs = 24 * 60 * 60 * 1000;
     for (let d = new Date(start); d <= end; d = new Date(d.getTime() + dayMs)) {
-      days.push(new Date(d));
+      days.push(toMidnight(d));
     }
     this.timelineDays = days;
 
-    // today marker offset
-    this.timelineTodayOffset = Math.round(((today.getTime() - start.getTime()) / dayMs) * 40);
+    // today marker offset（より正確に）
+    const todayIndex = days.findIndex(day => 
+      day.getFullYear() === today.getFullYear() && 
+      day.getMonth() === today.getMonth() && 
+      day.getDate() === today.getDate()
+    );
+    
+    // タイムライングリッドの実際の幅を取得して今日マーカーの位置を計算
+    setTimeout(() => {
+      const timelineGrid = document.querySelector('.timeline-grid');
+      if (timelineGrid) {
+        const gridWidth = timelineGrid.clientWidth;
+        const totalDays = days.length;
+        const actualDayWidth = gridWidth / totalDays;
+        this.timelineTodayOffset = todayIndex >= 0 ? todayIndex * actualDayWidth : 0;
+        console.log('Today marker offset:', this.timelineTodayOffset, 'Actual day width:', actualDayWidth);
+      } else {
+        this.timelineTodayOffset = todayIndex >= 0 ? todayIndex * this.dayWidth : 0;
+      }
+    }, 100);
 
-    // バーに必要な位置と幅を計算（1日=40px）。
+    console.log('Timeline Debug:', {
+      start: start.toLocaleDateString(),
+      end: end.toLocaleDateString(),
+      today: today.toLocaleDateString(),
+      todayIndex,
+      dayWidth: this.dayWidth
+    });
+
+    // バーに必要な位置と幅を計算（動的な日幅を使用）。
     // 既存データ: occurredOn(開始)〜dueDate(終了)。
     const items: Array<{ id:string; title:string; priority:string; left:number; width:number; due:any; assignee:string; progress:number }>=[];
     const toDate = (v:any) => v?.toDate ? v.toDate() : (v ? new Date(v) : undefined);
     (tasks || []).forEach(t => {
       if (t.status === 'completed') return; // 完了は非表示
-      // 0時基準に正規化
+      
+      // 日付の変換と正規化
       const startDateRaw = toDate(t.occurredOn) || today;
-      const endDateRaw = toDate(t.dueDate) || new Date(startDateRaw.getTime() + dayMs); // 期限未設定は+1日
+      const endDateRaw = toDate(t.dueDate) || new Date(startDateRaw.getTime() + dayMs);
       const startDate = toMidnight(startDateRaw);
       const endDate = toMidnight(endDateRaw);
+
+      console.log('Task Debug:', {
+        title: t.title,
+        startDateRaw: startDateRaw.toLocaleDateString(),
+        endDateRaw: endDateRaw.toLocaleDateString(),
+        startDate: startDate.toLocaleDateString(),
+        endDate: endDate.toLocaleDateString()
+      });
+
       // 可視範囲外はスキップ
-      if (endDate < start || startDate > end) return;
+      if (endDate < start || startDate > end) {
+        console.log('Task out of range:', t.title);
+        return;
+      }
 
       const clampedStart = startDate < start ? start : startDate;
       const clampedEnd = endDate > end ? end : endDate;
-      const left = Math.max(0, Math.floor((clampedStart.getTime() - start.getTime()) / dayMs) * 40);
-      // 終了日を含む幅（同日なら1日幅）
-      const widthDays = Math.max(1, Math.round(((clampedEnd.getTime() - clampedStart.getTime()) / dayMs)) + 1);
-      const width = widthDays * 40 - 6; // 少し余白
+      
+      // 日付のインデックスを正確に計算
+      const startIndex = days.findIndex(day => 
+        day.getFullYear() === clampedStart.getFullYear() && 
+        day.getMonth() === clampedStart.getMonth() && 
+        day.getDate() === clampedStart.getDate()
+      );
+      const endIndex = days.findIndex(day => 
+        day.getFullYear() === clampedEnd.getFullYear() && 
+        day.getMonth() === clampedEnd.getMonth() && 
+        day.getDate() === clampedEnd.getDate()
+      );
+      
+      console.log('Index Debug:', {
+        title: t.title,
+        startIndex,
+        endIndex,
+        clampedStart: clampedStart.toLocaleDateString(),
+        clampedEnd: clampedEnd.toLocaleDateString()
+      });
+      
+      if (startIndex === -1 || endIndex === -1) {
+        console.log('Index not found for task:', t.title);
+        return;
+      }
+      
+      // タイムライングリッドの実際の幅を取得
+      const timelineGrid = document.querySelector('.timeline-grid');
+      let actualDayWidth = this.dayWidth;
+      
+      if (timelineGrid) {
+        const gridWidth = timelineGrid.clientWidth;
+        const totalDays = days.length;
+        actualDayWidth = gridWidth / totalDays;
+        console.log('Grid width:', gridWidth, 'Total days:', totalDays, 'Actual day width:', actualDayWidth);
+      }
+
+      const left = Math.max(0, startIndex * actualDayWidth);
+      const widthDays = Math.max(1, endIndex - startIndex + 1);
+      const width = widthDays * actualDayWidth - 4;
+
+      console.log('Final Position:', {
+        title: t.title,
+        left,
+        width,
+        widthDays,
+        actualDayWidth,
+        startIndex,
+        endIndex
+      });
 
       items.push({
         id: t.id,
@@ -3066,6 +3509,16 @@ export class GroupDetailPage implements OnInit, OnDestroy {
       urgent: '緊急'
     };
     return labels[priority as keyof typeof labels] || priority;
+  }
+
+  getPriorityColor(priority: string): string {
+    const colors = {
+      low: '#60a5fa',
+      medium: '#34d399',
+      high: '#fb923c',
+      urgent: '#ef4444'
+    };
+    return colors[priority as keyof typeof colors] || '#6b7280';
   }
 
   getStatusLabel(status: string): string {
