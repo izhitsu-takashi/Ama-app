@@ -24,8 +24,8 @@ import { takeUntil, take } from 'rxjs/operators';
       </div>
 
       <!-- 進捗報告詳細 -->
-      <div class="report-detail" *ngIf="report">
-        <div class="report-header">
+      <div class="report-detail">
+        <div class="report-header" *ngIf="report">
           <h2 class="report-title">{{ report.title }}</h2>
           <span class="report-status" [class]="'status-' + report.status">
             {{ getStatusLabel(report.status) }}
@@ -35,38 +35,36 @@ import { takeUntil, take } from 'rxjs/operators';
         <div class="report-meta">
           <div class="meta-row">
             <span class="meta-label">送信者:</span>
-            <span class="meta-value">{{ report.senderName }}</span>
+            <span class="meta-value">{{ report?.senderName || '読み込み中...' }}</span>
           </div>
-          <div class="meta-row" *ngIf="report.recipientName">
+          <div class="meta-row" *ngIf="report?.recipientName">
             <span class="meta-label">受信者:</span>
-            <span class="meta-value">{{ report.recipientName }}</span>
+            <span class="meta-value">{{ report?.recipientName }}</span>
           </div>
-          <div class="meta-row" *ngIf="report.groupName">
+          <div class="meta-row" *ngIf="report?.groupName">
             <span class="meta-label">グループ:</span>
-            <span class="meta-value">{{ report.groupName }}</span>
+            <span class="meta-value">{{ report?.groupName }}</span>
           </div>
-          <div class="meta-row" *ngIf="report.attachedGroupName">
+          <div class="meta-row" *ngIf="report?.attachedGroupName">
             <span class="meta-label">関連グループ:</span>
-            <span class="meta-value">
-              <a class="group-link" (click)="navigateToGroup(report.attachedGroupId!)">{{ report.attachedGroupName }}</a>
-            </span>
+            <span class="meta-value">{{ report?.attachedGroupName }}</span>
           </div>
           <div class="meta-row">
             <span class="meta-label">送信日時:</span>
-            <span class="meta-value">{{ formatDate(report.createdAt) }}</span>
+            <span class="meta-value">{{ report?.createdAt ? formatDate(report?.createdAt) : '読み込み中...' }}</span>
           </div>
-          <div class="meta-row" *ngIf="report.readAt">
+          <div class="meta-row" *ngIf="report?.readAt">
             <span class="meta-label">既読日時:</span>
-            <span class="meta-value">{{ formatDate(report.readAt) }}</span>
+            <span class="meta-value">{{ formatDate(report?.readAt) }}</span>
           </div>
         </div>
 
-        <div class="report-content">
+        <div class="report-content" *ngIf="report">
           <h3 class="content-title">内容</h3>
           <div class="content-text">{{ report.content }}</div>
         </div>
 
-        <div class="report-actions" *ngIf="!isOwnReport">
+        <div class="report-actions" *ngIf="report && !isOwnReport">
           <button 
             class="btn primary" 
             (click)="markAsRead()" 
@@ -236,18 +234,6 @@ import { takeUntil, take } from 'rxjs/operators';
       color: #6b7280;
     }
 
-    .group-link {
-      color: #667eea;
-      text-decoration: none;
-      font-weight: 600;
-      cursor: pointer;
-      transition: color 0.2s;
-    }
-
-    .group-link:hover {
-      color: #5a67d8;
-      text-decoration: underline;
-    }
 
     .report-content {
       margin-bottom: 1.5rem;
@@ -523,9 +509,6 @@ export class ProgressReportDetailPage implements OnInit, OnDestroy {
     });
   }
 
-  navigateToGroup(groupId: string) {
-    this.router.navigate(['/group-detail', groupId]);
-  }
 
   async markAsRead() {
     if (!this.report) return;
@@ -587,4 +570,5 @@ export class ProgressReportDetailPage implements OnInit, OnDestroy {
       }
     }
   }
+
 }

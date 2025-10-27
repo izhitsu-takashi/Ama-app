@@ -134,7 +134,7 @@ import { takeUntil, take } from 'rxjs/operators';
               <div class="report-meta">
                 <span class="meta-item">📤 {{ getRecipientDisplayName(report) }}</span>
                 <span class="meta-item" *ngIf="report.attachedGroupName">
-                  📎 <a class="group-link" (click)="navigateToGroup(report.attachedGroupId!)">{{ report.attachedGroupName }}</a>
+                  📎 <span class="group-link" (click)="navigateToGroup($event, report.attachedGroupId!)">{{ report.attachedGroupName }}</span>
                 </span>
                 <span class="meta-item">📅 {{ formatDate(report.createdAt) }}</span>
                 <span class="meta-item" *ngIf="report.readAt">👁️ {{ formatDate(report.readAt) }} 既読</span>
@@ -181,7 +181,7 @@ import { takeUntil, take } from 'rxjs/operators';
               <div class="report-meta">
                 <span class="meta-item">📥 {{ report.senderName }}</span>
                 <span class="meta-item" *ngIf="report.attachedGroupName">
-                  📎 <a class="group-link" (click)="navigateToGroup(report.attachedGroupId!)">{{ report.attachedGroupName }}</a>
+                  📎 <span class="group-link" (click)="navigateToGroup($event, report.attachedGroupId!)">{{ report.attachedGroupName }}</span>
                 </span>
                 <span class="meta-item">📅 {{ formatDate(report.createdAt) }}</span>
               </div>
@@ -633,33 +633,6 @@ export class ProgressReportsPage implements OnInit, OnDestroy {
     this.router.navigate(['/progress-report-detail', report.id]);
   }
 
-  async navigateToGroup(groupId: string) {
-    try {
-      // 現在のユーザーを取得
-      const currentUser = await this.auth.currentUser$.pipe(take(1)).toPromise();
-      if (!currentUser) {
-        alert('ログインが必要です。');
-        return;
-      }
-
-      // ユーザーのグループ一覧を取得
-      const userGroups = await this.groupService.getUserGroups(currentUser.uid).pipe(take(1)).toPromise();
-      
-      // 指定されたグループに参加しているかチェック
-      const isMember = userGroups?.some(group => group.id === groupId);
-      
-      if (isMember) {
-        // 参加している場合はグループ詳細ページに遷移
-        this.router.navigate(['/group', groupId]);
-      } else {
-        // 参加していない場合はメッセージを表示
-        alert('グループに参加していません。グループ一覧からグループ名を検索して参加をお願いします。');
-      }
-    } catch (error) {
-      console.error('グループ遷移エラー:', error);
-      alert('グループ情報の取得に失敗しました。');
-    }
-  }
 
   async markAsRead(reportId: string) {
     try {
@@ -714,5 +687,40 @@ export class ProgressReportsPage implements OnInit, OnDestroy {
   // コンテンツの表示/非表示を切り替え
   toggleContent(reportId: string) {
     this.showFullContent[reportId] = !this.showFullContent[reportId];
+  }
+
+  // グループにナビゲート
+  async navigateToGroup(event: Event, groupId: string) {
+    if (!groupId) {
+      alert('グループIDが指定されていません。');
+      return;
+    }
+
+    try {
+      // 現在のユーザーを取得
+      const currentUser = await this.auth.currentUser$.pipe(take(1)).toPromise();
+      if (!currentUser) {
+        alert('ログインが必要です。');
+        return;
+      }
+
+      // ユーザーが参加しているグループを取得
+      const userGroups = await this.groupService.getUserGroups(currentUser.uid).pipe(take(1)).toPromise();
+      
+      // 指定されたグループに参加しているかチェック
+      const isMember = userGroups?.some((group: any) => group.id === groupId);
+      
+      if (isMember) {
+        // 参加している場合はグループ詳細画面に移動
+        this.router.navigate(['/group-detail', groupId]);
+      } else {
+        // 参加していない場合は検索画面に移動
+        this.router.navigate(['/groups'], { queryParams: { search: groupId } });
+        alert('このグループに参加していません。グループ検索画面で参加してください。');
+      }
+    } catch (error) {
+      console.error('グループナビゲーションエラー:', error);
+      alert('グループ情報の取得に失敗しました。');
+    }
   }
 }

@@ -124,6 +124,7 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
                   class="user-option" 
                   *ngFor="let user of filteredUsers"
                   (click)="selectUser(user)"
+                  [class.selected]="isUserSelected(user)"
                 >
                   <div class="user-avatar">
                     <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || 'ユーザー'" class="avatar-image">
@@ -133,19 +134,37 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
                     <span class="user-name">{{ user.displayName || (user.email ? user.email.split('@')[0] : 'ユーザー') }}</span>
                     <span class="user-email" *ngIf="user.email">{{ user.email }}</span>
                   </div>
+                  <div class="selection-indicator" *ngIf="isUserSelected(user)">✓</div>
                 </div>
               </div>
               <div class="user-dropdown" *ngIf="showUserDropdown && filteredUsers.length === 0 && userSearchTerm.length > 0">
                 <div class="no-results">ユーザーが見つかりません</div>
               </div>
             </div>
-            <div class="selected-user" *ngIf="selectedUser">
-              <span class="selected-label">選択中:</span>
-              <span class="selected-name">{{ selectedUser.displayName || (selectedUser.email ? selectedUser.email.split('@')[0] : 'ユーザー') }}</span>
-              <button type="button" class="clear-selection" (click)="clearUserSelection()">×</button>
+            
+            <!-- 選択されたユーザー一覧 -->
+            <div class="selected-users" *ngIf="selectedUsers.length > 0">
+              <div class="selected-users-header">
+                <span class="selected-label">選択中 ({{ selectedUsers.length }}人):</span>
+                <button type="button" class="clear-all-btn" (click)="clearAllUsers()">すべてクリア</button>
+              </div>
+              <div class="selected-users-list">
+                <div class="selected-user-item" *ngFor="let user of selectedUsers">
+                  <div class="user-avatar-small">
+                    <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || 'ユーザー'" class="avatar-image-small">
+                    <span *ngIf="!user.photoURL" class="default-avatar-small">{{ getUserInitials(user) }}</span>
+                  </div>
+                  <div class="user-info-small">
+                    <span class="user-name-small">{{ user.displayName || (user.email ? user.email.split('@')[0] : 'ユーザー') }}</span>
+                    <span class="user-email-small" *ngIf="user.email">{{ user.email }}</span>
+                  </div>
+                  <button type="button" class="remove-user-btn" (click)="removeUser(user)">×</button>
+                </div>
+              </div>
             </div>
-            <div *ngIf="reportForm.get('recipientId')?.invalid && reportForm.get('recipientId')?.touched" class="error-message">
-              送信先を選択してください
+            
+            <div *ngIf="selectedUsers.length === 0 && reportForm.get('recipientIds')?.touched" class="error-message">
+              送信先を1人以上選択してください
             </div>
           </div>
 
@@ -493,6 +512,122 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
       background-color: #fee2e2;
     }
 
+    .user-option.selected {
+      background-color: #eff6ff;
+      border-left: 3px solid #0ea5e9;
+    }
+
+    .selection-indicator {
+      color: #0ea5e9;
+      font-weight: 600;
+      font-size: 1.2rem;
+    }
+
+    .selected-users {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+    }
+
+    .selected-users-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .clear-all-btn {
+      background: none;
+      border: none;
+      color: #dc2626;
+      font-size: 0.875rem;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      transition: background-color 0.2s;
+    }
+
+    .clear-all-btn:hover {
+      background-color: #fee2e2;
+    }
+
+    .selected-users-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .selected-user-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.375rem;
+    }
+
+    .user-avatar-small {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .avatar-image-small {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .default-avatar-small {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.75rem;
+    }
+
+    .user-info-small {
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+      flex: 1;
+    }
+
+    .user-name-small {
+      font-weight: 500;
+      color: #374151;
+      font-size: 0.875rem;
+    }
+
+    .user-email-small {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
+    .remove-user-btn {
+      background: none;
+      border: none;
+      color: #dc2626;
+      font-size: 1.25rem;
+      cursor: pointer;
+      padding: 0.25rem;
+      border-radius: 0.25rem;
+      transition: background-color 0.2s;
+    }
+
+    .remove-user-btn:hover {
+      background-color: #fee2e2;
+    }
+
     .ai-section {
       background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
       border: 1px solid #0ea5e9;
@@ -616,7 +751,7 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
   userGroups$: Observable<Group[]> = of([]);
   availableUsers: User[] = [];
   filteredUsers: User[] = [];
-  selectedUser: User | null = null;
+  selectedUsers: User[] = [];
   userSearchTerm = '';
   showUserDropdown = false;
   loading = false;
@@ -631,7 +766,7 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
   reportForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(2)]],
     content: ['', [Validators.required, Validators.minLength(10)]],
-    recipientId: ['', [Validators.required]],
+    recipientIds: [[] as string[], [Validators.required, Validators.minLength(1)]],
     attachedGroupId: [''] // 添付グループ
   });
 
@@ -707,18 +842,31 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
   }
 
   selectUser(user: User) {
-    this.selectedUser = user;
-    this.userSearchTerm = user.displayName || (user.email ? user.email.split('@')[0] : 'ユーザー');
-    this.reportForm.patchValue({ recipientId: user.id });
+    if (!this.isUserSelected(user)) {
+      this.selectedUsers.push(user);
+      this.updateRecipientIds();
+    }
     this.showUserDropdown = false;
+    this.userSearchTerm = '';
   }
 
-  clearUserSelection() {
-    this.selectedUser = null;
-    this.userSearchTerm = '';
-    this.reportForm.patchValue({ recipientId: '' });
-    this.filteredUsers = [];
-    this.showUserDropdown = false;
+  removeUser(user: User) {
+    this.selectedUsers = this.selectedUsers.filter(u => u.id !== user.id);
+    this.updateRecipientIds();
+  }
+
+  clearAllUsers() {
+    this.selectedUsers = [];
+    this.updateRecipientIds();
+  }
+
+  isUserSelected(user: User): boolean {
+    return this.selectedUsers.some(u => u.id === user.id);
+  }
+
+  private updateRecipientIds() {
+    const recipientIds = this.selectedUsers.map(user => user.id);
+    this.reportForm.patchValue({ recipientIds });
   }
 
   onDocumentClick(event: Event) {
@@ -824,11 +972,11 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
         });
 
         if (report.recipientId) {
-          this.reportForm.patchValue({ recipientId: report.recipientId });
+          this.reportForm.patchValue({ recipientIds: [report.recipientId] });
           // ユーザー情報を設定
           const user = this.availableUsers.find(u => u.id === report.recipientId);
           if (user) {
-            this.selectedUser = user;
+            this.selectedUsers = [user];
             this.userSearchTerm = user.displayName || (user.email ? user.email.split('@')[0] : 'ユーザー');
           }
         }
@@ -867,9 +1015,10 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
         status: 'draft'
       };
 
-      if (formData.recipientId) {
-        const recipient = this.availableUsers.find(u => u.id === formData.recipientId);
-        reportData.recipientId = formData.recipientId;
+      if (formData.recipientIds && formData.recipientIds.length > 0) {
+        // 下書きでは最初のユーザーのみ保存
+        const recipient = this.availableUsers.find(u => u.id === formData.recipientIds?.[0]);
+        reportData.recipientId = formData.recipientIds[0];
         reportData.recipientName = recipient?.displayName || (recipient?.email ? recipient.email.split('@')[0] : 'ユーザー');
       }
 
@@ -919,23 +1068,38 @@ export class ProgressReportCreatePage implements OnInit, OnDestroy {
         status: 'sent'
       };
 
-      if (formData.recipientId) {
-        const recipient = this.availableUsers.find(u => u.id === formData.recipientId);
-        reportData.recipientId = formData.recipientId;
-        reportData.recipientName = recipient?.displayName || (recipient?.email ? recipient.email.split('@')[0] : 'ユーザー');
-      }
+      // 複数ユーザーへの送信処理
+      if (formData.recipientIds && formData.recipientIds.length > 0) {
+        // 添付グループ情報を取得
+        let attachedGroup: Group | undefined;
+        if (formData.attachedGroupId) {
+          const groups = await firstValueFrom(this.userGroups$);
+          attachedGroup = groups?.find(g => g.id === formData.attachedGroupId);
+        }
 
-      // 添付グループの処理
-      if (formData.attachedGroupId) {
-        const groups = await firstValueFrom(this.userGroups$);
-        const attachedGroup = groups?.find(g => g.id === formData.attachedGroupId);
-        reportData.attachedGroupId = formData.attachedGroupId;
-        reportData.attachedGroupName = attachedGroup?.name || 'グループ';
-      }
+        // 全受信者の名前を取得
+        const allRecipients = (formData.recipientIds || []).map(recipientId => {
+          const recipient = this.availableUsers.find(u => u.id === recipientId);
+          return recipient?.displayName || (recipient?.email ? recipient.email.split('@')[0] : 'ユーザー');
+        });
 
-      const createdReport = await this.progressReportService.createProgressReport(reportData);
+        // 1つの進捗報告に複数受信者を含める
+        const multiRecipientReportData: Omit<ProgressReport, 'id' | 'createdAt' | 'updatedAt'> = {
+          ...reportData,
+          recipientIds: formData.recipientIds,
+          recipientNames: allRecipients
+        };
+
+        // 添付グループ情報を追加
+        if (formData.attachedGroupId && attachedGroup) {
+          multiRecipientReportData.attachedGroupId = formData.attachedGroupId;
+          multiRecipientReportData.attachedGroupName = attachedGroup.name;
+        }
+        
+        await this.progressReportService.createProgressReport(multiRecipientReportData);
+      }
       
-      alert('進捗報告を送信しました！');
+      alert(`${formData.recipientIds?.length || 0}人に進捗報告を送信しました！`);
       this.router.navigate(['/progress-reports']);
     } catch (error) {
       console.error('進捗報告送信エラー:', error);

@@ -123,17 +123,107 @@ export const scheduledProgressReport = functions.pubsub
           
           const tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           console.log(`取得したタスク数: ${tasks.length}`);
+          console.log(`グループID: ${schedule.attachedGroupId}`);
           
-          // 過去1週間のタスクをフィルタリング
+          // 強制的にログを出力（確実に実行されるように）
+          console.error('=== タスク詳細情報開始 ===');
+          console.error(`タスク数: ${tasks.length}`);
+          console.log('=== タスク詳細情報開始 ===');
+          console.log(`タスク数: ${tasks.length}`);
+          
+          // 各タスクの詳細を強制出力
+          for (let i = 0; i < tasks.length; i++) {
+            const task: any = tasks[i];
+            console.error(`[TASK_${i + 1}] ID: ${task.id}`);
+            console.error(`[TASK_${i + 1}] タイトル: ${task.title}`);
+            console.error(`[TASK_${i + 1}] ステータス: ${task.status}`);
+            console.error(`[TASK_${i + 1}] グループID: ${task.groupId}`);
+            console.error(`[TASK_${i + 1}] 担当者: ${task.assigneeName || '未設定'}`);
+            console.error(`[TASK_${i + 1}] 優先度: ${task.priority}`);
+            console.error(`[TASK_${i + 1}] 期限: ${task.dueDate ? task.dueDate.toDate() : '未設定'}`);
+            console.error(`[TASK_${i + 1}] 内容: ${task.content || 'なし'}`);
+            console.error(`[TASK_${i + 1}] 作成日: ${task.createdAt ? task.createdAt.toDate() : '未設定'}`);
+            console.error(`[TASK_${i + 1}] 更新日: ${task.updatedAt ? task.updatedAt.toDate() : '未設定'}`);
+            console.error(`[TASK_${i + 1}] 発生日: ${task.occurredOn ? task.occurredOn.toDate() : '未設定'}`);
+            
+            // ログレベルでも出力
+            console.log(`[TASK_${i + 1}] ID: ${task.id}`);
+            console.log(`[TASK_${i + 1}] タイトル: ${task.title}`);
+            console.log(`[TASK_${i + 1}] ステータス: ${task.status}`);
+            console.log(`[TASK_${i + 1}] グループID: ${task.groupId}`);
+            console.log(`[TASK_${i + 1}] 担当者: ${task.assigneeName || '未設定'}`);
+            console.log(`[TASK_${i + 1}] 優先度: ${task.priority}`);
+            console.log(`[TASK_${i + 1}] 期限: ${task.dueDate ? task.dueDate.toDate() : '未設定'}`);
+            console.log(`[TASK_${i + 1}] 内容: ${task.content || 'なし'}`);
+            console.log(`[TASK_${i + 1}] 作成日: ${task.createdAt ? task.createdAt.toDate() : '未設定'}`);
+            console.log(`[TASK_${i + 1}] 更新日: ${task.updatedAt ? task.updatedAt.toDate() : '未設定'}`);
+            console.log(`[TASK_${i + 1}] 発生日: ${task.occurredOn ? task.occurredOn.toDate() : '未設定'}`);
+          }
+          console.error('=== タスク詳細情報終了 ===');
+          console.log('=== タスク詳細情報終了 ===');
+          
+          // 過去1週間のタスクをフィルタリング（より柔軟な日付比較）
           const oneWeekAgo = new Date();
           oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+          console.log(`フィルタ基準日（1週間前）: ${oneWeekAgo}`);
           
           const filteredTasks = tasks.filter((task: any) => {
-            const taskDate = task.occurredOn?.toDate() || task.createdAt?.toDate();
-            return taskDate && taskDate >= oneWeekAgo;
+            // occurredOn、createdAt、updatedAtのいずれかが過去1週間以内
+            const occurredDate = task.occurredOn?.toDate ? task.occurredOn.toDate() : null;
+            const createdDate = task.createdAt?.toDate ? task.createdAt.toDate() : null;
+            const updatedDate = task.updatedAt?.toDate ? task.updatedAt.toDate() : null;
+            
+            const taskDate = occurredDate || createdDate || updatedDate;
+            const isIncluded = taskDate && taskDate >= oneWeekAgo;
+            
+            console.log(`タスク「${task.title}」の日付チェック:`);
+            console.log(`  occurredOn: ${occurredDate}`);
+            console.log(`  createdAt: ${createdDate}`);
+            console.log(`  updatedAt: ${updatedDate}`);
+            console.log(`  使用日付: ${taskDate}`);
+            console.log(`  フィルタ結果: ${isIncluded ? '含む' : '除外'}`);
+            
+            return isIncluded;
           });
           
           console.log(`フィルタリング後のタスク数: ${filteredTasks.length}`);
+          
+          // 強制的にログを出力（確実に実行されるように）
+          console.error('=== タスク詳細情報開始 ===');
+          console.error(`タスク数: ${filteredTasks.length}`);
+          console.log('=== タスク詳細情報開始 ===');
+          console.log(`タスク数: ${filteredTasks.length}`);
+          
+          // 各タスクの詳細を強制出力
+          for (let i = 0; i < filteredTasks.length; i++) {
+            const task: any = filteredTasks[i];
+            console.error(`[TASK_${i + 1}] ID: ${task.id}`);
+            console.error(`[TASK_${i + 1}] タイトル: ${task.title}`);
+            console.error(`[TASK_${i + 1}] ステータス: ${task.status}`);
+            console.error(`[TASK_${i + 1}] グループID: ${task.groupId}`);
+            console.error(`[TASK_${i + 1}] 担当者: ${task.assigneeName || '未設定'}`);
+            console.error(`[TASK_${i + 1}] 優先度: ${task.priority}`);
+            console.error(`[TASK_${i + 1}] 期限: ${task.dueDate ? task.dueDate.toDate() : '未設定'}`);
+            console.error(`[TASK_${i + 1}] 内容: ${task.content || 'なし'}`);
+            console.error(`[TASK_${i + 1}] 作成日: ${task.createdAt ? task.createdAt.toDate() : '未設定'}`);
+            console.error(`[TASK_${i + 1}] 更新日: ${task.updatedAt ? task.updatedAt.toDate() : '未設定'}`);
+            console.error(`[TASK_${i + 1}] 発生日: ${task.occurredOn ? task.occurredOn.toDate() : '未設定'}`);
+            
+            // ログレベルでも出力
+            console.log(`[TASK_${i + 1}] ID: ${task.id}`);
+            console.log(`[TASK_${i + 1}] タイトル: ${task.title}`);
+            console.log(`[TASK_${i + 1}] ステータス: ${task.status}`);
+            console.log(`[TASK_${i + 1}] グループID: ${task.groupId}`);
+            console.log(`[TASK_${i + 1}] 担当者: ${task.assigneeName || '未設定'}`);
+            console.log(`[TASK_${i + 1}] 優先度: ${task.priority}`);
+            console.log(`[TASK_${i + 1}] 期限: ${task.dueDate ? task.dueDate.toDate() : '未設定'}`);
+            console.log(`[TASK_${i + 1}] 内容: ${task.content || 'なし'}`);
+            console.log(`[TASK_${i + 1}] 作成日: ${task.createdAt ? task.createdAt.toDate() : '未設定'}`);
+            console.log(`[TASK_${i + 1}] 更新日: ${task.updatedAt ? task.updatedAt.toDate() : '未設定'}`);
+            console.log(`[TASK_${i + 1}] 発生日: ${task.occurredOn ? task.occurredOn.toDate() : '未設定'}`);
+          }
+          console.error('=== タスク詳細情報終了 ===');
+          console.log('=== タスク詳細情報終了 ===');
           
           // 送信者のユーザー情報を取得
           const userDoc = await db.collection('users').doc(schedule.userId).get();
@@ -141,9 +231,14 @@ export const scheduledProgressReport = functions.pubsub
           const senderName = userData?.displayName || userData?.email?.split('@')[0] || 'ユーザー';
 
           // 進捗レポートを作成
+          console.error('=== レポート生成開始 ===');
+          console.error(`フィルタリング後のタスク数: ${filteredTasks.length}`);
+          const reportContent = generateReportContent(filteredTasks, schedule.attachedGroupName || 'グループ');
+          console.error(`生成されたレポート内容: ${reportContent}`);
+          
           const reportData: any = {
             title: schedule.title,
-            content: generateReportContent(filteredTasks, schedule.attachedGroupName || 'グループ'),
+            content: reportContent,
             senderId: schedule.userId,
             senderName: senderName,
             status: 'sent',
@@ -342,40 +437,186 @@ async function sendPushNotificationToUser(db: admin.firestore.Firestore, userId:
   }
 }
 
-// レポート内容生成
+// レポート内容生成（更新済み）
 function generateReportContent(tasks: any[], groupName: string): string {
+  console.error('=== generateReportContent開始 ===');
+  console.error(`[REPORT] タスク数: ${tasks.length}`);
+  console.error(`[REPORT] グループ名: ${groupName}`);
+  
+  // 全タスクのステータスをログ出力（強制出力）
+  console.error('=== タスクステータス詳細 ===');
+  for (let i = 0; i < tasks.length; i++) {
+    const task: any = tasks[i];
+    console.error(`[REPORT_TASK_${i + 1}] タイトル: ${task.title}`);
+    console.error(`[REPORT_TASK_${i + 1}] ステータス: ${task.status}`);
+    console.error(`[REPORT_TASK_${i + 1}] 担当者: ${task.assigneeName || '未設定'}`);
+  }
+  console.error('=== タスクステータス詳細終了 ===');
+  
+  // 正しいステータス分類（TaskItem interface に基づく）
   const completedTasks = tasks.filter(task => task.status === 'completed');
   const inProgressTasks = tasks.filter(task => task.status === 'in_progress');
-  const pendingTasks = tasks.filter(task => task.status === 'pending');
+  const notStartedTasks = tasks.filter(task => task.status === 'not_started');
   
-  let content = `【${groupName}】の進捗報告\n\n`;
-  content += `📊 タスク状況\n`;
-  content += `✅ 完了: ${completedTasks.length}件\n`;
-  content += `🔄 進行中: ${inProgressTasks.length}件\n`;
-  content += `⏳ 未着手: ${pendingTasks.length}件\n\n`;
+  // 未着手タスク（not_started と同じ）
+  const pendingTasks = tasks.filter(task => task.status === 'not_started');
   
+  console.error('=== ステータス分類結果 ===');
+  console.error(`[CLASSIFY] 完了: ${completedTasks.length}件`);
+  console.error(`[CLASSIFY] 進行中: ${inProgressTasks.length}件`);
+  console.error(`[CLASSIFY] 未着手: ${pendingTasks.length}件`);
+  console.error(`[CLASSIFY] 未開始: ${notStartedTasks.length}件`);
+  
+  // 未分類のタスクを確認（正しいステータス値に基づく）
+  const unclassifiedTasks = tasks.filter(task => {
+    const status = task.status;
+    return !(
+      status === 'completed' || 
+      status === 'in_progress' || 
+      status === 'not_started'
+    );
+  });
+  
+  if (unclassifiedTasks.length > 0) {
+    console.error(`[UNCLASSIFIED] 未分類のタスク: ${unclassifiedTasks.length}件`);
+    for (let i = 0; i < unclassifiedTasks.length; i++) {
+      const task = unclassifiedTasks[i];
+      console.error(`[UNCLASSIFIED] タスク: ${task.title} - ステータス: ${task.status}`);
+    }
+  } else {
+    console.error('[UNCLASSIFIED] 未分類のタスク: 0件');
+  }
+  console.error('=== ステータス分類結果終了 ===');
+  
+  // 日付範囲を計算
+  const today = new Date();
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(today.getDate() - 7);
+  
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+  
+  let content = `## 進捗サマリー（${formatDate(oneWeekAgo)} - ${formatDate(today)}）\n\n`;
+  
+  // 課題が0件の場合の処理
+  if (tasks.length === 0) {
+    content += `- **総タスク数**: 0件\n`;
+    content += `- **完了タスク**: 0件\n`;
+    content += `- **進行中タスク**: 0件\n`;
+    content += `- **遅延タスク**: 0件\n`;
+    content += `- **完了率**: 0%\n\n`;
+    content += `## ハイライト\n\n`;
+    content += `- 過去1週間で新しいタスクの登録がありませんでした\n\n`;
+    content += `## 次のステップ\n\n`;
+    content += `- 新しいタスクが登録された際は、改めて進捗報告をお送りします\n\n`;
+    content += `---\n`;
+    content += `*この報告書はAIによって自動生成されました。*\n`;
+    return content;
+  }
+  
+  // 完了率を計算
+  const completionRate = Math.round((completedTasks.length / tasks.length) * 100);
+  
+  content += `- **総タスク数**: ${tasks.length}件\n`;
+  content += `- **完了タスク**: ${completedTasks.length}件\n`;
+  content += `- **進行中タスク**: ${inProgressTasks.length}件\n`;
+  content += `- **未着手タスク**: ${pendingTasks.length}件\n`;
+  content += `- **遅延タスク**: 0件\n`;
+  content += `- **完了率**: ${completionRate}%\n\n`;
+  
+  // ハイライト
+  content += `## ハイライト\n\n`;
+  content += `- **総タスク数**: ${tasks.length}件のタスクを管理中\n`;
   if (completedTasks.length > 0) {
-    content += `✅ 完了したタスク:\n`;
-    completedTasks.forEach(task => {
-      content += `- ${task.title}\n`;
-    });
-    content += `\n`;
+    content += `- ${completedTasks.length}件のタスクを完了しました\n`;
   }
-  
   if (inProgressTasks.length > 0) {
-    content += `🔄 進行中のタスク:\n`;
-    inProgressTasks.forEach(task => {
-      content += `- ${task.title}\n`;
+    content += `- ${inProgressTasks.length}件のタスクが進行中です\n`;
+  }
+  if (pendingTasks.length > 0) {
+    content += `- ${pendingTasks.length}件のタスクが未着手です\n`;
+  }
+  content += `\n`;
+  
+  // 懸念事項
+  content += `## 懸念事項\n\n`;
+  if (completionRate < 50) {
+    content += `- 完了率が${completionRate}%と低く、進捗の加速が必要です\n`;
+  } else if (completionRate >= 80) {
+    content += `- 完了率が${completionRate}%と高く、順調に進捗しています\n`;
+  } else {
+    content += `- 完了率が${completionRate}%で、適度な進捗を維持しています\n`;
+  }
+  if (pendingTasks.length > completedTasks.length) {
+    content += `- 未着手タスクが完了タスクより多く、優先順位の見直しが必要です\n`;
+  }
+  content += `\n`;
+  
+  // 次のステップ
+  content += `## 次のステップ\n\n`;
+  if (pendingTasks.length > 0) {
+    content += `- 未着手タスクの着手を進めます\n`;
+  }
+  if (inProgressTasks.length > 0) {
+    content += `- 進行中タスクの完了を目指します\n`;
+  }
+  content += `- 来週のタスク計画を立て、リソース配分を最適化します\n\n`;
+  
+  // 完了したタスク
+  if (completedTasks.length > 0) {
+    content += `## 完了したタスク\n\n`;
+    completedTasks.forEach(task => {
+      const priorityLabel = task.priority === 'urgent' ? '緊急' : 
+                           task.priority === 'high' ? '優先度高' :
+                           task.priority === 'medium' ? '優先度中' : '優先度低';
+      const assignee = task.assigneeName || '未設定';
+      const completedDate = task.completedAt ? 
+        task.completedAt.toDate().toLocaleDateString('ja-JP') : 
+        '完了日不明';
+      
+      content += `- [${priorityLabel}] **${task.title}** (完了日: ${completedDate})\n`;
+      content += `  - 担当者: ${assignee}\n`;
     });
     content += `\n`;
   }
   
-  if (pendingTasks.length > 0) {
-    content += `⏳ 未着手のタスク:\n`;
-    pendingTasks.forEach(task => {
-      content += `- ${task.title}\n`;
+  // 進行中のタスク
+  if (inProgressTasks.length > 0) {
+    content += `## 進行中のタスク\n\n`;
+    inProgressTasks.forEach(task => {
+      const priorityLabel = task.priority === 'urgent' ? '緊急' : 
+                           task.priority === 'high' ? '優先度高' :
+                           task.priority === 'medium' ? '優先度中' : '優先度低';
+      const assignee = task.assigneeName || '未設定';
+      
+      content += `- [${priorityLabel}] **${task.title}**\n`;
+      content += `  - 担当者: ${assignee}\n`;
     });
+    content += `\n`;
   }
+  
+  // 未着手のタスク
+  if (pendingTasks.length > 0) {
+    content += `## 未着手のタスク\n\n`;
+    pendingTasks.forEach(task => {
+      const priorityLabel = task.priority === 'urgent' ? '緊急' : 
+                           task.priority === 'high' ? '優先度高' :
+                           task.priority === 'medium' ? '優先度中' : '優先度低';
+      const assignee = task.assigneeName || '未設定';
+      
+      content += `- [${priorityLabel}] **${task.title}**\n`;
+      content += `  - 担当者: ${assignee}\n`;
+    });
+    content += `\n`;
+  }
+  
+  content += `---\n`;
+  content += `*この報告書はAIによって自動生成されました。*\n`;
   
   return content;
 }
