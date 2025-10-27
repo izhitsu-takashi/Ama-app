@@ -262,11 +262,58 @@ export class MessageService {
   // メッセージを既読にする
   async markAsRead(messageId: string): Promise<void> {
     const messageRef = doc(this.firestore, 'messages', messageId);
+    const messageDoc = await getDoc(messageRef);
+    
+    if (!messageDoc.exists()) {
+      throw new Error('メッセージが見つかりません');
+    }
+    
+    const messageData = messageDoc.data();
+    const senderId = messageData['senderId'];
+    const receiverId = messageData['receiverId'];
+    
+    // メッセージを既読にする
     await updateDoc(messageRef, {
       isRead: true,
       readAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
+
+    // スレッドの未読数をリセット（現在のユーザーの未読数を0にする）
+    if (senderId && receiverId) {
+      const participants = [senderId, receiverId].sort();
+      const threadId = participants.join('_');
+      const threadRef = doc(this.firestore, 'messageThreads', threadId);
+      
+      try {
+        // 現在のスレッドデータを取得
+        const threadDoc = await getDoc(threadRef);
+        if (threadDoc.exists()) {
+          const currentData = threadDoc.data();
+          const currentUnreadCounts = currentData['unreadCounts'] || {};
+          
+          // 現在のユーザー（チャットルームを開いている人）の未読数を0にする
+          const currentUser = this.authService.currentUser;
+          if (currentUser) {
+            const newUnreadCounts = { ...currentUnreadCounts };
+            newUnreadCounts[currentUser.uid] = 0;
+            
+            // 後方互換性のため、全体の未読数も計算
+            const totalUnreadCount = Object.values(newUnreadCounts).reduce((sum: number, count: any) => sum + (count as number), 0);
+            
+            await updateDoc(threadRef, {
+              unreadCounts: newUnreadCounts,
+              unreadCount: totalUnreadCount, // 後方互換性
+              updatedAt: serverTimestamp()
+            });
+            
+            console.log(`スレッド ${threadId} の未読数をリセットしました:`, newUnreadCounts, `(現在のユーザー: ${currentUser.uid})`);
+          }
+        }
+      } catch (error) {
+        console.error('未読数リセットエラー:', error);
+      }
+    }
 
     // 関連する通知も既読にする
     try {
@@ -276,6 +323,43 @@ export class MessageService {
     }
   }
 
+
+  // スレッドの未読数をリセット（チャットルームを開いた時など）
+  async resetThreadUnreadCount(threadId: string): Promise<void> {
+    const currentUser = this.authService.currentUser;
+    if (!currentUser) {
+      console.error('ユーザーがログインしていません');
+      return;
+    }
+
+    const threadRef = doc(this.firestore, 'messageThreads', threadId);
+    
+    try {
+      // 現在のスレッドデータを取得
+      const threadDoc = await getDoc(threadRef);
+      if (threadDoc.exists()) {
+        const currentData = threadDoc.data();
+        const currentUnreadCounts = currentData['unreadCounts'] || {};
+        
+        // 現在のユーザーの未読数を0にする
+        const newUnreadCounts = { ...currentUnreadCounts };
+        newUnreadCounts[currentUser.uid] = 0;
+        
+        // 後方互換性のため、全体の未読数も計算
+        const totalUnreadCount = Object.values(newUnreadCounts).reduce((sum: number, count: any) => sum + (count as number), 0);
+        
+        await updateDoc(threadRef, {
+          unreadCounts: newUnreadCounts,
+          unreadCount: totalUnreadCount, // 後方互換性
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log(`スレッド ${threadId} の未読数をリセットしました:`, newUnreadCounts, `(現在のユーザー: ${currentUser.uid})`);
+      }
+    } catch (error) {
+      console.error('スレッド未読数リセットエラー:', error);
+    }
+  }
 
   // 未読メッセージ数を取得
   getUnreadCount(): Observable<number> {
@@ -305,9 +389,36 @@ export class MessageService {
     
     if (threadDoc.exists()) {
       // 既存のスレッドを更新
+      const currentData = threadDoc.data();
+      const currentUnreadCount = currentData['unreadCount'] || 0;
+      
+      // メッセージ送信時: 受信者の未読数を+1、送信者の未読数は0
+      const isSender1 = lastMessage.senderId === userId1;
+      const isSender2 = lastMessage.senderId === userId2;
+      
+      // ユーザー別の未読数管理
+      const currentUnreadCounts = currentData['unreadCounts'] || {};
+      const newUnreadCounts = { ...currentUnreadCounts };
+      
+      if (isSender1) {
+        // userId1が送信者の場合、受信者（userId2）の未読数を+1、送信者（userId1）は0
+        newUnreadCounts[userId1] = 0;
+        newUnreadCounts[userId2] = (newUnreadCounts[userId2] || 0) + 1;
+      } else if (isSender2) {
+        // userId2が送信者の場合、受信者（userId1）の未読数を+1、送信者（userId2）は0
+        newUnreadCounts[userId1] = (newUnreadCounts[userId1] || 0) + 1;
+        newUnreadCounts[userId2] = 0;
+      }
+      
+      // 後方互換性のため、全体の未読数も計算
+      const totalUnreadCount = Object.values(newUnreadCounts).reduce((sum: number, count: any) => sum + (count as number), 0);
+      
+      console.log(`スレッド ${threadId} の未読数更新:`, newUnreadCounts, `(送信者: ${lastMessage.senderId})`);
+      
       await updateDoc(threadRef, {
         lastMessage: lastMessage,
-        unreadCount: lastMessage.senderId === userId1 ? 0 : (threadDoc.data()['unreadCount'] || 0) + 1,
+        unreadCounts: newUnreadCounts,
+        unreadCount: totalUnreadCount, // 後方互換性
         updatedAt: serverTimestamp()
       });
     } else {
@@ -317,6 +428,28 @@ export class MessageService {
         this.userService.getUserProfile(userId2)
       ]);
       
+      // 新しいスレッドの場合、受信者の未読数を1にする
+      const isSender1 = lastMessage.senderId === userId1;
+      const isSender2 = lastMessage.senderId === userId2;
+      
+      // ユーザー別の未読数管理
+      const initialUnreadCounts: { [userId: string]: number } = {};
+      
+      if (isSender1) {
+        // userId1が送信者の場合、受信者（userId2）の未読数を1、送信者（userId1）は0
+        initialUnreadCounts[userId1] = 0;
+        initialUnreadCounts[userId2] = 1;
+      } else if (isSender2) {
+        // userId2が送信者の場合、受信者（userId1）の未読数を1、送信者（userId2）は0
+        initialUnreadCounts[userId1] = 1;
+        initialUnreadCounts[userId2] = 0;
+      }
+      
+      // 後方互換性のため、全体の未読数も計算
+      const totalUnreadCount = Object.values(initialUnreadCounts).reduce((sum: number, count: any) => sum + (count as number), 0);
+      
+      console.log(`新しいスレッド ${threadId} 作成:`, initialUnreadCounts, `(送信者: ${lastMessage.senderId})`);
+      
       const threadData = {
         participants: participants,
         participantNames: [
@@ -324,7 +457,8 @@ export class MessageService {
           user2?.displayName || user2?.email || ''
         ],
         lastMessage: lastMessage,
-        unreadCount: 0,
+        unreadCounts: initialUnreadCounts,
+        unreadCount: totalUnreadCount, // 後方互換性
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };

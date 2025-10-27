@@ -655,7 +655,21 @@ export class ChatRoomPage implements OnInit, OnDestroy {
   }
 
   private async markMessagesAsRead(): Promise<void> {
-    // 受信メッセージを既読にする
+    // スレッドの未読数を直接リセット（より効率的）
+    const currentUser = this.authService.currentUser;
+    if (currentUser && this.otherUserId) {
+      const participants = [currentUser.uid, this.otherUserId].sort();
+      const threadId = participants.join('_');
+      
+      try {
+        await this.messageService.resetThreadUnreadCount(threadId);
+        console.log('チャットルーム開封時に未読数をリセットしました');
+      } catch (error) {
+        console.error('未読数リセットエラー:', error);
+      }
+    }
+
+    // 受信メッセージを既読にする（個別メッセージの既読状態も更新）
     const unreadMessages = this.messages.filter(msg => 
       !this.isSentByCurrentUser(msg) && !msg.isRead
     );

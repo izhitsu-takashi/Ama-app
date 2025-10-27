@@ -125,13 +125,15 @@ import { AuthService } from './auth.service';
               class="room-item message-room"
               (click)="openThread(thread)"
             >
+              <!-- 未読バッジをroom-itemの上に配置 -->
+              <div *ngIf="getUserUnreadCount(thread) > 0" class="unread-badge">
+                {{ getUserUnreadCount(thread) }}
+              </div>
+              
               <div class="room-avatar">
                 <div class="avatar-circle">
                   <img *ngIf="getThreadUserPhotoURL(thread)" [src]="getThreadUserPhotoURL(thread)" [alt]="getThreadTitle(thread)" class="avatar-image">
                   <span *ngIf="!getThreadUserPhotoURL(thread)">{{ getThreadInitials(thread) }}</span>
-                </div>
-                <div *ngIf="thread.unreadCount > 0" class="unread-badge">
-                  {{ thread.unreadCount }}
                 </div>
               </div>
               
@@ -624,24 +626,27 @@ import { AuthService } from './auth.service';
       font-weight: 600;
       font-size: 1.2rem;
       box-shadow: 0 2px 8px rgba(0, 200, 81, 0.3);
+      position: relative;
     }
 
     .unread-badge {
       position: absolute;
-      top: -5px;
-      right: -5px;
-      background: #ff4444;
+      top: 8px;
+      right: 8px;
+      background: #ef4444;
       color: white;
       border-radius: 50%;
-      width: 22px;
-      height: 22px;
+      min-width: 20px;
+      height: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 0.7rem;
-      font-weight: 600;
+      font-weight: 700;
       border: 2px solid white;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+      z-index: 10;
+      line-height: 1;
     }
 
     .unread-indicator {
@@ -1214,6 +1219,15 @@ export class MessagesPage implements OnInit, OnDestroy {
     return user?.photoURL;
   }
 
+  // 現在のユーザーの未読数を取得
+  getUserUnreadCount(thread: MessageThread): number {
+    const currentUser = this.authService.currentUser;
+    if (!currentUser || !thread.unreadCounts) {
+      return thread.unreadCount || 0; // 後方互換性
+    }
+    return thread.unreadCounts[currentUser.uid] || 0;
+  }
+
   getUserInitials(name: string): string {
     if (!name) return '?';
     const words = name.split(' ');
@@ -1259,8 +1273,8 @@ export class MessagesPage implements OnInit, OnDestroy {
     return this.authService.currentUser?.uid || '';
   }
 
-  // 全体の未読メッセージ数を取得
+  // 全体の未読メッセージ数を取得（現在のユーザーのみ）
   getTotalUnreadCount(): number {
-    return this.threads.reduce((total, thread) => total + (thread.unreadCount || 0), 0);
+    return this.threads.reduce((total, thread) => total + this.getUserUnreadCount(thread), 0);
   }
 }

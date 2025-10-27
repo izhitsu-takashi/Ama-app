@@ -400,7 +400,8 @@ export interface MessageThread {
     senderName: string;
     createdAt: Timestamp;
   };
-  unreadCount: number; // 未読メッセージ数
+  unreadCounts: { [userId: string]: number }; // ユーザー別の未読メッセージ数
+  unreadCount: number; // 後方互換性のための未読メッセージ数（非推奨）
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
