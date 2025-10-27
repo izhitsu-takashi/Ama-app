@@ -35,101 +35,72 @@ import { AuthService } from './auth.service';
           </button>
         </div>
 
-        <!-- 新規メッセージ作成フォーム -->
-        <div *ngIf="showCompose" class="compose-section">
-          <div class="compose-card">
-            <div class="compose-header">
-              <h3>📝 新規メッセージ</h3>
+        <!-- ユーザー検索セクション -->
+        <div *ngIf="showCompose" class="user-search-section">
+          <div class="search-card">
+            <div class="search-header">
+              <h3>🔍 ユーザー検索</h3>
+              <p>メッセージを送信したいユーザーを検索して選択してください</p>
             </div>
-            <div class="compose-content">
-              <form (ngSubmit)="sendMessage()" #messageForm="ngForm">
-                <!-- 受信者選択 -->
-                <div class="form-group">
-                  <label for="recipient">受信者</label>
-                  <div class="recipient-selector">
-                    <input 
-                      type="text" 
-                      id="recipient"
-                      [(ngModel)]="searchTerm"
-                      (input)="onSearchChange()"
-                      placeholder="ユーザー名またはメールアドレスで検索..."
-                      class="search-input"
-                      name="recipient"
-                      required
-                      #recipientInput="ngModel"
-                    >
-                    <div *ngIf="searchTerm && filteredUsers.length > 0" class="user-dropdown">
-                      <div 
-                        *ngFor="let user of filteredUsers" 
-                        class="user-option"
-                        (click)="selectUser(user)"
-                      >
-                        <div class="user-avatar">
-                          <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || user.email" class="avatar-image" (error)="onImageError(user.photoURL)">
-                          <span *ngIf="!user.photoURL">{{ getUserInitials(user.displayName || user.email) }}</span>
-                        </div>
-                        <div class="user-info">
-                          <div class="user-name">{{ user.displayName || user.email }}</div>
-                          <div class="user-email">{{ user.email }}</div>
-                        </div>
+            <div class="search-content">
+              <!-- 検索入力 -->
+              <div class="search-input-group">
+                <input 
+                  type="text" 
+                  [(ngModel)]="searchTerm"
+                  (input)="onSearchChange()"
+                  placeholder="ユーザー名またはメールアドレスで検索..."
+                  class="search-input"
+                >
+                <button class="search-btn" (click)="onSearchChange()">
+                  🔍
+                </button>
+              </div>
+
+              <!-- 検索結果 -->
+              <div *ngIf="searchTerm && filteredUsers.length > 0" class="search-results">
+                <h4>検索結果 ({{ filteredUsers.length }}件)</h4>
+                <div class="users-list">
+                  <div 
+                    *ngFor="let user of filteredUsers" 
+                    class="user-item"
+                    (click)="startChatWithUser(user)"
+                  >
+                    <div class="user-avatar">
+                      <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || user.email" class="avatar-image" (error)="onImageError(user.photoURL)">
+                      <div *ngIf="!user.photoURL" class="default-avatar">
+                        {{ getUserInitials(user.displayName || user.email) }}
                       </div>
                     </div>
-                  </div>
-                  <div *ngIf="selectedUser" class="selected-user">
-                    <div class="user-avatar">
-                      <img *ngIf="selectedUser.photoURL" [src]="selectedUser.photoURL" [alt]="selectedUser.displayName || selectedUser.email" class="avatar-image" (error)="onImageError(selectedUser.photoURL)">
-                      <span *ngIf="!selectedUser.photoURL">{{ getUserInitials(selectedUser.displayName || selectedUser.email) }}</span>
-                    </div>
                     <div class="user-info">
-                      <div class="user-name">{{ selectedUser.displayName || selectedUser.email }}</div>
-                      <div class="user-email">{{ selectedUser.email }}</div>
+                      <div class="user-name">{{ user.displayName || '名前未設定' }}</div>
+                      <div class="user-email">{{ user.email }}</div>
+                      <div class="user-role" [class]="'role-' + user.role">
+                        {{ user.role === 'admin' ? '管理者' : 'ユーザー' }}
+                      </div>
                     </div>
-                    <button type="button" class="remove-btn" (click)="removeSelectedUser()">
-                      ✕
-                    </button>
-                  </div>
-                  <div *ngIf="!selectedUser && recipientInput.touched" class="error-message">
-                    受信者を選択してください
+                    <div class="user-action">
+                      <button class="chat-btn">
+                        💬 チャット開始
+                      </button>
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                <!-- メッセージ本文 -->
-                <div class="form-group">
-                  <label for="content">メッセージ本文</label>
-                  <textarea 
-                    id="content"
-                    [(ngModel)]="message.content"
-                    placeholder="メッセージの内容を入力..."
-                    class="form-textarea"
-                    name="content"
-                    rows="6"
-                    required
-                    #contentInput="ngModel"
-                  ></textarea>
-                  <div *ngIf="contentInput.invalid && contentInput.touched" class="error-message">
-                    メッセージの内容を入力してください
-                  </div>
-                </div>
+              <!-- 検索結果なし -->
+              <div *ngIf="searchTerm && filteredUsers.length === 0" class="no-results">
+                <p>「{{ searchTerm }}」に一致するユーザーが見つかりません</p>
+                <button class="clear-search-btn" (click)="clearSearch()">
+                  検索をクリア
+                </button>
+              </div>
 
-                <!-- 送信ボタン -->
-                <div class="form-actions">
-                  <button 
-                    type="button" 
-                    class="btn btn-secondary" 
-                    (click)="cancelCompose()"
-                  >
-                    キャンセル
-                  </button>
-                  <button 
-                    type="submit" 
-                    class="btn btn-primary"
-                    [disabled]="!isFormValid() || sending"
-                  >
-                    <span *ngIf="!sending">📤 送信</span>
-                    <span *ngIf="sending">送信中...</span>
-                  </button>
-                </div>
-              </form>
+              <!-- 検索前の状態 -->
+              <div *ngIf="!searchTerm" class="search-placeholder">
+                <div class="placeholder-icon">🔍</div>
+                <p>ユーザー名またはメールアドレスを入力して検索してください</p>
+              </div>
             </div>
           </div>
         </div>
@@ -350,6 +321,238 @@ import { AuthService } from './auth.service';
     .empty-state p {
       margin: 0;
       font-size: 0.9rem;
+    }
+
+    /* ユーザー検索セクションのスタイル */
+    .user-search-section {
+      margin-bottom: 2rem;
+    }
+
+    .search-card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .search-header {
+      background: #f8fafc;
+      padding: 1.5rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .search-header h3 {
+      margin: 0 0 0.5rem 0;
+      color: #1e293b;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .search-header p {
+      margin: 0;
+      color: #64748b;
+      font-size: 0.9rem;
+    }
+
+    .search-content {
+      padding: 2rem;
+    }
+
+    .search-input-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .search-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+    }
+
+    .search-btn:hover {
+      background: #5a67d8;
+    }
+
+    .search-results h4 {
+      margin: 0 0 1rem 0;
+      color: #374151;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .users-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .user-item {
+      display: flex;
+      align-items: center;
+      padding: 1rem;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .user-item:hover {
+      background: #f1f5f9;
+      border-color: #667eea;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    }
+
+    .user-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-right: 1rem;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .avatar-image {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .default-avatar {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .user-info {
+      flex: 1;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 0.25rem;
+      font-size: 1rem;
+    }
+
+    .user-email {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 0.25rem;
+    }
+
+    .user-role {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .role-admin {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .role-user {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .user-action {
+      flex-shrink: 0;
+    }
+
+    .chat-btn {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .chat-btn:hover {
+      background: #059669;
+      transform: translateY(-1px);
+    }
+
+    .no-results {
+      text-align: center;
+      padding: 2rem;
+      color: #64748b;
+    }
+
+    .no-results p {
+      margin: 0 0 1rem 0;
+    }
+
+    .clear-search-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+    }
+
+    .clear-search-btn:hover {
+      background: #5a67d8;
+    }
+
+    .search-placeholder {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: #9ca3af;
+    }
+
+    .placeholder-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    .search-placeholder p {
+      margin: 0;
+      font-size: 1rem;
     }
 
     .chat-rooms {
@@ -875,6 +1078,40 @@ export class MessagesPage implements OnInit, OnDestroy {
   // 選択したユーザーを削除
   removeSelectedUser(): void {
     this.selectedUser = null;
+  }
+
+  // ユーザーとのチャットを開始
+  async startChatWithUser(user: User): Promise<void> {
+    try {
+      const currentUser = this.authService.currentUser;
+      if (!currentUser) return;
+
+      // 既存のスレッドがあるかチェック
+      const existingThread = this.threads.find(thread => 
+        thread.participants.includes(user.id) && thread.participants.includes(currentUser.uid)
+      );
+
+      if (existingThread) {
+        // 既存のスレッドがある場合はそのスレッドを開く
+        this.openThread(existingThread);
+      } else {
+        // 新しいスレッドを作成してチャットページに遷移
+        this.router.navigate(['/chat', user.id]);
+      }
+      
+      // 検索フォームを閉じる
+      this.showCompose = false;
+      this.resetComposeForm();
+    } catch (error) {
+      console.error('チャット開始エラー:', error);
+      alert('チャットの開始に失敗しました。');
+    }
+  }
+
+  // 検索をクリア
+  clearSearch(): void {
+    this.searchTerm = '';
+    this.filteredUsers = [];
   }
 
   // フォームの有効性チェック
