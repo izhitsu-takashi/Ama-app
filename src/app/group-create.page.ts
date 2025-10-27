@@ -212,15 +212,6 @@ import { TaskService } from './task.service';
                 </select>
               </div>
 
-              <div class="form-group">
-                <label class="form-label">期限（任意）</label>
-                <input 
-                  type="date" 
-                  [(ngModel)]="projectInput.deadline" 
-                  [ngModelOptions]="{standalone: true}"
-                  class="form-input"
-                />
-              </div>
 
               <div class="ai-actions">
                 <button 
@@ -250,7 +241,7 @@ import { TaskService } from './task.service';
                       <p class="task-description">{{ task.description }}</p>
                       <div class="task-meta">
                         <span class="task-category">{{ task.category }}</span>
-                        <span class="task-duration">予想日数: {{ task.estimatedDays }}日</span>
+                        <span class="task-duration">予想日数: {{ Math.round(task.estimatedDays) }}日</span>
                       </div>
                     </div>
                   </div>
@@ -262,7 +253,7 @@ import { TaskService } from './task.service';
                     <div *ngFor="let phase of projectAnalysis.timeline" class="timeline-phase">
                       <div class="phase-header">
                         <span class="phase-name">{{ phase.phase }}</span>
-                        <span class="phase-duration">{{ phase.duration }}日</span>
+                        <span class="phase-duration">{{ Math.round(phase.duration) }}日</span>
                       </div>
                       <p class="phase-description">{{ phase.description }}</p>
                       <div class="phase-tasks">
@@ -323,7 +314,7 @@ import { TaskService } from './task.service';
                           <p class="task-description">{{ task.description }}</p>
                           <div class="task-meta">
                             <span class="task-category">{{ task.category }}</span>
-                            <span class="task-days">平均{{ task.averageDays }}日</span>
+                            <span class="task-days">平均{{ Math.round(task.averageDays) }}日</span>
                           </div>
                         </div>
                       </div>

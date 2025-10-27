@@ -295,11 +295,13 @@ export class AiProjectAnalyzerService {
     
     // 個人の課題・学習に特化したタスク
     if (input.goals.toLowerCase().includes('学習') || input.goals.toLowerCase().includes('勉強')) {
+      const baseDays = this.getEstimatedDaysFromScale(input.scale);
+      
       tasks.push({
         title: '学習計画の策定',
         description: `${input.goals}を達成するための詳細な学習計画を作成する`,
         priority: 'high',
-        estimatedDays: 1,
+        estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
         category: '計画'
       });
       
@@ -307,7 +309,7 @@ export class AiProjectAnalyzerService {
         title: '学習リソースの収集',
         description: '必要な教材、参考書、オンラインコースなどの学習リソースを収集する',
         priority: 'high',
-        estimatedDays: 1,
+        estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
         category: '準備',
         dependencies: ['学習計画の策定']
       });
@@ -316,7 +318,7 @@ export class AiProjectAnalyzerService {
         title: '学習環境の整備',
         description: '集中できる学習環境を整備し、必要なツールをセットアップする',
         priority: 'medium',
-        estimatedDays: 1,
+        estimatedDays: Math.max(1, Math.round(baseDays * 0.05)),
         category: '準備'
       });
     }
@@ -356,12 +358,13 @@ export class AiProjectAnalyzerService {
 
   private generateResearchTasks(input: ProjectInput): GeneratedTask[] {
     const tasks: GeneratedTask[] = [];
+    const baseDays = this.getEstimatedDaysFromScale(input.scale);
     
     tasks.push({
       title: '研究テーマの詳細化',
       description: `${input.goals}に関する研究テーマを具体的に定義し、研究範囲を明確にする`,
       priority: 'high',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
       category: '計画'
     });
     
@@ -369,7 +372,7 @@ export class AiProjectAnalyzerService {
       title: '先行研究の調査',
       description: '関連する先行研究や文献を調査し、現状を把握する',
       priority: 'high',
-      estimatedDays: 3,
+      estimatedDays: Math.max(2, Math.round(baseDays * 0.15)),
       category: '調査',
       dependencies: ['研究テーマの詳細化']
     });
@@ -378,7 +381,7 @@ export class AiProjectAnalyzerService {
       title: '研究方法の決定',
       description: '研究の目的に最適な研究方法を選択し、手順を決定する',
       priority: 'high',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
       category: '計画',
       dependencies: ['先行研究の調査']
     });
@@ -387,7 +390,7 @@ export class AiProjectAnalyzerService {
       title: 'データ収集',
       description: '研究に必要なデータを収集する',
       priority: 'high',
-      estimatedDays: this.getEstimatedDaysFromScale(input.scale) * 0.6,
+      estimatedDays: Math.round(this.getEstimatedDaysFromScale(input.scale) * 0.6),
       category: '実践',
       dependencies: ['研究方法の決定']
     });
@@ -396,7 +399,7 @@ export class AiProjectAnalyzerService {
       title: 'データ分析',
       description: '収集したデータを分析し、結果を導き出す',
       priority: 'high',
-      estimatedDays: this.getEstimatedDaysFromScale(input.scale) * 0.3,
+      estimatedDays: Math.round(this.getEstimatedDaysFromScale(input.scale) * 0.3),
       category: '分析',
       dependencies: ['データ収集']
     });
@@ -405,7 +408,7 @@ export class AiProjectAnalyzerService {
       title: '研究報告書の作成',
       description: '研究結果をまとめ、報告書を作成する',
       priority: 'medium',
-      estimatedDays: 3,
+      estimatedDays: Math.max(2, Math.round(baseDays * 0.1)),
       category: '文書化',
       dependencies: ['データ分析']
     });
@@ -415,12 +418,13 @@ export class AiProjectAnalyzerService {
 
   private generateEventTasks(input: ProjectInput): GeneratedTask[] {
     const tasks: GeneratedTask[] = [];
+    const baseDays = this.getEstimatedDaysFromScale(input.scale);
     
     tasks.push({
       title: 'イベント企画の詳細化',
       description: `${input.goals}のイベント企画を具体的に詳細化する`,
       priority: 'high',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
       category: '企画'
     });
     
@@ -428,7 +432,7 @@ export class AiProjectAnalyzerService {
       title: '予算計画の策定',
       description: 'イベント開催に必要な予算を算出し、予算計画を策定する',
       priority: 'high',
-      estimatedDays: 1,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.05)),
       category: '計画',
       dependencies: ['イベント企画の詳細化']
     });
@@ -437,7 +441,7 @@ export class AiProjectAnalyzerService {
       title: '会場の確保',
       description: 'イベント開催に適した会場を確保する',
       priority: 'urgent',
-      estimatedDays: 3,
+      estimatedDays: Math.max(2, Math.round(baseDays * 0.1)),
       category: '準備'
     });
     
@@ -445,7 +449,7 @@ export class AiProjectAnalyzerService {
       title: '参加者の募集',
       description: 'イベントの参加者を募集し、申し込みを受け付ける',
       priority: 'high',
-      estimatedDays: 5,
+      estimatedDays: Math.max(3, Math.round(baseDays * 0.2)),
       category: '募集',
       dependencies: ['会場の確保']
     });
@@ -454,7 +458,7 @@ export class AiProjectAnalyzerService {
       title: '当日の運営準備',
       description: 'イベント当日の運営に必要な準備を行う',
       priority: 'high',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
       category: '準備',
       dependencies: ['参加者の募集']
     });
@@ -463,7 +467,7 @@ export class AiProjectAnalyzerService {
       title: 'イベントの実施',
       description: '計画通りにイベントを実施する',
       priority: 'urgent',
-      estimatedDays: 1,
+      estimatedDays: 1, // 実施日は固定
       category: '実施',
       dependencies: ['当日の運営準備']
     });
@@ -472,7 +476,7 @@ export class AiProjectAnalyzerService {
       title: '事後評価と報告',
       description: 'イベントの結果を評価し、報告書を作成する',
       priority: 'medium',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
       category: '評価',
       dependencies: ['イベントの実施']
     });
@@ -482,12 +486,13 @@ export class AiProjectAnalyzerService {
 
   private generateMarketingTasks(input: ProjectInput): GeneratedTask[] {
     const tasks: GeneratedTask[] = [];
+    const baseDays = this.getEstimatedDaysFromScale(input.scale);
     
     tasks.push({
       title: 'マーケティング戦略の策定',
       description: `${input.goals}を達成するためのマーケティング戦略を策定する`,
       priority: 'high',
-      estimatedDays: 3,
+      estimatedDays: Math.max(2, Math.round(baseDays * 0.1)),
       category: '戦略'
     });
     
@@ -495,7 +500,7 @@ export class AiProjectAnalyzerService {
       title: 'ターゲット分析',
       description: 'マーケティングのターゲットとなる顧客層を分析する',
       priority: 'high',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
       category: '分析',
       dependencies: ['マーケティング戦略の策定']
     });
@@ -504,7 +509,7 @@ export class AiProjectAnalyzerService {
       title: 'コンテンツ制作',
       description: 'マーケティングに必要なコンテンツ（動画、画像、文章など）を制作する',
       priority: 'high',
-      estimatedDays: this.getEstimatedDaysFromScale(input.scale) * 0.5,
+      estimatedDays: Math.round(this.getEstimatedDaysFromScale(input.scale) * 0.5),
       category: '制作',
       dependencies: ['ターゲット分析']
     });
@@ -513,7 +518,7 @@ export class AiProjectAnalyzerService {
       title: 'SNS運用',
       description: 'SNSを活用したマーケティング活動を実施する',
       priority: 'medium',
-      estimatedDays: this.getEstimatedDaysFromScale(input.scale) * 0.3,
+      estimatedDays: Math.round(this.getEstimatedDaysFromScale(input.scale) * 0.3),
       category: '運用',
       dependencies: ['コンテンツ制作']
     });
@@ -522,7 +527,7 @@ export class AiProjectAnalyzerService {
       title: '効果測定と分析',
       description: 'マーケティング活動の効果を測定し、分析する',
       priority: 'medium',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
       category: '分析',
       dependencies: ['SNS運用']
     });
@@ -532,12 +537,13 @@ export class AiProjectAnalyzerService {
 
   private generateAppDevelopmentTasks(input: ProjectInput): GeneratedTask[] {
     const tasks: GeneratedTask[] = [];
+    const baseDays = this.getEstimatedDaysFromScale(input.scale);
     
     tasks.push({
       title: '要件定義書の作成',
       description: `${input.goals}を実現するための詳細な要件を整理し、要件定義書を作成する`,
       priority: 'high',
-      estimatedDays: 3,
+      estimatedDays: Math.max(2, Math.round(baseDays * 0.1)),
       category: '要件定義'
     });
     
@@ -545,7 +551,7 @@ export class AiProjectAnalyzerService {
       title: 'システム設計',
       description: 'アーキテクチャ設計、データベース設計、API設計を行う',
       priority: 'high',
-      estimatedDays: 5,
+      estimatedDays: Math.max(3, Math.round(baseDays * 0.15)),
       category: '設計',
       dependencies: ['要件定義書の作成']
     });
@@ -554,7 +560,7 @@ export class AiProjectAnalyzerService {
       title: '開発環境構築',
       description: '開発に必要な環境、ツール、ライブラリのセットアップ',
       priority: 'urgent',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.05)),
       category: '開発'
     });
     
@@ -563,7 +569,7 @@ export class AiProjectAnalyzerService {
         title: 'フロントエンド開発',
         description: 'ユーザーインターフェースの開発',
         priority: 'high',
-        estimatedDays: 8,
+        estimatedDays: Math.max(5, Math.round(baseDays * 0.3)),
         category: '開発',
         dependencies: ['システム設計', '開発環境構築']
       });
@@ -574,7 +580,7 @@ export class AiProjectAnalyzerService {
         title: 'モバイルアプリ開発',
         description: 'iOS/Androidアプリの開発',
         priority: 'high',
-        estimatedDays: 12,
+        estimatedDays: Math.max(8, Math.round(baseDays * 0.4)),
         category: '開発',
         dependencies: ['システム設計', '開発環境構築']
       });
@@ -584,7 +590,7 @@ export class AiProjectAnalyzerService {
       title: 'コア機能の実装',
       description: `${input.goals}の核心となる機能を実装する`,
       priority: 'high',
-      estimatedDays: this.getEstimatedDaysFromScale(input.scale) * 0.4,
+      estimatedDays: Math.round(this.getEstimatedDaysFromScale(input.scale) * 0.4),
       category: '開発',
       dependencies: ['システム設計', '開発環境構築']
     });
@@ -593,7 +599,7 @@ export class AiProjectAnalyzerService {
       title: 'テスト実装',
       description: '各機能のテストを作成し、品質を確保する',
       priority: 'medium',
-      estimatedDays: 4,
+      estimatedDays: Math.max(2, Math.round(baseDays * 0.15)),
       category: 'テスト',
       dependencies: ['コア機能の実装']
     });
@@ -602,7 +608,7 @@ export class AiProjectAnalyzerService {
       title: 'デプロイ準備',
       description: '本番環境へのデプロイ準備と設定',
       priority: 'high',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.05)),
       category: 'デプロイ',
       dependencies: ['テスト実装']
     });
@@ -612,12 +618,13 @@ export class AiProjectAnalyzerService {
 
   private generateGenericTasks(input: ProjectInput): GeneratedTask[] {
     const tasks: GeneratedTask[] = [];
+    const baseDays = this.getEstimatedDaysFromScale(input.scale);
     
     tasks.push({
       title: 'プロジェクト計画の策定',
       description: `${input.goals}を達成するための詳細なプロジェクト計画を策定する`,
       priority: 'high',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
       category: '計画'
     });
     
@@ -625,7 +632,7 @@ export class AiProjectAnalyzerService {
       title: 'リソースの準備',
       description: 'プロジェクトに必要なリソース（人材、資金、設備など）を準備する',
       priority: 'high',
-      estimatedDays: 3,
+      estimatedDays: Math.max(2, Math.round(baseDays * 0.1)),
       category: '準備',
       dependencies: ['プロジェクト計画の策定']
     });
@@ -634,7 +641,7 @@ export class AiProjectAnalyzerService {
       title: '実行フェーズ',
       description: `${input.goals}の実現に向けて実際の作業を実行する`,
       priority: 'high',
-      estimatedDays: this.getEstimatedDaysFromScale(input.scale) * 0.7,
+      estimatedDays: Math.round(this.getEstimatedDaysFromScale(input.scale) * 0.7),
       category: '実行',
       dependencies: ['リソースの準備']
     });
@@ -643,7 +650,7 @@ export class AiProjectAnalyzerService {
       title: '品質管理',
       description: 'プロジェクトの品質を管理し、必要に応じて調整を行う',
       priority: 'medium',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.1)),
       category: '管理',
       dependencies: ['実行フェーズ']
     });
@@ -652,7 +659,7 @@ export class AiProjectAnalyzerService {
       title: '完了報告',
       description: 'プロジェクトの完了報告書を作成し、成果をまとめる',
       priority: 'medium',
-      estimatedDays: 2,
+      estimatedDays: Math.max(1, Math.round(baseDays * 0.05)),
       category: '報告',
       dependencies: ['品質管理']
     });
@@ -662,11 +669,11 @@ export class AiProjectAnalyzerService {
 
   private getEstimatedDaysFromScale(scale: string): number {
     if (scale.includes('個人課題（数日）')) return 3;
-    if (scale.includes('小規模（1-2週間）')) return 10;
-    if (scale.includes('中規模（1-2ヶ月）')) return 30;
-    if (scale.includes('大規模（3-6ヶ月）')) return 90;
-    if (scale.includes('超大規模（6ヶ月以上）')) return 180;
-    return 10; // デフォルト
+    if (scale.includes('小規模（1-2週間）')) return 14;
+    if (scale.includes('中規模（1-2ヶ月）')) return 45;
+    if (scale.includes('大規模（3-6ヶ月）')) return 135;
+    if (scale.includes('超大規模（6ヶ月以上）')) return 270;
+    return 14; // デフォルト
   }
 
   private generateTimelineForProject(input: ProjectInput): TimelinePhase[] {
