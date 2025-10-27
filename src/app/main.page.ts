@@ -74,7 +74,10 @@ import { ProgressReportService } from './progress-report.service';
           <img *ngIf="currentUser?.photoURL" [src]="currentUser?.photoURL" alt="ユーザーアイコン" class="header-avatar-image">
           <span *ngIf="!currentUser?.photoURL" class="avatar-icon">👤</span>
         </div>
-            <button class="logout-btn" (click)="logout()">ログアウト</button>
+            <button class="logout-btn" (click)="logout()" [disabled]="isLoggingOut">
+              <span *ngIf="!isLoggingOut">ログアウト</span>
+              <span *ngIf="isLoggingOut">ログアウト中...</span>
+            </button>
           </div>
         </div>
       </header>
@@ -673,11 +676,20 @@ import { ProgressReportService } from './progress-report.service';
       cursor: pointer;
       font-size: 0.656rem; /* 13.3インチ用に調整 */
       transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
-    .logout-btn:hover {
+    .logout-btn:hover:not(:disabled) {
       background: #c53030;
     }
+
+    .logout-btn:disabled {
+      background: #a0a0a0;
+      cursor: not-allowed;
+    }
+
 
     .main-content {
       padding: clamp(1rem, 3vw, 2rem); /* 可変パディング */
@@ -1887,6 +1899,7 @@ export class MainPage implements OnInit, OnDestroy {
   private userGroupsCache: Group[] = [];
   recentTasks$: Observable<TaskItem[]> = of([]);
   unreadNotifications = 0;
+  isLoggingOut = false; // ログアウト処理中の状態
   unreadMessageCount = 0;
   unreadProgressReports = 0;
   
@@ -1988,6 +2001,12 @@ export class MainPage implements OnInit, OnDestroy {
   }
 
   async logout() {
+    if (this.isLoggingOut) {
+      return; // 既にログアウト処理中の場合は何もしない
+    }
+    
+    this.isLoggingOut = true; // ログアウト処理開始
+    
     try {
       // ログアウト前にすべてのリアルタイムリスナーを停止
       this.destroy$.next();
@@ -2012,6 +2031,7 @@ export class MainPage implements OnInit, OnDestroy {
       window.location.reload();
     } catch (error) {
       console.error('Logout error:', error);
+      this.isLoggingOut = false; // エラー時はローディング状態を解除
       // エラーが発生してもページをリロード
       window.location.reload();
     }
