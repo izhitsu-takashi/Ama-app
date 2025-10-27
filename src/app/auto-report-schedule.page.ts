@@ -945,7 +945,6 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
     // 現在のユーザーIDを取得
     const currentUser = this.authService.currentUser;
     if (currentUser) {
-      console.log('Loading schedules for user:', currentUser.uid);
       this.schedules$ = this.autoReportScheduleService.getUserSchedules(currentUser.uid).pipe(
         map(schedules => {
           // クライアント側でソート（作成日時の降順）
@@ -957,10 +956,8 @@ export class AutoReportSchedulePage implements OnInit, OnDestroy {
         })
       );
       this.schedules$.subscribe(schedules => {
-        console.log('Loaded schedules:', schedules);
+        // スケジュール読み込み完了
       });
-    } else {
-      console.log('No current user found');
     }
   }
 

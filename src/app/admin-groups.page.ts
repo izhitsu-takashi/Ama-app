@@ -125,7 +125,8 @@ import { takeUntil } from 'rxjs/operators';
                 <div class="members-list">
                   <div *ngFor="let memberId of group.memberIds" class="member-item">
                     <div class="member-avatar">
-                      <div class="avatar-circle">
+                      <img *ngIf="getUserPhotoURL(memberId)" [src]="getUserPhotoURL(memberId)" [alt]="getUserName(memberId)" class="avatar-image">
+                      <div *ngIf="!getUserPhotoURL(memberId)" class="avatar-circle">
                         {{ getUserInitials(memberId) }}
                       </div>
                     </div>
@@ -476,6 +477,13 @@ import { takeUntil } from 'rxjs/operators';
       font-size: 0.875rem;
     }
 
+    .avatar-image {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
     .member-info {
       flex: 1;
       display: flex;
@@ -621,6 +629,11 @@ export class AdminGroupsPage implements OnInit, OnDestroy {
   getUserName(userId: string): string {
     const user = this.allUsers.find(user => user.id === userId);
     return user ? (user.displayName || user.email) : '不明';
+  }
+
+  getUserPhotoURL(userId: string): string | null {
+    const user = this.allUsers.find(user => user.id === userId);
+    return user?.photoURL || null;
   }
 
   getUserInitials(userId: string): string {

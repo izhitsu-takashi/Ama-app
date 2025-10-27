@@ -70,7 +70,8 @@ import { takeUntil } from 'rxjs/operators';
             <div *ngFor="let user of filteredUsers" class="user-card">
               <div class="user-header">
                 <div class="user-avatar">
-                  <div class="avatar-circle">
+                  <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || 'ユーザー'" class="avatar-image">
+                  <div *ngIf="!user.photoURL" class="avatar-circle">
                     {{ getUserInitials(user) }}
                   </div>
                 </div>
@@ -330,6 +331,13 @@ import { takeUntil } from 'rxjs/operators';
       justify-content: center;
       font-weight: 600;
       font-size: 1.25rem;
+    }
+
+    .avatar-image {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      object-fit: cover;
     }
 
     .user-info {

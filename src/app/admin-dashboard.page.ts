@@ -89,7 +89,8 @@ import { map, takeUntil } from 'rxjs/operators';
             </div>
             <div *ngFor="let user of recentUsers" class="activity-item">
               <div class="activity-avatar">
-                <div class="avatar-circle">
+                <img *ngIf="user.photoURL" [src]="user.photoURL" [alt]="user.displayName || 'ユーザー'" class="avatar-image">
+                <div *ngIf="!user.photoURL" class="avatar-circle">
                   {{ getUserInitials(user) }}
                 </div>
               </div>
@@ -323,6 +324,13 @@ import { map, takeUntil } from 'rxjs/operators';
       justify-content: center;
       font-weight: 600;
       font-size: 0.875rem;
+    }
+
+    .avatar-image {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
     }
 
     .activity-content {
