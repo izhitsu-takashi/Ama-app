@@ -163,40 +163,44 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
   styles: [`
     .page-container {
       min-height: 100vh;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      padding: 20px;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      padding: 2rem;
     }
 
     .page-header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 1rem 2rem;
+      border-radius: 1rem;
+      margin-bottom: 2rem;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 30px;
-      background: white;
-      border-radius: 16px;
-      padding: 24px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      position: relative;
     }
 
     .back-btn {
+      position: absolute;
+      left: 2rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(102, 126, 234, 0.1);
+      border: 2px solid rgba(102, 126, 234, 0.3);
+      color: #667eea;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
       display: flex;
       align-items: center;
-      gap: 8px;
-      background: #f8f9fa;
-      border: 2px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 12px 16px;
-      color: #4a5568;
-      text-decoration: none;
-      font-weight: 600;
-      transition: all 0.2s ease;
-      cursor: pointer;
+      gap: 0.5rem;
     }
 
     .back-btn:hover {
-      border-color: #667eea;
-      color: #667eea;
-      transform: translateY(-1px);
+      background: rgba(102, 126, 234, 0.2);
+      transform: translateY(-50%) scale(1.05);
     }
 
     .back-icon {
@@ -206,8 +210,10 @@ import { takeUntil, switchMap, take } from 'rxjs/operators';
     .page-title {
       margin: 0;
       color: #2d3748;
-      font-size: 28px;
+      font-size: 1.8rem;
       font-weight: 700;
+      text-align: center;
+      flex: 1;
     }
 
     .header-actions {

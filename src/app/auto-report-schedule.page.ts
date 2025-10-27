@@ -229,7 +229,7 @@ import { AutoReportSchedule, Group, User } from './models';
   styles: [`
     .container {
       min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
       padding: 2rem;
       overflow-x: hidden;
       box-sizing: border-box;
@@ -260,13 +260,15 @@ import { AutoReportSchedule, Group, User } from './models';
       font-size: 14px;
       font-weight: 500;
       transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .back-btn:hover {
       background: rgba(102, 126, 234, 0.2);
       transform: translateY(-50%) scale(1.05);
     }
-
 
     .header h1 {
       color: #2d3748;

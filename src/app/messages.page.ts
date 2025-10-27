@@ -155,45 +155,55 @@ import { AuthService } from './auth.service';
   styles: [`
     .container {
       min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 1rem;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      padding: 2rem;
     }
 
     .header {
-      text-align: center;
-      color: white;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 1rem 2rem;
+      border-radius: 1rem;
       margin-bottom: 2rem;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       position: relative;
     }
 
     .back-btn {
       position: absolute;
-      left: 0;
-      top: 0;
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 20px;
+      left: 2rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(102, 126, 234, 0.1);
+      border: 2px solid rgba(102, 126, 234, 0.3);
+      color: #667eea;
+      padding: 8px 16px;
+      border-radius: 8px;
       cursor: pointer;
-      font-size: 0.9rem;
+      font-size: 14px;
+      font-weight: 500;
       transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .back-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
-      transform: translateY(-1px);
+      background: rgba(102, 126, 234, 0.2);
+      transform: translateY(-50%) scale(1.05);
     }
 
     .header h1 {
-      font-size: 2.5rem;
+      font-size: 1.8rem;
       margin: 0 0 0.5rem 0;
       font-weight: 700;
+      color: #2d3748;
     }
 
     .header p {
-      font-size: 1.1rem;
-      opacity: 0.9;
+      font-size: 1rem;
+      color: #718096;
       margin: 0;
     }
 
@@ -207,17 +217,28 @@ import { AuthService } from './auth.service';
       justify-content: space-between;
       align-items: center;
       margin-bottom: 1.5rem;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.95);
       padding: 1rem 1.5rem;
       border-radius: 12px;
       backdrop-filter: blur(10px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
 
     .chat-header h2 {
       margin: 0;
-      color: white;
+      color: #2d3748;
       font-size: 1.5rem;
       font-weight: 600;
+    }
+
+    .total-unread-badge {
+      background: #ef4444;
+      color: white;
+      padding: 0.25rem 0.5rem;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
     }
 
     .new-chat-btn {

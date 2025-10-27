@@ -198,7 +198,7 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
   styles: [`
     .page-container {
       min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
       padding: 2rem;
     }
 
@@ -210,26 +210,32 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
       margin-bottom: 2rem;
       display: flex;
       align-items: center;
-      gap: 1rem;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      position: relative;
     }
 
     .back-btn {
-      background: none;
-      border: none;
+      position: absolute;
+      left: 2rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(102, 126, 234, 0.1);
+      border: 2px solid rgba(102, 126, 234, 0.3);
       color: #667eea;
-      font-size: 1rem;
+      padding: 8px 16px;
+      border-radius: 8px;
       cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      transition: background-color 0.2s;
     }
 
     .back-btn:hover {
-      background-color: rgba(102, 126, 234, 0.1);
+      background: rgba(102, 126, 234, 0.2);
+      transform: translateY(-50%) scale(1.05);
     }
 
     .page-title {
@@ -237,6 +243,8 @@ import { takeUntil, take, switchMap } from 'rxjs/operators';
       font-size: 1.8rem;
       font-weight: 700;
       color: #2d3748;
+      text-align: center;
+      flex: 1;
     }
 
     .form-container {

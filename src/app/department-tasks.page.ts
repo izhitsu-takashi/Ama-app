@@ -125,37 +125,54 @@ interface DepartmentTask {
   `,
   styles: [`
     .container {
-      max-width: 1200px;
-      margin: 0 auto;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
       padding: 2rem;
     }
 
     .header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 1rem 2rem;
+      border-radius: 1rem;
+      margin-bottom: 2rem;
       display: flex;
       align-items: center;
-      gap: 1rem;
-      margin-bottom: 2rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      position: relative;
     }
 
     .back-btn {
-      background: #667eea;
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.5rem;
-      font-size: 1rem;
+      position: absolute;
+      left: 2rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(102, 126, 234, 0.1);
+      border: 2px solid rgba(102, 126, 234, 0.3);
+      color: #667eea;
+      padding: 8px 16px;
+      border-radius: 8px;
       cursor: pointer;
-      transition: background 0.2s;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .back-btn:hover {
-      background: #5a67d8;
+      background: rgba(102, 126, 234, 0.2);
+      transform: translateY(-50%) scale(1.05);
     }
 
     .header h1 {
-      font-size: 2.5rem;
+      font-size: 1.8rem;
+      font-weight: 700;
       color: #2d3748;
       margin: 0;
+      text-align: center;
+      flex: 1;
     }
 
     .content {

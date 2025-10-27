@@ -346,15 +346,19 @@ interface UserGroup {
   styles: [`
     .container {
       min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
       padding: 2rem;
       box-sizing: border-box;
     }
 
     .header {
-      text-align: center;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 1rem 2rem;
+      border-radius: 1rem;
       margin-bottom: 2rem;
-      color: white;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       position: relative;
     }
 
@@ -363,31 +367,35 @@ interface UserGroup {
       left: 2rem;
       top: 50%;
       transform: translateY(-50%);
-      background: rgba(255, 255, 255, 0.1);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      color: white;
+      background: rgba(102, 126, 234, 0.1);
+      border: 2px solid rgba(102, 126, 234, 0.3);
+      color: #667eea;
       padding: 8px 16px;
       border-radius: 8px;
       cursor: pointer;
       font-size: 14px;
       font-weight: 500;
       transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .back-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(102, 126, 234, 0.2);
       transform: translateY(-50%) scale(1.05);
     }
 
     .header h1 {
-      font-size: 2.5rem;
+      font-size: 1.8rem;
       margin: 0 0 0.5rem 0;
       font-weight: 700;
+      color: #2d3748;
     }
 
     .header p {
-      font-size: 1.1rem;
-      opacity: 0.9;
+      font-size: 1rem;
+      color: #718096;
       margin: 0;
     }
 
